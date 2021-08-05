@@ -6,7 +6,6 @@ import com.intellij.openapi.ui.DialogWrapper;
 import com.mzyupc.aredis.persistence.PropertyUtil;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import org.jetbrains.annotations.Nullable;
-import redis.clients.jedis.Jedis;
 
 import javax.swing.*;
 import java.awt.*;
@@ -17,13 +16,13 @@ import java.awt.event.MouseEvent;
  * @author mzyupc@163.com
  * @date 2021/8/4 4:33 下午
  */
-public class NewConnectionSettingsDialog extends DialogWrapper {
+public class ConnectionSettingsDialog extends DialogWrapper {
 
     private Project project;
     private PropertiesComponent properties;
     private String connectionId;
 
-    public NewConnectionSettingsDialog(@Nullable Project project, String connectionId) {
+    public ConnectionSettingsDialog(@Nullable Project project, String connectionId) {
         super(project);
         this.project = project;
         properties = PropertiesComponent.getInstance(project);

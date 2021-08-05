@@ -2,17 +2,10 @@ package com.mzyupc.aredis.window;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.wm.ToolWindow;
-import com.intellij.ui.JBColor;
-import com.mzyupc.aredis.dialog.NewConnectionSettingsDialog;
-import com.mzyupc.aredis.persistence.PropertyUtil;
-import org.jetbrains.annotations.Nullable;
+import com.mzyupc.aredis.dialog.ConnectionSettingsDialog;
 
 import javax.swing.*;
-import javax.swing.event.AncestorEvent;
-import javax.swing.event.AncestorListener;
-import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 
@@ -49,8 +42,8 @@ public class ARedisToolWindow {
             @Override
             public void mouseClicked(MouseEvent e) {
                 // todo 弹出连接配置窗口
-                NewConnectionSettingsDialog newConnectionSettingsDialog = new NewConnectionSettingsDialog(project, null);
-                newConnectionSettingsDialog.show();
+                ConnectionSettingsDialog connectionSettingsDialog = new ConnectionSettingsDialog(project, null);
+                connectionSettingsDialog.show();
             }
         });
 

@@ -16,7 +16,7 @@
                     factoryClass="com.mzyupc.aredis.MyToolWindowFactory"/>
 
         <toolWindow factoryClass="com.mzyupc.aredis.factory.ARedisToolWindowFactory" id="A-Redis" secondary="true"
-                    icon="AllIcons.Actions.Preview" anchor="right"/>
+                    icon="AllIcons.Debugger.Db_db_object" anchor="right"/>
     </extensions>
 
     <actions>
