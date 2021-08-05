@@ -1,0 +1,25 @@
+<idea-plugin>
+    <id>com.mzyupc.a-redis</id>
+    <name>A-Redis</name>
+    <vendor email="mzyupc@163.com" url="http://www.github.com/MattMin">MattMin</vendor>
+
+    <description><![CDATA[
+    an idea redis desktop manage plugin..................
+    ]]></description>
+
+    <!-- please see https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html
+         on how to target different products -->
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="Sample Calendar" secondary="true" icon="AllIcons.General.Modified" anchor="right"
+                    factoryClass="com.mzyupc.aredis.MyToolWindowFactory"/>
+
+        <toolWindow factoryClass="com.mzyupc.aredis.factory.ARedisToolWindowFactory" id="A-Redis" secondary="true"
+                    icon="AllIcons.Actions.Preview" anchor="right"/>
+    </extensions>
+
+    <actions>
+        <!-- Add your actions here -->
+    </actions>
+</idea-plugin>
