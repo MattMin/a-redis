@@ -6,6 +6,7 @@ import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.ui.JBColor;
 import com.mzyupc.aredis.dialog.NewConnectionSettingsDialog;
+import com.mzyupc.aredis.persistence.PropertyUtil;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
@@ -29,6 +30,7 @@ public class ARedisToolWindow {
     public ARedisToolWindow(Project project, ToolWindow toolWindow){
         this.project = project;
         initARedisToolBar();
+        initConnections();
     }
 
     public JPanel getContent(){
@@ -40,51 +42,24 @@ public class ARedisToolWindow {
      */
     private void initARedisToolBar() {
 
-//        JLabel addLabel = new JLabel(AllIcons.General.Add);
-//        addLabel.setToolTipText("Connect to Redis Server");
-
         JButton addButtun = new JButton(AllIcons.General.Add);
         addButtun.setContentAreaFilled(false);
         addButtun.setBorderPainted(false);
-//        addButtun.setPreferredSize(new Dimension(30, 30));
         addButtun.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
                 // todo 弹出连接配置窗口
-                NewConnectionSettingsDialog newConnectionSettingsDialog = new NewConnectionSettingsDialog(project);
+                NewConnectionSettingsDialog newConnectionSettingsDialog = new NewConnectionSettingsDialog(project, null);
                 newConnectionSettingsDialog.show();
             }
         });
 
-//        aRedisToolBar.add(addLabel);
         aRedisToolBar.add(addButtun);
         aRedisToolBar.setFloatable(false);
     }
 
-    /**
-     * 弹出新建连接对话框
-     */
-    private void popupNewConnectionSettings() {
-        DialogWrapper dialogWrapper = new DialogWrapper(project) {
-            @Override
-            protected void init() {
-                super.init();
-            }
-
-            @Override
-            protected @Nullable JComponent createCenterPanel() {
-                JPanel connectionSettingsPanel = new JPanel();
-
-                JTextField urlField = new JTextField();
-                JTextField passwordField = new JPasswordField();
-
-                connectionSettingsPanel.add(urlField);
-                connectionSettingsPanel.add(passwordField);
-                return connectionSettingsPanel;
-            }
-        };
-
-        dialogWrapper.setTitle("New Connection Settings");
-        dialogWrapper.show();
+    private void initConnections() {
+        //todo 初始化连接
     }
+
 }
