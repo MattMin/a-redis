@@ -22,4 +22,9 @@ public class ConnectionInfo {
     private String port;
 
     private String password;
+
+    @Override
+    public String toString() {
+        return this.name;
+    }
 }

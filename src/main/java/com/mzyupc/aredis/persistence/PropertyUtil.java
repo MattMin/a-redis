@@ -5,7 +5,6 @@ import com.google.common.collect.Lists;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.project.Project;
 import com.mzyupc.aredis.vo.ConnectionInfo;
-import com.mzyupc.aredis.vo.ConnectionListItem;
 import org.apache.commons.lang.StringUtils;
 
 import java.util.ArrayList;
@@ -42,7 +41,7 @@ public class PropertyUtil {
      *
      * @return 连接列表元素
      */
-    public List<ConnectionListItem> getConnections() {
+    public List<ConnectionInfo> getConnections() {
         String[] ids = properties.getValues(CONNECTION_ID_LIST_KEY);
         if (ids == null || ids.length == 0) {
             return Lists.newArrayList();
@@ -50,7 +49,7 @@ public class PropertyUtil {
 
         return Arrays.stream(ids).map(id -> {
             String connection = properties.getValue(id);
-            return JSON.parseObject(connection, ConnectionListItem.class);
+            return JSON.parseObject(connection, ConnectionInfo.class);
         }).collect(Collectors.toList());
     }
 
@@ -65,7 +64,17 @@ public class PropertyUtil {
         }
 
         String id = UUID.randomUUID().toString();
+        connectionInfo.setId(id);
         properties.setValue(id, JSON.toJSONString(connectionInfo));
+
+        String[] ids = properties.getValues(CONNECTION_ID_LIST_KEY);
+        if (ids == null || ids.length == 0) {
+            properties.setValues(CONNECTION_ID_LIST_KEY, new String[]{id});
+        } else {
+            ArrayList<String> idList = Lists.newArrayList(ids);
+            idList.add(id);
+            properties.setValues(CONNECTION_ID_LIST_KEY, idList.toArray(new String[]{}));
+        }
         return id;
     }
 
