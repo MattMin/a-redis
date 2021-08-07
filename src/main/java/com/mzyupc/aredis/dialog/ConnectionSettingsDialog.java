@@ -41,7 +41,7 @@ public class ConnectionSettingsDialog extends DialogWrapper {
         this.connectionPanel = connectionPanel;
         this.connectionRedisMap = connectionRedisMap;
         this.setTitle("New Connection Settings");
-        this.setSize(750, 500);
+        this.setSize(500, 500);
         this.init();
     }
 
