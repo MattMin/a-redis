@@ -5,13 +5,16 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindow;
 import com.mzyupc.aredis.dialog.ConnectionSettingsDialog;
 import com.mzyupc.aredis.utils.PropertyUtil;
+import com.mzyupc.aredis.utils.RedisPoolMgr;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import lombok.Getter;
 
 import javax.swing.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static com.mzyupc.aredis.utils.ConnectionListUtil.addConnectionToList;
 
@@ -26,10 +29,13 @@ public class ARedisToolWindow {
     private JToolBar aRedisToolBar;
     private JPanel connectionPanel;
     private PropertyUtil propertyUtil;
+    // 连接id对应的redis连接
+    private Map<String, RedisPoolMgr> connectionRedisMap;
 
     public ARedisToolWindow(Project project, ToolWindow toolWindow){
         this.project = project;
         this.propertyUtil = PropertyUtil.getInstance(project);
+        connectionRedisMap = new HashMap<>();
         initARedisToolBar();
         initConnections();
     }
@@ -50,7 +56,7 @@ public class ARedisToolWindow {
             @Override
             public void mouseClicked(MouseEvent e) {
                 // todo 弹出连接配置窗口
-                ConnectionSettingsDialog connectionSettingsDialog = new ConnectionSettingsDialog(project, null, connectionPanel);
+                ConnectionSettingsDialog connectionSettingsDialog = new ConnectionSettingsDialog(project, null, connectionPanel, connectionRedisMap);
                 connectionSettingsDialog.show();
             }
         });
@@ -66,7 +72,7 @@ public class ARedisToolWindow {
         List<ConnectionInfo> connections = propertyUtil.getConnections();
 //        DefaultListModel<Tree> treeList = new DefaultListModel<>();
         for (ConnectionInfo connection : connections) {
-            addConnectionToList(this.connectionPanel, connection);
+            addConnectionToList(this.connectionPanel, connection, connectionRedisMap);
         }
     }
 

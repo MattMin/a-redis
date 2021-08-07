@@ -6,6 +6,7 @@ import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.mzyupc.aredis.utils.ConnectionListUtil;
 import com.mzyupc.aredis.utils.PropertyUtil;
+import com.mzyupc.aredis.utils.RedisPoolMgr;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import org.apache.commons.lang.StringUtils;
 import org.jetbrains.annotations.NotNull;
@@ -16,6 +17,7 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.Map;
 
 /**
  * @author mzyupc@163.com
@@ -26,17 +28,19 @@ public class ConnectionSettingsDialog extends DialogWrapper {
     private String connectionId;
     private  CustomOKAction okAction;
     private JPanel connectionPanel;
+    private Map<String, RedisPoolMgr> connectionRedisMap;
 
     JTextField nameTextField;
     JTextField urlField;
     JTextField portField;
     JTextField passwordField;
 
-    public ConnectionSettingsDialog(Project project, String connectionId, JPanel connectionPanel) {
+    public ConnectionSettingsDialog(Project project, String connectionId, JPanel connectionPanel, Map<String, RedisPoolMgr> connectionRedisMap) {
         super(project);
         this.propertyUtil = PropertyUtil.getInstance(project);
         this.connectionId = connectionId;
         this.connectionPanel = connectionPanel;
+        this.connectionRedisMap = connectionRedisMap;
         this.setTitle("New Connection Settings");
         this.setSize(500, 500);
         this.init();
@@ -60,7 +64,7 @@ public class ConnectionSettingsDialog extends DialogWrapper {
         boolean newConnection = connection == null;
 
         // TODO 参数校验, 输入框下面展示提示
-        nameTextField = new JTextField(newConnection ? "" : connection.getName());
+        nameTextField = new JTextField(newConnection ? null : connection.getName());
         nameTextField.setToolTipText("Connection Name");
         nameTextField.setPreferredSize(new Dimension(300, 30));
         JPanel row0 = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -68,10 +72,10 @@ public class ConnectionSettingsDialog extends DialogWrapper {
         row0.add(nameTextField);
 
         // url port 输入框
-        urlField = new JTextField(newConnection ? "" : connection.getUrl());
+        urlField = new JTextField(newConnection ? null : connection.getUrl());
         urlField.setToolTipText("Url");
         urlField.setPreferredSize(new Dimension(300, 30));
-        portField = new JTextField(newConnection ? "" : connection.getPort());
+        portField = new JTextField(newConnection ? null : connection.getPort());
         portField.setPreferredSize(new Dimension(100, 30));
         portField.setToolTipText("Port");
         JPanel row1 = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -139,17 +143,22 @@ public class ConnectionSettingsDialog extends DialogWrapper {
                 Messages.showMessageDialog(validationInfo.message,"Verification Failed", Messages.getInformationIcon());
             } else {
                 // 保存connection
+                String password = null;
+                if (StringUtils.isNotBlank(passwordField.getText())) {
+                    password = passwordField.getText();
+                }
+
                 ConnectionInfo connectionInfo = ConnectionInfo.builder()
                         .name(nameTextField.getText())
                         .url(urlField.getText())
                         .port(portField.getText())
                         // TODO 持久化敏感数据
-                        .password(passwordField.getText())
+                        .password(password)
                         .build();
                 propertyUtil.saveConnection(connectionInfo);
 
                 // connection列表中添加节点
-                ConnectionListUtil.addConnectionToList(connectionPanel, connectionInfo);
+                ConnectionListUtil.addConnectionToList(connectionPanel, connectionInfo, connectionRedisMap);
 
                 close(CANCEL_EXIT_CODE);
             }

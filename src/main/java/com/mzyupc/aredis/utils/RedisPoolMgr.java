@@ -1,5 +1,6 @@
 package com.mzyupc.aredis.utils;
 
+import com.mzyupc.aredis.vo.ConnectionInfo;
 import redis.clients.jedis.*;
 
 import java.io.*;
@@ -12,22 +13,24 @@ import java.util.Set;
 /**
  * @author mzyupc@163.com
  */
-public class RedisUtil extends CloseTranscoder{
+public class RedisPoolMgr extends CloseTranscoder{
 
     private String host;
     private Integer port;
     private String password;
     private Integer db;
+    private JedisPool pool = null;
 
-    public RedisUtil(String host, Integer port, String password, Integer db) {
-        this.host = host;
-        this.port = port;
-        this.password = password;
-        this.db = db;
-        instancePool();
+    public RedisPoolMgr(ConnectionInfo connectionInfo) {
+        this.host = connectionInfo.getUrl();
+        this.port = Integer.parseInt(connectionInfo.getPort());
+        this.password = connectionInfo.getPassword();
+        this.db = Protocol.DEFAULT_DATABASE;
     }
 
-    private JedisPool pool = null;
+    public boolean isPoolActive() {
+        return pool != null;
+    }
 
     private JedisPool getJedisPool() {
         if (pool == null) {
@@ -137,29 +140,6 @@ public class RedisUtil extends CloseTranscoder{
     }
 
     /**
-     * 发布消息
-     *
-     * @param channel
-     * @param message
-     * @return
-     */
-    public Long publish(final String channel, final String message) {
-        return publish(channel, message, getDb());
-    }
-
-    public Long publish(final String channel, final String message, final int db) {
-        Jedis jedis = null;
-        try {
-            jedis = getJedis(db);
-            return jedis.publish(channel, message);
-        } catch (Exception e) {
-            throw new IllegalArgumentException(e);
-        } finally {
-            close(jedis);
-        }
-    }
-
-    /**
      * 如果key存在返回true，不存在返回false
      *
      * @param key
@@ -192,6 +172,36 @@ public class RedisUtil extends CloseTranscoder{
         try {
             jedis = getJedis(db);
             return jedis.get(key);
+        } finally {
+            close(jedis);
+        }
+    }
+
+    /**
+     * 查询有多少个db
+     * @return
+     */
+    public int getDbCount() {
+        Jedis jedis = null;
+        try {
+            jedis = getJedis(db);
+            return Integer.parseInt(jedis.configGet("databases").get(1));
+        } finally {
+            close(jedis);
+        }
+    }
+
+    /**
+     * 查询db有多少个key
+     *
+     * @param db
+     * @return
+     */
+    public Long dbSize(int db) {
+        Jedis jedis = null;
+        try {
+            jedis = getJedis(db);
+            return jedis.dbSize();
         } finally {
             close(jedis);
         }
