@@ -4,6 +4,7 @@ import com.intellij.icons.AllIcons;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindow;
 import com.mzyupc.aredis.dialog.ConnectionSettingsDialog;
+import com.mzyupc.aredis.dialog.RemoveConnectionDialog;
 import com.mzyupc.aredis.utils.PropertyUtil;
 import com.mzyupc.aredis.utils.RedisPoolMgr;
 import com.mzyupc.aredis.vo.ConnectionInfo;
@@ -49,19 +50,34 @@ public class ARedisToolWindow {
      */
     private void initARedisToolBar() {
 
+        // 添加连接的按钮
         JButton addButtun = new JButton(AllIcons.General.Add);
         addButtun.setContentAreaFilled(false);
         addButtun.setBorderPainted(false);
         addButtun.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                // todo 弹出连接配置窗口
+                // 弹出连接配置窗口
                 ConnectionSettingsDialog connectionSettingsDialog = new ConnectionSettingsDialog(project, null, connectionPanel, connectionRedisMap);
                 connectionSettingsDialog.show();
             }
         });
 
+        // 移除连接的按钮
+        JButton removeButton = new JButton(AllIcons.General.Remove);
+        removeButton.setContentAreaFilled(false);
+        removeButton.setBorderPainted(false);
+        removeButton.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                // 弹出删除确认对话框
+                RemoveConnectionDialog removeConnectionDialog = new RemoveConnectionDialog(project, connectionPanel, connectionRedisMap);
+                removeConnectionDialog.show();
+            }
+        });
+
         aRedisToolBar.add(addButtun);
+        aRedisToolBar.add(removeButton);
         aRedisToolBar.setFloatable(false);
     }
 

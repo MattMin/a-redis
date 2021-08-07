@@ -1,7 +1,12 @@
 package com.mzyupc.aredis.utils;
 
+
+import lombok.extern.slf4j.Slf4j;
+
 import java.io.Closeable;
 
+
+@Slf4j
 public class CloseTranscoder {
 
 	public static void close(Closeable closeable) {
@@ -9,7 +14,8 @@ public class CloseTranscoder {
 			try {
 				closeable.close();
 			} catch (Exception e) {
-				e.printStackTrace();
+				log.error("关闭资源失败", e);
+				throw new RuntimeException(e);
 			}
 		}
 	}

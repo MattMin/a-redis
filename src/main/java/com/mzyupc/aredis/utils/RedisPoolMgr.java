@@ -28,8 +28,20 @@ public class RedisPoolMgr extends CloseTranscoder{
         this.db = Protocol.DEFAULT_DATABASE;
     }
 
-    public boolean isPoolActive() {
+    /**
+     * 连接池是否实例化
+     *
+     * @return
+     */
+    public boolean isValidate() {
         return pool != null;
+    }
+
+    /**
+     * 关闭连接池
+     */
+    public void invalidate() {
+        close(this.pool);
     }
 
     private JedisPool getJedisPool() {

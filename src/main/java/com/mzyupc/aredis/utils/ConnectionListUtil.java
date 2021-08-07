@@ -19,6 +19,13 @@ import java.util.Map;
  */
 public class ConnectionListUtil {
 
+    /**
+     * 添加连接到connectionPanel
+     *
+     * @param connectionPanel
+     * @param connection
+     * @param connectionRedisMap
+     */
     public static void addConnectionToList(JPanel connectionPanel, ConnectionInfo connection, Map<String, RedisPoolMgr> connectionRedisMap) {
         DefaultMutableTreeNode root = new DefaultMutableTreeNode(connection, true);
 
@@ -53,8 +60,6 @@ public class ConnectionListUtil {
                     // 保存这个连接的redisPool
                     connectionRedisMap.put(connection.getId(), redisPoolMgr);
                 }
-
-
             }
 
             @Override
@@ -103,5 +108,63 @@ public class ConnectionListUtil {
         });
 
         connectionPanel.add(tree);
+    }
+
+    /**
+     * 移除选中的连接
+     *
+     * @param connectionPanel
+     * @param connectionRedisMap
+     * @param propertyUtil
+     */
+    public static void removeConnectionFromList(JPanel connectionPanel, Map<String, RedisPoolMgr> connectionRedisMap, PropertyUtil propertyUtil) {
+        // 从connectionPanel移除元素
+        ConnectionInfo connectionInfo = getSelectedConnectionAndRemove(connectionPanel);
+        if (connectionInfo == null) {
+            return;
+        }
+
+        // 关闭redis连接池
+        String connectionInfoId = connectionInfo.getId();
+        RedisPoolMgr redisPoolMgr = connectionRedisMap.get(connectionInfoId);
+        // 查询过DB才有
+        if (redisPoolMgr != null) {
+            redisPoolMgr.invalidate();
+        }
+
+        // 从connectionRedisMap中移除
+        connectionRedisMap.remove(connectionInfoId);
+
+        // 从properties中移除
+        propertyUtil.removeConnection(connectionInfoId);
+    }
+
+    /**
+     * 查询connectionPanel中选中的connectionInfo, 并删除选中的tree
+     *
+     * @param connectionPanel
+     * @return
+     */
+    private static ConnectionInfo getSelectedConnectionAndRemove(JPanel connectionPanel) {
+        // 查询选中的 connection
+        Component[] components = connectionPanel.getComponents();
+        for (Component component : components) {
+            if (component instanceof Tree) {
+                Tree connectionTree = (Tree) component;
+                boolean rowSelected = connectionTree.isRowSelected(0);
+                if (rowSelected) {
+                    DefaultMutableTreeNode[] selectedNodes = connectionTree.getSelectedNodes(
+                            DefaultMutableTreeNode.class,
+                            DefaultMutableTreeNode::isRoot
+                    );
+                    DefaultMutableTreeNode root = selectedNodes[0];
+                    // 移除选中的组件
+                    connectionPanel.remove(component);
+                    // 返回connectionInfo
+                    return (ConnectionInfo) root.getUserObject();
+                }
+            }
+        }
+        return null;
     }
 }

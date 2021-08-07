@@ -82,7 +82,7 @@ public class PropertyUtil {
      *
      * @param id 连接ID
      */
-    public void deleteConnection(String id) {
+    public void removeConnection(String id) {
         String[] ids = properties.getValues(CONNECTION_ID_LIST_KEY);
         if (ids == null || ids.length == 0) {
             return;
