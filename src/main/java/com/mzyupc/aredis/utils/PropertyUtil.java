@@ -1,4 +1,4 @@
-package com.mzyupc.aredis.persistence;
+package com.mzyupc.aredis.utils;
 
 import com.alibaba.fastjson.JSON;
 import com.google.common.collect.Lists;
@@ -15,7 +15,6 @@ import java.util.stream.Collectors;
 
 /**
  * @author mzyupc@163.com
- * @date 2021/8/5 4:21 下午
  */
 public class PropertyUtil {
     /**

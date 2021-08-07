@@ -3,22 +3,22 @@ package com.mzyupc.aredis.window;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindow;
-import com.intellij.ui.treeStructure.Tree;
 import com.mzyupc.aredis.dialog.ConnectionSettingsDialog;
-import com.mzyupc.aredis.persistence.PropertyUtil;
+import com.mzyupc.aredis.utils.PropertyUtil;
 import com.mzyupc.aredis.vo.ConnectionInfo;
+import lombok.Getter;
 
 import javax.swing.*;
-import javax.swing.tree.DefaultMutableTreeNode;
-import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.List;
 
+import static com.mzyupc.aredis.utils.ConnectionListUtil.addConnectionToList;
+
 /**
  * @author mzyupc@163.com
- * @date 2021/8/4 2:08 下午
  */
+@Getter
 public class ARedisToolWindow {
 
     private Project project;
@@ -50,7 +50,7 @@ public class ARedisToolWindow {
             @Override
             public void mouseClicked(MouseEvent e) {
                 // todo 弹出连接配置窗口
-                ConnectionSettingsDialog connectionSettingsDialog = new ConnectionSettingsDialog(project, null);
+                ConnectionSettingsDialog connectionSettingsDialog = new ConnectionSettingsDialog(project, null, connectionPanel);
                 connectionSettingsDialog.show();
             }
         });
@@ -59,23 +59,21 @@ public class ARedisToolWindow {
         aRedisToolBar.setFloatable(false);
     }
 
+    /**
+     * 初始化连接
+     */
     private void initConnections() {
-        //todo 初始化连接
         List<ConnectionInfo> connections = propertyUtil.getConnections();
+//        DefaultListModel<Tree> treeList = new DefaultListModel<>();
         for (ConnectionInfo connection : connections) {
-            DefaultMutableTreeNode root = new DefaultMutableTreeNode(connection, true);
-            Tree tree = new Tree(root);
-            root.add(new DefaultMutableTreeNode("节点1"));
-            root.add(new DefaultMutableTreeNode("节点2"));
-
-            JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT));
-            row.add(tree);
-            connectionPanel.add(row);
+            addConnectionToList(this.connectionPanel, connection);
         }
     }
 
     private void createUIComponents() {
         connectionPanel = new JPanel();
-        connectionPanel.setLayout(new GridLayout(10, 1));
+        // panel内的元素垂直布局
+        BoxLayout boxLayout = new BoxLayout(connectionPanel, BoxLayout.Y_AXIS);
+        connectionPanel.setLayout(boxLayout);
     }
 }

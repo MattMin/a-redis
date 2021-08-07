@@ -4,7 +4,8 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.ui.ValidationInfo;
-import com.mzyupc.aredis.persistence.PropertyUtil;
+import com.mzyupc.aredis.utils.ConnectionListUtil;
+import com.mzyupc.aredis.utils.PropertyUtil;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import org.apache.commons.lang.StringUtils;
 import org.jetbrains.annotations.NotNull;
@@ -18,28 +19,26 @@ import java.awt.event.MouseEvent;
 
 /**
  * @author mzyupc@163.com
- * @date 2021/8/4 4:33 下午
  */
 public class ConnectionSettingsDialog extends DialogWrapper {
 
-    private Project project;
     private PropertyUtil propertyUtil;
     private String connectionId;
     private  CustomOKAction okAction;
+    private JPanel connectionPanel;
 
     JTextField nameTextField;
     JTextField urlField;
     JTextField portField;
     JTextField passwordField;
 
-    public ConnectionSettingsDialog(@Nullable Project project, String connectionId) {
+    public ConnectionSettingsDialog(Project project, String connectionId, JPanel connectionPanel) {
         super(project);
-        this.project = project;
         this.propertyUtil = PropertyUtil.getInstance(project);
         this.connectionId = connectionId;
+        this.connectionPanel = connectionPanel;
         this.setTitle("New Connection Settings");
         this.setSize(500, 500);
-        Action myOKAction = this.myOKAction;
         this.init();
     }
 
@@ -140,14 +139,17 @@ public class ConnectionSettingsDialog extends DialogWrapper {
                 Messages.showMessageDialog(validationInfo.message,"Verification Failed", Messages.getInformationIcon());
             } else {
                 // 保存connection
-                propertyUtil.saveConnection(ConnectionInfo.builder()
+                ConnectionInfo connectionInfo = ConnectionInfo.builder()
                         .name(nameTextField.getText())
                         .url(urlField.getText())
                         .port(portField.getText())
                         // TODO 持久化敏感数据
                         .password(passwordField.getText())
-                        .build()
-                );
+                        .build();
+                propertyUtil.saveConnection(connectionInfo);
+
+                // connection列表中添加节点
+                ConnectionListUtil.addConnectionToList(connectionPanel, connectionInfo);
 
                 close(CANCEL_EXIT_CODE);
             }
