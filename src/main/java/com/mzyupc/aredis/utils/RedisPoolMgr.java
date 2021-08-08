@@ -2,8 +2,11 @@ package com.mzyupc.aredis.utils;
 
 import com.intellij.openapi.ui.Messages;
 import com.mzyupc.aredis.vo.ConnectionInfo;
+import lombok.Builder;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import redis.clients.jedis.*;
+import redis.clients.util.Pool;
 
 import java.io.*;
 import java.nio.charset.Charset;
@@ -23,6 +26,27 @@ public class RedisPoolMgr extends CloseTranscoder{
     private String password;
     private Integer db;
     private JedisPool pool = null;
+    private static JedisPoolConfig jedisPoolConfig;
+
+    static {
+        jedisPoolConfig = new JedisPoolConfig();
+        //连接耗尽时是否阻塞, false报异常,ture阻塞直到超时, 默认true
+        jedisPoolConfig.setBlockWhenExhausted(false);
+        //最大空闲连接数, 默认8个
+        jedisPoolConfig.setMaxIdle(10);
+        //最小空闲连接数, 默认0
+        jedisPoolConfig.setMinIdle(0);
+        //最大连接数, 默认8个
+        jedisPoolConfig.setMaxTotal(100);
+        //逐出连接的最小空闲时间 默认1800000毫秒(1分钟)
+        jedisPoolConfig.setMinEvictableIdleTimeMillis(60000);
+        //对象空闲多久后逐出, 当空闲时间>该值 且 空闲连接>最大空闲数 时直接逐出,不再根据MinEvictableIdleTimeMillis判断  (默认逐出策略)
+        jedisPoolConfig.setSoftMinEvictableIdleTimeMillis(60000);
+        //逐出扫描的时间间隔(毫秒) 如果为负数,则不运行逐出线程, 默认-1
+        jedisPoolConfig.setTimeBetweenEvictionRunsMillis(-1);
+        //检查链接是否有效
+        jedisPoolConfig.setTestOnBorrow(true);
+    }
 
     public RedisPoolMgr(ConnectionInfo connectionInfo) {
         this.host = connectionInfo.getUrl();
@@ -54,25 +78,38 @@ public class RedisPoolMgr extends CloseTranscoder{
         return pool;
     }
 
-    private synchronized void instancePool() {
-        JedisPoolConfig jedisPoolConfig = new JedisPoolConfig();
-        //连接耗尽时是否阻塞, false报异常,ture阻塞直到超时, 默认true
-        jedisPoolConfig.setBlockWhenExhausted(false);
-        //最大空闲连接数, 默认8个
-        jedisPoolConfig.setMaxIdle(10);
-        //最小空闲连接数, 默认0
-        jedisPoolConfig.setMinIdle(0);
-        //最大连接数, 默认8个
-        jedisPoolConfig.setMaxTotal(100);
-        //逐出连接的最小空闲时间 默认1800000毫秒(1分钟)
-        jedisPoolConfig.setMinEvictableIdleTimeMillis(60000);
-        //对象空闲多久后逐出, 当空闲时间>该值 且 空闲连接>最大空闲数 时直接逐出,不再根据MinEvictableIdleTimeMillis判断  (默认逐出策略)
-        jedisPoolConfig.setSoftMinEvictableIdleTimeMillis(60000);
-        //逐出扫描的时间间隔(毫秒) 如果为负数,则不运行逐出线程, 默认-1
-        jedisPoolConfig.setTimeBetweenEvictionRunsMillis(-1);
-        //检查链接是否有效
-        jedisPoolConfig.setTestOnBorrow(true);
+    public static TestConnectionResult getTestConnectionResult(String host, Integer port, String password) {
+        try (Pool<Jedis> pool = new JedisPool(jedisPoolConfig, host, port, Protocol.DEFAULT_TIMEOUT, password);
+             Jedis jedis = pool.getResource()) {
+            String pong = jedis.ping();
+            if ("PONG".equalsIgnoreCase(pong)) {
+                return TestConnectionResult.builder()
+                        .success(true)
+                        // todo
+                        .msg("Succeeded")
+                        .build();
+            }
+            return TestConnectionResult.builder()
+                    .success(false)
+                    .msg(pong)
+                    .build();
+        } catch (Exception e) {
+            return TestConnectionResult.builder()
+                    .success(false)
+                    .msg(e.getCause().getMessage())
+                    .build();
+        }
+    }
 
+    @Builder
+    @Getter
+    public static class TestConnectionResult {
+        private boolean success;
+
+        private String msg;
+    }
+
+    private synchronized void instancePool() {
 //            HashSet<String> sentinels = new HashSet<>(nodes);
 //            pool = new JedisSentinelPool(masterName, sentinels, jedisPoolConfig, Protocol.DEFAULT_TIMEOUT, password);
         try {

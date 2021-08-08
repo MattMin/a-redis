@@ -4,6 +4,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.ui.ValidationInfo;
+import com.intellij.ui.JBColor;
 import com.mzyupc.aredis.utils.ConnectionListUtil;
 import com.mzyupc.aredis.utils.PropertyUtil;
 import com.mzyupc.aredis.utils.RedisPoolMgr;
@@ -15,6 +16,7 @@ import org.jetbrains.annotations.Nullable;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.awt.event.ItemEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.Map;
@@ -27,7 +29,7 @@ public class ConnectionSettingsDialog extends DialogWrapper {
     JTextField nameTextField;
     JTextField hostField;
     JTextField portField;
-    JTextField passwordField;
+    JPasswordField passwordField;
     private PropertyUtil propertyUtil;
     private String connectionId;
     private CustomOKAction okAction;
@@ -41,7 +43,7 @@ public class ConnectionSettingsDialog extends DialogWrapper {
         this.connectionPanel = connectionPanel;
         this.connectionRedisMap = connectionRedisMap;
         this.setTitle("New Connection Settings");
-        this.setSize(500, 500);
+        this.setSize(600, 500);
         this.init();
     }
 
@@ -68,63 +70,88 @@ public class ConnectionSettingsDialog extends DialogWrapper {
         // url port 输入框
         hostField = new JTextField(newConnection ? null : connection.getUrl());
         hostField.setToolTipText("Host");
-
         portField = new JTextField(newConnection ? null : connection.getPort());
         portField.setToolTipText("Port");
 
         // password输入框
         passwordField = new JPasswordField();
 
+        // 显示密码
+        JCheckBox checkBox = new JCheckBox("显示密码");
+        checkBox.addItemListener(e -> {
+            if (e.getStateChange() == ItemEvent.SELECTED) {
+                passwordField.setEchoChar((char) 0);
+            } else {
+                passwordField.setEchoChar('*');
+            }
+        });
+        checkBox.setBounds(300, 81, 135, 27);
+
         // 测试连接按钮
         JButton testButton = new JButton("Test Connection");
+        JTextPane testResult = new JTextPane();
+        testResult.setMargin(new Insets(0, 10, 0, 0));
+        testResult.setOpaque(false);
+        testResult.setEditable(false);
+        testResult.setFocusable(false);
+        testResult.setAlignmentX(SwingConstants.LEFT);
+
         testButton.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                // todo 测试连接
-
+                ValidationInfo validationInfo = doValidate(true);
+                if (validationInfo != null) {
+                    Messages.showMessageDialog(validationInfo.message, "Verification Failed", Messages.getErrorIcon());
+                } else {
+                    String password = null;
+                    if (StringUtils.isNotBlank(new String(passwordField.getPassword()))) {
+                        password = new String(passwordField.getPassword());
+                    }
+                    RedisPoolMgr.TestConnectionResult testConnectionResult = RedisPoolMgr.getTestConnectionResult(hostField.getText(), Integer.parseInt(portField.getText()), password);
+                    testResult.setText(testConnectionResult.getMsg());
+                    if (testConnectionResult.isSuccess()) {
+                        testResult.setForeground(JBColor.GREEN);
+                    } else {
+                        testResult.setForeground(JBColor.RED);
+                    }
+                }
             }
         });
-        JLabel testResult = new JLabel();
 
-        JPanel connectionSettingsPanel = new JPanel();
-
+        // 使用 GridBagLayout 布局
         GridBagLayout gridBagLayout = new GridBagLayout();
         GridBagConstraints constraints = new GridBagConstraints();
-        //组件填充显示区域
         constraints.fill = GridBagConstraints.BOTH;
+        JPanel connectionSettingsPanel = new JPanel();
         connectionSettingsPanel.setLayout(gridBagLayout);
-
-
-        JLabel connnectionNameLabel = new JLabel("Connection Name:");
 
         constraints.gridx = 0;
         constraints.gridy = 0;
         constraints.gridwidth = 1;
         constraints.gridheight = 1;
         constraints.weightx = 0.15;
-        constraints.weighty = 0.25;
-        gridBagLayout.setConstraints(connnectionNameLabel, constraints);
+        constraints.weighty = 0.33;
+        JLabel connectionNameLabel = new JLabel("Connection Name:");
+        gridBagLayout.setConstraints(connectionNameLabel, constraints);
 
         constraints.gridx = 1;
         constraints.gridy = 0;
         constraints.gridwidth = 3;
         constraints.gridheight = 1;
         constraints.weightx = 0.85;
-        constraints.weighty = 0.25;
+        constraints.weighty = 0.33;
         gridBagLayout.setConstraints(nameTextField, constraints);
 
-        connectionSettingsPanel.add(connnectionNameLabel);
+        connectionSettingsPanel.add(connectionNameLabel);
         connectionSettingsPanel.add(nameTextField);
-
-
-        JLabel hostLabel = new JLabel("Host:");
 
         constraints.gridx = 0;
         constraints.gridy = 1;
         constraints.gridwidth = 1;
         constraints.gridheight = 1;
         constraints.weightx = 0.15;
-        constraints.weighty = 0.25;
+        constraints.weighty = 0.33;
+        JLabel hostLabel = new JLabel("Host:");
         gridBagLayout.setConstraints(hostLabel, constraints);
 
         constraints.gridx = 1;
@@ -132,17 +159,16 @@ public class ConnectionSettingsDialog extends DialogWrapper {
         constraints.gridwidth = 1;
         constraints.gridheight = 1;
         constraints.weightx = 0.55;
-        constraints.weighty = 0.25;
+        constraints.weighty = 0.33;
         gridBagLayout.setConstraints(hostField, constraints);
-
-        JLabel portLabel = new JLabel("Port:", SwingConstants.CENTER);
 
         constraints.gridx = 2;
         constraints.gridy = 1;
         constraints.gridwidth = 1;
         constraints.gridheight = 1;
         constraints.weightx = 0.15;
-        constraints.weighty = 0.25;
+        constraints.weighty = 0.33;
+        JLabel portLabel = new JLabel("Port:", SwingConstants.CENTER);
         gridBagLayout.setConstraints(portLabel, constraints);
 
         constraints.gridx = 3;
@@ -150,7 +176,7 @@ public class ConnectionSettingsDialog extends DialogWrapper {
         constraints.gridwidth = 1;
         constraints.gridheight = 1;
         constraints.weightx = 0.15;
-        constraints.weighty = 0.25;
+        constraints.weighty = 0.33;
         gridBagLayout.setConstraints(portField, constraints);
 
         connectionSettingsPanel.add(hostLabel);
@@ -158,49 +184,44 @@ public class ConnectionSettingsDialog extends DialogWrapper {
         connectionSettingsPanel.add(portLabel);
         connectionSettingsPanel.add(portField);
 
-
-        JLabel passwordLabel = new JLabel("Password:");
-
         constraints.gridx = 0;
         constraints.gridy = 2;
         constraints.gridwidth = 1;
         constraints.gridheight = 1;
         constraints.weightx = 0.15;
-        constraints.weighty = 0.25;
+        constraints.weighty = 0.33;
+        JLabel passwordLabel = new JLabel("Password:");
         gridBagLayout.setConstraints(passwordLabel, constraints);
 
         constraints.gridx = 1;
         constraints.gridy = 2;
-        constraints.gridwidth = 3;
+        constraints.gridwidth = 2;
         constraints.gridheight = 1;
-        constraints.weightx = 0.85;
-        constraints.weighty = 0.25;
+        constraints.weightx = 0.7;
+        constraints.weighty = 0.33;
         gridBagLayout.setConstraints(passwordField, constraints);
 
-        connectionSettingsPanel.add(passwordLabel);
-        connectionSettingsPanel.add(passwordField);
-
-        constraints.gridx = 0;
-        constraints.gridy = 3;
+        constraints.gridx = 3;
+        constraints.gridy = 2;
         constraints.gridwidth = 1;
         constraints.gridheight = 1;
         constraints.weightx = 0.15;
-        constraints.weighty = 0.25;
-        gridBagLayout.setConstraints(testButton, constraints);
+        constraints.weighty = 0.33;
+        gridBagLayout.setConstraints(checkBox, constraints);
 
-        constraints.gridx = 1;
-        constraints.gridy = 3;
-        constraints.gridwidth = 3;
-        constraints.gridheight = 1;
-        constraints.weightx = 0.85;
-        constraints.weighty = 0.25;
-        gridBagLayout.setConstraints(testResult, constraints);
+        connectionSettingsPanel.add(passwordLabel);
+        connectionSettingsPanel.add(passwordField);
+        connectionSettingsPanel.add(checkBox);
 
-        connectionSettingsPanel.add(testButton);
-        connectionSettingsPanel.add(testResult);
+        JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        row.add(testButton);
+        JPanel testConnectionSettingsPanel = new JPanel(new GridLayout(2, 1));
+        testConnectionSettingsPanel.add(row);
+        testConnectionSettingsPanel.add(testResult);
 
         JPanel centerPanel = new JPanel(new BorderLayout());
         centerPanel.add(connectionSettingsPanel, BorderLayout.NORTH);
+        centerPanel.add(testConnectionSettingsPanel, BorderLayout.SOUTH);
         return centerPanel;
     }
 
@@ -225,16 +246,21 @@ public class ConnectionSettingsDialog extends DialogWrapper {
      * @return 通过必须返回null，不通过返回一个 ValidationInfo 信息
      */
     @Nullable
-    @Override
-    protected ValidationInfo doValidate() {
-        if (StringUtils.isBlank(nameTextField.getText())) {
-            return new ValidationInfo("Name can not be empty");
+    protected ValidationInfo doValidate(boolean isTest) {
+        if (!isTest) {
+            if (StringUtils.isBlank(nameTextField.getText())) {
+                return new ValidationInfo("Connection Name can not be empty");
+            }
         }
         if (StringUtils.isBlank(hostField.getText())) {
-            return new ValidationInfo("Url can not be empty");
+            return new ValidationInfo("Host can not be empty");
         }
-        if (StringUtils.isBlank(portField.getText())) {
+        String port = portField.getText();
+        if (StringUtils.isBlank(port)) {
             return new ValidationInfo("Port can not be empty");
+        }
+        if (!StringUtils.isNumeric(port)) {
+            return new ValidationInfo("Port must be in digital form");
         }
         return null;
     }
@@ -251,14 +277,14 @@ public class ConnectionSettingsDialog extends DialogWrapper {
         @Override
         protected void doAction(ActionEvent e) {
             // 点击ok的时候进行数据校验
-            ValidationInfo validationInfo = doValidate();
+            ValidationInfo validationInfo = doValidate(false);
             if (validationInfo != null) {
                 Messages.showMessageDialog(validationInfo.message, "Verification Failed", Messages.getInformationIcon());
             } else {
                 // 保存connection
                 String password = null;
-                if (StringUtils.isNotBlank(passwordField.getText())) {
-                    password = passwordField.getText();
+                if (StringUtils.isNotBlank(new String(passwordField.getPassword()))) {
+                    password = new String(passwordField.getPassword());
                 }
 
                 ConnectionInfo connectionInfo = ConnectionInfo.builder()
