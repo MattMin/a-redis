@@ -5,6 +5,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindow;
 import com.mzyupc.aredis.dialog.ConnectionSettingsDialog;
 import com.mzyupc.aredis.dialog.RemoveConnectionDialog;
+import com.mzyupc.aredis.layout.VFlowLayout;
 import com.mzyupc.aredis.utils.PropertyUtil;
 import com.mzyupc.aredis.utils.RedisPoolMgr;
 import com.mzyupc.aredis.vo.ConnectionInfo;
@@ -92,10 +93,13 @@ public class ARedisToolWindow {
         }
     }
 
+    /**
+     * 自定义初始化UI组件
+     */
     private void createUIComponents() {
         connectionPanel = new JPanel();
         // panel内的元素垂直布局
-        BoxLayout boxLayout = new BoxLayout(connectionPanel, BoxLayout.Y_AXIS);
-        connectionPanel.setLayout(boxLayout);
+//        BoxLayout boxLayout = new BoxLayout(connectionPanel, BoxLayout.Y_AXIS);
+        connectionPanel.setLayout(new VFlowLayout());
     }
 }

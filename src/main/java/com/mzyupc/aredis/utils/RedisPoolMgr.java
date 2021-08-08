@@ -1,6 +1,8 @@
 package com.mzyupc.aredis.utils;
 
+import com.intellij.openapi.ui.Messages;
 import com.mzyupc.aredis.vo.ConnectionInfo;
+import lombok.extern.slf4j.Slf4j;
 import redis.clients.jedis.*;
 
 import java.io.*;
@@ -13,6 +15,7 @@ import java.util.Set;
 /**
  * @author mzyupc@163.com
  */
+@Slf4j
 public class RedisPoolMgr extends CloseTranscoder{
 
     private String host;
@@ -72,8 +75,15 @@ public class RedisPoolMgr extends CloseTranscoder{
 
 //            HashSet<String> sentinels = new HashSet<>(nodes);
 //            pool = new JedisSentinelPool(masterName, sentinels, jedisPoolConfig, Protocol.DEFAULT_TIMEOUT, password);
-
-        pool = new JedisPool(jedisPoolConfig, host, port, Protocol.DEFAULT_TIMEOUT, password);
+        try {
+            pool = new JedisPool(jedisPoolConfig, host, port, Protocol.DEFAULT_TIMEOUT, password);
+        } catch (Exception e) {
+            log.error("初始化redis pool失败", e);
+            Messages.showMessageDialog(
+                    "Failed to initialize the Redis pool." + "\n" + e.getMessage(),
+                    "Error",
+                    Messages.getInformationIcon());
+        }
     }
 
 
@@ -139,16 +149,21 @@ public class RedisPoolMgr extends CloseTranscoder{
      *
      * @return
      */
-    public Jedis getJedis() {
-        return getJedis(getDb());
-    }
-
     public Jedis getJedis(int db) {
-        Jedis resource = getJedisPool().getResource();
-        if (db != Protocol.DEFAULT_DATABASE) {
-            resource.select(db);
+        try {
+            Jedis resource = getJedisPool().getResource();
+            if (db != Protocol.DEFAULT_DATABASE) {
+                resource.select(db);
+            }
+            return resource;
+        } catch (Exception e) {
+            log.warn("Failed to get resource from the pool", e);
+            Messages.showMessageDialog(
+                    e.getCause().getMessage(),
+                    "Error",
+                    Messages.getInformationIcon());
         }
-        return resource;
+        return null;
     }
 
     /**
@@ -198,6 +213,9 @@ public class RedisPoolMgr extends CloseTranscoder{
         try {
             jedis = getJedis(db);
             return Integer.parseInt(jedis.configGet("databases").get(1));
+        } catch (NullPointerException e) {
+            log.warn("", e);
+            return 0;
         } finally {
             close(jedis);
         }
