@@ -3,168 +3,160 @@ package com.mzyupc.aredis.utils;
 import com.intellij.ui.treeStructure.Tree;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import com.mzyupc.aredis.vo.RedisDbInfo;
+import org.apache.commons.collections.CollectionUtils;
+import org.jetbrains.annotations.Nullable;
 
-import javax.swing.*;
-import javax.swing.event.TreeExpansionEvent;
-import javax.swing.event.TreeExpansionListener;
 import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
-import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.util.Map;
+import java.util.*;
 
 /**
  * @author mzyupc@163.com
  */
 public class ConnectionListUtil {
+    /**
+     * 激活的连接的个数
+     */
+    public static boolean isConnected = false;
+
+    /**
+     * 连接id对应的redis连接
+     */
+    public static Map<String, RedisPoolMgr> connectionRedisMap = new HashMap<>();
 
     /**
      * 添加连接到connectionPanel
      *
-     * @param connectionPanel
+     * @param treeModel
      * @param connection
-     * @param connectionRedisMap
      */
-    public static void addConnectionToList(JPanel connectionPanel, ConnectionInfo connection, Map<String, RedisPoolMgr> connectionRedisMap) {
-        DefaultMutableTreeNode root = new DefaultMutableTreeNode(connection, true);
+    public static void addConnectionToList(DefaultTreeModel treeModel, ConnectionInfo connection) {
+        DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
+        root.add(new DefaultMutableTreeNode(connection));
 
-        Tree tree = new Tree(root);
-        // tree左对齐
-        tree.setAlignmentX(Component.LEFT_ALIGNMENT);
+        // 保存这个连接的redisPool
+        RedisPoolMgr redisPoolMgr = new RedisPoolMgr(connection);
+        connectionRedisMap.put(connection.getId(), redisPoolMgr);
 
-        tree.addTreeExpansionListener(new TreeExpansionListener() {
+        treeModel.reload();
+    }
 
-            /**
-             * tree 展开事件
-             * @param event
-             */
-            @Override
-            public void treeExpanded(TreeExpansionEvent event) {
+    /**
+     * 添加DB子节点到connection节点下面
+     *
+     * @param connectionNode
+     */
+    public static void addDbs2Connection(DefaultMutableTreeNode connectionNode) {
+        ConnectionInfo connection = (ConnectionInfo) connectionNode.getUserObject();
+        RedisPoolMgr redisPoolMgr = connectionRedisMap.get(connection.getId());
+        int dbCount = redisPoolMgr.getDbCount();
 
-                // 如果根节点没有子节点, 则查询DB
-                if (root.getChildCount() == 0) {
-                    RedisPoolMgr redisPoolMgr = new RedisPoolMgr(connection);
-                    int dbCount = redisPoolMgr.getDbCount();
+        // 创建db列表
+        for (int i = 0; i < dbCount; i++) {
+            Long keyCount = redisPoolMgr.dbSize(i);
+            RedisDbInfo dbInfo = RedisDbInfo.builder()
+                    .index(i)
+                    .keyCount(keyCount)
+                    .build();
+            connectionNode.add(new DefaultMutableTreeNode(dbInfo, false));
+        }
+    }
 
-                    // 创建db列表
-                    for (int i = 0; i < dbCount; i++) {
-                        Long keyCount = redisPoolMgr.dbSize(i);
-                        RedisDbInfo dbInfo = RedisDbInfo.builder()
-                                .index(i)
-                                .keyCount(keyCount)
-                                .build();
-                        root.add(new DefaultMutableTreeNode(dbInfo, false));
-                    }
-
-                    // 保存这个连接的redisPool
-                    connectionRedisMap.put(connection.getId(), redisPoolMgr);
-                }
-            }
-
-            @Override
-            public void treeCollapsed(TreeExpansionEvent event) {
-
-            }
-        });
-
-        tree.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                // 双击事件
-                if (e.getClickCount() == 2) {
-                    TreePath pathForLocation = tree.getPathForLocation(e.getX(), e.getY());
-
-                    if (pathForLocation == null) {
-                        return;
-                    }
-
-                    // 如果是根节点
-                    if (pathForLocation.getPathCount() == 1) {
-                        if (tree.isCollapsed(pathForLocation)) {
-                            // 如果根节点没有子节点, 则查询DB
-                            if (root.getChildCount() == 0) {
-                                RedisPoolMgr redisPoolMgr = new RedisPoolMgr(connection);
-                                int dbCount = redisPoolMgr.getDbCount();
-
-                                // 创建db列表
-                                for (int i = 0; i < dbCount; i++) {
-                                    Long keyCount = redisPoolMgr.dbSize(i);
-                                    RedisDbInfo dbInfo = RedisDbInfo.builder()
-                                            .index(i)
-                                            .keyCount(keyCount)
-                                            .build();
-                                    root.add(new DefaultMutableTreeNode(dbInfo, false));
-                                }
-
-                                // 保存这个连接的redisPool
-                                connectionRedisMap.put(connection.getId(), redisPoolMgr);
-                            }
-
-                        }
-                    }
-                }
-            }
-        });
-
-        connectionPanel.add(tree);
+    public static void removeAllDbs(DefaultMutableTreeNode connectionNode) {
+        connectionNode.removeAllChildren();
+        ConnectionInfo connectionInfo = (ConnectionInfo) connectionNode.getUserObject();
+        String id = connectionInfo.getId();
     }
 
     /**
      * 移除选中的连接
      *
-     * @param connectionPanel
+     * @param connectionTree
      * @param connectionRedisMap
      * @param propertyUtil
      */
-    public static void removeConnectionFromList(JPanel connectionPanel, Map<String, RedisPoolMgr> connectionRedisMap, PropertyUtil propertyUtil) {
-        // 从connectionPanel移除元素
-        ConnectionInfo connectionInfo = getSelectedConnectionAndRemove(connectionPanel);
-        if (connectionInfo == null) {
+    public static void removeConnectionFromTree(Tree connectionTree, Map<String, RedisPoolMgr> connectionRedisMap, PropertyUtil propertyUtil) {
+        // 从connectionTree移除元素
+        List<ConnectionInfo> connectionInfoList = getSelectedConnectionAndRemove(connectionTree);
+        if (CollectionUtils.isEmpty(connectionInfoList)) {
             return;
         }
 
-        // 关闭redis连接池
-        String connectionInfoId = connectionInfo.getId();
-        RedisPoolMgr redisPoolMgr = connectionRedisMap.get(connectionInfoId);
-        // 查询过DB才有
-        if (redisPoolMgr != null) {
-            redisPoolMgr.invalidate();
+        for (ConnectionInfo connectionInfo : connectionInfoList) {
+            // 关闭redis连接池
+            String connectionInfoId = connectionInfo.getId();
+            RedisPoolMgr redisPoolMgr = connectionRedisMap.get(connectionInfoId);
+            // 查询过DB才有
+            if (redisPoolMgr != null) {
+                redisPoolMgr.invalidate();
+            }
+
+            // 从connectionRedisMap中移除
+            connectionRedisMap.remove(connectionInfoId);
+
+            // 从properties中移除
+            propertyUtil.removeConnection(connectionInfoId);
         }
-
-        // 从connectionRedisMap中移除
-        connectionRedisMap.remove(connectionInfoId);
-
-        // 从properties中移除
-        propertyUtil.removeConnection(connectionInfoId);
     }
+
 
     /**
      * 查询connectionPanel中选中的connectionInfo, 并删除选中的tree
      *
-     * @param connectionPanel
+     * @param connectionTree
      * @return
      */
-    private static ConnectionInfo getSelectedConnectionAndRemove(JPanel connectionPanel) {
+    @Nullable
+    private static List<ConnectionInfo> getSelectedConnectionAndRemove(Tree connectionTree) {
         // 查询选中的 connection
-        Component[] components = connectionPanel.getComponents();
-        for (Component component : components) {
-            if (component instanceof Tree) {
-                Tree connectionTree = (Tree) component;
-                boolean rowSelected = connectionTree.isRowSelected(0);
-                if (rowSelected) {
-                    DefaultMutableTreeNode[] selectedNodes = connectionTree.getSelectedNodes(
-                            DefaultMutableTreeNode.class,
-                            DefaultMutableTreeNode::isRoot
-                    );
-                    DefaultMutableTreeNode root = selectedNodes[0];
-                    // 移除选中的组件
-                    connectionPanel.remove(component);
-                    // 返回connectionInfo
-                    return (ConnectionInfo) root.getUserObject();
-                }
-            }
+        DefaultTreeModel connectionTreeModel = (DefaultTreeModel) connectionTree.getModel();
+        DefaultMutableTreeNode root = (DefaultMutableTreeNode) connectionTreeModel.getRoot();
+
+        TreePath[] selectionPaths = connectionTree.getSelectionPaths();
+        if (selectionPaths == null || selectionPaths.length == 0) {
+            return null;
         }
-        return null;
+
+        List<ConnectionInfo> result = new ArrayList<>();
+        for (TreePath selectionPath : selectionPaths) {
+            Object[] path = selectionPath.getPath();
+            if (path.length != 2) {
+                continue;
+            }
+
+            DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) path[1];
+            result.add((ConnectionInfo) connectionNode.getUserObject());
+            root.remove(connectionNode);
+        }
+
+        if (!result.isEmpty()) {
+            connectionTreeModel.reload();
+        }
+        return result;
+    }
+
+    /**
+     * 复制选中的连接
+     *
+     * @param connectionTree
+     * @return
+     */
+    public static ConnectionInfo duplicateConnections(Tree connectionTree) {
+        TreePath selectionPath = connectionTree.getSelectionPath();
+        if (selectionPath == null || selectionPath.getPathCount() != 2) {
+            return null;
+        }
+        DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) selectionPath.getPath()[1];
+        ConnectionInfo connectionInfo = (ConnectionInfo) connectionNode.getUserObject();
+        ConnectionInfo newConnectionInfo = ConnectionInfo.builder()
+                .id(UUID.randomUUID().toString())
+                .name(connectionInfo.getName() + "_copy")
+                .url(connectionInfo.getUrl())
+                .port(connectionInfo.getPort())
+                .password(connectionInfo.getPassword())
+                .build();
+        addConnectionToList((DefaultTreeModel) connectionTree.getModel(), newConnectionInfo);
+        return newConnectionInfo;
     }
 }

@@ -56,25 +56,31 @@ public class PropertyUtil {
      * 保存连接信息
      * @param connectionInfo 连接信息
      * @return 连接ID
+     *
+     * todo 持久化敏感信息
      */
     public String saveConnection(ConnectionInfo connectionInfo) {
         if (connectionInfo == null) {
             return null;
         }
 
-        String id = UUID.randomUUID().toString();
-        connectionInfo.setId(id);
-        properties.setValue(id, JSON.toJSONString(connectionInfo));
+        String connectionInfoId = connectionInfo.getId();
+        if (StringUtils.isEmpty(connectionInfoId)) {
+            connectionInfoId = UUID.randomUUID().toString();
+        }
+
+        connectionInfo.setId(connectionInfoId);
+        properties.setValue(connectionInfoId, JSON.toJSONString(connectionInfo));
 
         String[] ids = properties.getValues(CONNECTION_ID_LIST_KEY);
         if (ids == null || ids.length == 0) {
-            properties.setValues(CONNECTION_ID_LIST_KEY, new String[]{id});
+            properties.setValues(CONNECTION_ID_LIST_KEY, new String[]{connectionInfoId});
         } else {
             ArrayList<String> idList = Lists.newArrayList(ids);
-            idList.add(id);
+            idList.add(connectionInfoId);
             properties.setValues(CONNECTION_ID_LIST_KEY, idList.toArray(new String[]{}));
         }
-        return id;
+        return connectionInfoId;
     }
 
     /**

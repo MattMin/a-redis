@@ -2,6 +2,7 @@ package com.mzyupc.aredis.dialog;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
+import com.intellij.ui.treeStructure.Tree;
 import com.mzyupc.aredis.utils.ConnectionListUtil;
 import com.mzyupc.aredis.utils.PropertyUtil;
 import com.mzyupc.aredis.utils.RedisPoolMgr;
@@ -19,14 +20,14 @@ import java.util.Map;
 public class RemoveConnectionDialog extends DialogWrapper {
     private CustomOKAction okAction;
     private PropertyUtil propertyUtil;
-    private JPanel connectionPanel;
+    private Tree connectionTree;
     private Map<String, RedisPoolMgr> connectionRedisMap;
 
-    public RemoveConnectionDialog(@Nullable Project project, JPanel connectionPanel, Map<String, RedisPoolMgr> connectionRedisMap) {
+    public RemoveConnectionDialog(@Nullable Project project, Tree connectionTree, Map<String, RedisPoolMgr> connectionRedisMap) {
         super(project);
         this.propertyUtil = PropertyUtil.getInstance(project);
         this.connectionRedisMap = connectionRedisMap;
-        this.connectionPanel = connectionPanel;
+        this.connectionTree = connectionTree;
 
         this.setTitle("Confirm");
         this.init();
@@ -69,7 +70,7 @@ public class RemoveConnectionDialog extends DialogWrapper {
         @Override
         protected void doAction(ActionEvent e) {
             // connection列表中移除
-            ConnectionListUtil.removeConnectionFromList(connectionPanel, connectionRedisMap, propertyUtil);
+            ConnectionListUtil.removeConnectionFromTree(connectionTree, connectionRedisMap, propertyUtil);
 
             close(CANCEL_EXIT_CODE);
         }

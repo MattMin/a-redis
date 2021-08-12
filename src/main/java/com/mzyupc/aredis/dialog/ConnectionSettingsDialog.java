@@ -5,6 +5,7 @@ import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.ui.JBColor;
+import com.intellij.ui.treeStructure.Tree;
 import com.mzyupc.aredis.utils.ConnectionListUtil;
 import com.mzyupc.aredis.utils.PropertyUtil;
 import com.mzyupc.aredis.utils.RedisPoolMgr;
@@ -14,12 +15,16 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.TreePath;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ItemEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.util.Map;
+
+import static com.mzyupc.aredis.utils.ConnectionListUtil.connectionRedisMap;
 
 /**
  * @author mzyupc@163.com
@@ -33,17 +38,21 @@ public class ConnectionSettingsDialog extends DialogWrapper {
     private PropertyUtil propertyUtil;
     private String connectionId;
     private CustomOKAction okAction;
-    private JPanel connectionPanel;
-    private Map<String, RedisPoolMgr> connectionRedisMap;
+    private Tree connectionTree;
 
-    public ConnectionSettingsDialog(Project project, String connectionId, JPanel connectionPanel, Map<String, RedisPoolMgr> connectionRedisMap) {
+    /**
+     * if connectionId is blank ? New Connection : Edit Connection
+     * @param project
+     * @param connectionId
+     * @param connectionTree
+     */
+    public ConnectionSettingsDialog(Project project, String connectionId, Tree connectionTree) {
         super(project);
         this.propertyUtil = PropertyUtil.getInstance(project);
         this.connectionId = connectionId;
-        this.connectionPanel = connectionPanel;
-        this.connectionRedisMap = connectionRedisMap;
+        this.connectionTree = connectionTree;
         this.setTitle("New Connection Settings");
-        this.setSize(600, 500);
+        this.setSize(600, 300);
         this.init();
     }
 
@@ -74,10 +83,10 @@ public class ConnectionSettingsDialog extends DialogWrapper {
         portField.setToolTipText("Port");
 
         // password输入框
-        passwordField = new JPasswordField();
+        passwordField = new JPasswordField(newConnection ? null : connection.getPassword());
 
         // 显示密码
-        JCheckBox checkBox = new JCheckBox("显示密码");
+        JCheckBox checkBox = new JCheckBox("Show Password");
         checkBox.addItemListener(e -> {
             if (e.getStateChange() == ItemEvent.SELECTED) {
                 passwordField.setEchoChar((char) 0);
@@ -281,25 +290,53 @@ public class ConnectionSettingsDialog extends DialogWrapper {
             if (validationInfo != null) {
                 Messages.showMessageDialog(validationInfo.message, "Verification Failed", Messages.getInformationIcon());
             } else {
-                // 保存connection
-                String password = null;
-                if (StringUtils.isNotBlank(new String(passwordField.getPassword()))) {
-                    password = new String(passwordField.getPassword());
+                DefaultTreeModel connectionTreeModel = (DefaultTreeModel) connectionTree.getModel();
+                if (StringUtils.isEmpty(connectionId)) {
+                    // 保存connection
+                    String password = null;
+                    if (StringUtils.isNotBlank(new String(passwordField.getPassword()))) {
+                        password = new String(passwordField.getPassword());
+                    }
+                    // 持久化连接信息
+                    ConnectionInfo connectionInfo = ConnectionInfo.builder()
+                            .name(nameTextField.getText())
+                            .url(hostField.getText())
+                            .port(portField.getText())
+                            .password(password)
+                            .build();
+                    propertyUtil.saveConnection(connectionInfo);
+                    // connectionTree 中添加节点
+                    ConnectionListUtil.addConnectionToList(connectionTreeModel, connectionInfo);
+                    close(CANCEL_EXIT_CODE);
+
+                } else {
+                    // 更新connection
+                    String password = null;
+                    if (StringUtils.isNotBlank(new String(passwordField.getPassword()))) {
+                        password = new String(passwordField.getPassword());
+                    }
+                    ConnectionInfo connectionInfo = ConnectionInfo.builder()
+                            .id(connectionId)
+                            .name(nameTextField.getText())
+                            .url(hostField.getText())
+                            .port(portField.getText())
+                            .password(password)
+                            .build();
+                    // 更新redisPoolMgr
+                    RedisPoolMgr redisPoolMgr = new RedisPoolMgr(connectionInfo);
+                    connectionRedisMap.put(connectionId, redisPoolMgr);
+                    // 设置connectionNode的connectionInfo
+                    TreePath selectionPath = connectionTree.getSelectionPath();
+                    DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) selectionPath.getPath()[1];
+                    connectionNode.setUserObject(connectionInfo);
+                    // 重新载入connectionNode
+                    connectionTreeModel.reload(connectionNode);
+                    // 更新持久化信息
+                    propertyUtil.removeConnection(connectionId);
+                    propertyUtil.saveConnection(connectionInfo);
+
+                    close(CANCEL_EXIT_CODE);
                 }
-
-                ConnectionInfo connectionInfo = ConnectionInfo.builder()
-                        .name(nameTextField.getText())
-                        .url(hostField.getText())
-                        .port(portField.getText())
-                        // TODO 持久化敏感数据
-                        .password(password)
-                        .build();
-                propertyUtil.saveConnection(connectionInfo);
-
-                // connection列表中添加节点
-                ConnectionListUtil.addConnectionToList(connectionPanel, connectionInfo, connectionRedisMap);
-
-                close(CANCEL_EXIT_CODE);
             }
         }
     }

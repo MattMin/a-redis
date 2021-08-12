@@ -17,6 +17,8 @@ import java.util.Set;
 
 /**
  * @author mzyupc@163.com
+ *
+ * todo redis线程池回收
  */
 @Slf4j
 public class RedisPoolMgr extends CloseTranscoder{
@@ -192,6 +194,7 @@ public class RedisPoolMgr extends CloseTranscoder{
             if (db != Protocol.DEFAULT_DATABASE) {
                 resource.select(db);
             }
+            ConnectionListUtil.isConnected = true;
             return resource;
         } catch (Exception e) {
             log.warn("Failed to get resource from the pool", e);
