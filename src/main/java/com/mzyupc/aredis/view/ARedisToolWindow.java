@@ -1,4 +1,4 @@
-package com.mzyupc.aredis.window;
+package com.mzyupc.aredis.view;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.project.Project;
@@ -12,6 +12,8 @@ import com.mzyupc.aredis.dialog.RemoveConnectionDialog;
 import com.mzyupc.aredis.layout.VFlowLayout;
 import com.mzyupc.aredis.utils.JTreeUtil;
 import com.mzyupc.aredis.utils.PropertyUtil;
+import com.mzyupc.aredis.view.editor.ARedisFileSystem;
+import com.mzyupc.aredis.view.editor.ARedisVirtualFile;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
@@ -120,6 +122,7 @@ public class ARedisToolWindow {
                         DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) path[1];
                         DefaultMutableTreeNode dbNode = (DefaultMutableTreeNode) path[2];
 
+                        ARedisFileSystem.getInstance(project).openEditor(new ARedisVirtualFile("name", project));
                     }
                 }
 
