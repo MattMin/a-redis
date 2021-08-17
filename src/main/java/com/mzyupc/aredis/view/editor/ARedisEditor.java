@@ -8,7 +8,6 @@ import com.intellij.openapi.fileEditor.FileEditorState;
 import com.intellij.openapi.fileEditor.FileEditorStateLevel;
 import com.intellij.openapi.util.UserDataHolderBase;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.mzyupc.aredis.view.ARedisKeyValueDisplayPanel;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -30,7 +29,7 @@ public class ARedisEditor extends UserDataHolderBase implements FileEditor {
 
     @Override
     public @NotNull JComponent getComponent() {
-        return new ARedisKeyValueDisplayPanel();
+        return aRedisVirtualFile.getARedisKeyValueDisplayPanel();
     }
 
     @Override

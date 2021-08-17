@@ -1,5 +1,6 @@
 package com.mzyupc.aredis.utils;
 
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.ui.Messages;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import lombok.Builder;
@@ -21,7 +22,7 @@ import java.util.Set;
  * todo redis线程池回收
  */
 @Slf4j
-public class RedisPoolMgr extends CloseTranscoder{
+public class RedisPoolMgr extends CloseTranscoder implements Disposable {
 
     private String host;
     private Integer port;
@@ -70,7 +71,10 @@ public class RedisPoolMgr extends CloseTranscoder{
      * 关闭连接池
      */
     public void invalidate() {
-        close(this.pool);
+        if (isValidate()) {
+            this.pool.close();
+            this.pool = null;
+        }
     }
 
     private JedisPool getJedisPool() {
@@ -101,6 +105,11 @@ public class RedisPoolMgr extends CloseTranscoder{
                     .msg(e.getCause().getMessage())
                     .build();
         }
+    }
+
+    @Override
+    public void dispose() {
+        this.invalidate();
     }
 
     @Builder
@@ -589,18 +598,18 @@ public class RedisPoolMgr extends CloseTranscoder{
      * @since 使用scan 替代keys keys如果数据量过大，会直接使redis崩溃
      */
     public List<String> scan(String pattern, int count) {
-        return scan(pattern, count, getDb());
+        return scan(ScanParams.SCAN_POINTER_START, pattern, count, getDb());
     }
 
-    public List<String> scan(String pattern, int count, int db) {
+    public List<String> scan(String cursor, String pattern, int count, int db) {
         List<String> list = new ArrayList<>();
         Jedis jedis = null;
         try {
             jedis = getJedis(db);
-            String cursor = ScanParams.SCAN_POINTER_START;
             ScanParams scanParams = new ScanParams();
             scanParams.count(count);
             scanParams.match(pattern);
+
             do {
                 ScanResult<String> scanResult = jedis.scan(cursor, scanParams);
                 list.addAll(scanResult.getResult());

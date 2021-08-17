@@ -5,27 +5,28 @@ import lombok.*;
 
 /**
  * @author mzyupc@163.com
+ * @date 2021/8/7 3:30 下午
  */
 @Getter
 @Setter
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class ConnectionInfo {
+public class DbInfo {
 
-    private String id;
+    /**
+     * db index, from 0
+     */
+    private Integer index;
 
-    private String name;
-
-    private String url;
-
-    private String port;
-
-    private String password;
+    /**
+     * key的个数
+     */
+    private Long keyCount;
 
     @Override
     public String toString() {
-        return this.name;
+        return String.format("DB%s (%s)", index, keyCount);
     }
 
     @Override
@@ -36,12 +37,12 @@ public class ConnectionInfo {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        ConnectionInfo that = (ConnectionInfo) o;
-        return Objects.equal(id, that.id);
+        DbInfo dbInfo = (DbInfo) o;
+        return Objects.equal(index, dbInfo.index);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(id);
+        return Objects.hashCode(index);
     }
 }

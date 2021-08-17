@@ -1,9 +1,15 @@
 package com.mzyupc.aredis.view.editor;
 
+import com.google.common.base.Objects;
+import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileSystem;
+import com.mzyupc.aredis.utils.RedisPoolMgr;
+import com.mzyupc.aredis.view.ARedisKeyValueDisplayPanel;
+import com.mzyupc.aredis.vo.ConnectionInfo;
+import com.mzyupc.aredis.vo.DbInfo;
 import lombok.Getter;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
@@ -20,10 +26,21 @@ import java.io.OutputStream;
 public class ARedisVirtualFile extends VirtualFile {
     private final String name;
     private final Project project;
+    private ConnectionInfo connectionInfo;
+    private DbInfo dbInfo;
+    private ARedisKeyValueDisplayPanel aRedisKeyValueDisplayPanel;
 
-    public ARedisVirtualFile(String name, Project project) {
+    @Override
+    public @NotNull FileType getFileType() {
+        return new ARedisFileType();
+    }
+
+    public ARedisVirtualFile(String name, Project project, ConnectionInfo connectionInfo, DbInfo dbInfo, RedisPoolMgr redisPoolMgr) {
         this.project = project;
         this.name = name;
+        this.connectionInfo = connectionInfo;
+        this.dbInfo = dbInfo;
+        this.aRedisKeyValueDisplayPanel = new ARedisKeyValueDisplayPanel(connectionInfo, dbInfo, redisPoolMgr);
     }
 
     @Override
@@ -45,7 +62,7 @@ public class ARedisVirtualFile extends VirtualFile {
 
     @Override
     public boolean isWritable() {
-        return false;
+        return true;
     }
 
     @Override
@@ -96,5 +113,27 @@ public class ARedisVirtualFile extends VirtualFile {
     @Override
     public @NotNull InputStream getInputStream() throws IOException {
         return null;
+    }
+
+    @Override
+    public long getModificationStamp() {
+        return 0;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ARedisVirtualFile that = (ARedisVirtualFile) o;
+        return Objects.equal(connectionInfo, that.connectionInfo) && Objects.equal(dbInfo, that.dbInfo);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(connectionInfo, dbInfo);
     }
 }

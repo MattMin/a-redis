@@ -1,25 +1,26 @@
 package com.mzyupc.aredis.view;
 
-import com.intellij.icons.AllIcons;
+import com.intellij.ide.CommonActionsManager;
+import com.intellij.ide.TreeExpander;
+import com.intellij.openapi.Disposable;
+import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindow;
-import com.intellij.ui.AnActionButton;
-import com.intellij.ui.AnActionButtonRunnable;
-import com.intellij.ui.ToolbarDecorator;
 import com.intellij.ui.treeStructure.Tree;
-import com.mzyupc.aredis.dialog.ConnectionSettingsDialog;
-import com.mzyupc.aredis.dialog.RemoveConnectionDialog;
-import com.mzyupc.aredis.layout.VFlowLayout;
+import com.mzyupc.aredis.action.*;
 import com.mzyupc.aredis.utils.JTreeUtil;
 import com.mzyupc.aredis.utils.PropertyUtil;
+import com.mzyupc.aredis.utils.RedisPoolMgr;
+import com.mzyupc.aredis.view.dialog.ConnectionSettingsDialog;
+import com.mzyupc.aredis.view.dialog.RemoveConnectionDialog;
 import com.mzyupc.aredis.view.editor.ARedisFileSystem;
 import com.mzyupc.aredis.view.editor.ARedisVirtualFile;
 import com.mzyupc.aredis.vo.ConnectionInfo;
+import com.mzyupc.aredis.vo.DbInfo;
 import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
-import javax.swing.border.LineBorder;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
@@ -29,12 +30,13 @@ import java.awt.event.MouseEvent;
 import java.util.List;
 
 import static com.mzyupc.aredis.utils.ConnectionListUtil.*;
+import static com.mzyupc.aredis.utils.JTreeUtil.expandTree;
 
 /**
  * @author mzyupc@163.com
  */
 @Getter
-public class ARedisToolWindow {
+public class ARedisToolWindow implements Disposable {
 
     private Project project;
     private JPanel aRedisWindowContent;
@@ -73,19 +75,71 @@ public class ARedisToolWindow {
      */
     private void createUIComponents() {
         connectionPanel = new JPanel();
-        // panel内的元素垂直布局
-//        BoxLayout boxLayout = new BoxLayout(connectionPanel, BoxLayout.Y_AXIS);
-        connectionPanel.setLayout(new VFlowLayout());
-
+        connectionPanel.setLayout(new BorderLayout());
         connectionTreeRoot = new DefaultMutableTreeNode();
+
+        // 连接列表
+        connectionTree = createConnectionTree();
+
+        // 工具栏
+        CommonActionsManager actionManager = CommonActionsManager.getInstance();
+        DefaultActionGroup actions = new DefaultActionGroup();
+        // 增加key
+        actions.add(createAddAction());
+        // 删除key
+        actions.add(createDeleteAction());
+        actions.addSeparator();
+        // 展开所有
+        actions.add(actionManager.createExpandAllAction(getTreeExpander(connectionTree), connectionTree));
+        // 折叠所有
+        actions.add(actionManager.createCollapseAllAction(getTreeExpander(connectionTree), connectionTree));
+        ActionToolbar actionToolbar = ActionManager.getInstance().createActionToolbar(ActionPlaces.TOOLWINDOW_TOOLBAR_BAR, actions, true);
+        actionToolbar.setTargetComponent(connectionPanel);
+        actionToolbar.adjustTheSameSize(true);
+
+        connectionPanel.add(actionToolbar.getComponent(), BorderLayout.NORTH);
+        ScrollPane scrollPane = new ScrollPane();
+        scrollPane.add(connectionTree);
+        connectionPanel.add(scrollPane, BorderLayout.CENTER);
+    }
+
+    private static TreeExpander getTreeExpander(JTree tree) {
+        return new TreeExpander() {
+            @Override
+            public void expandAll() {
+                expandTree(tree, true);
+            }
+
+            @Override
+            public boolean canExpand() {
+                return true;
+            }
+
+            @Override
+            public void collapseAll() {
+                DefaultMutableTreeNode root = (DefaultMutableTreeNode) tree.getModel().getRoot();
+                for (int i = 0; i < root.getChildCount(); i++) {
+                    DefaultMutableTreeNode child = (DefaultMutableTreeNode) root.getChildAt(i);
+                    JTreeUtil.expandAll(tree, new TreePath(child.getPath()), false);
+                }
+            }
+
+            @Override
+            public boolean canCollapse() {
+                return true;
+            }
+
+        };
+    }
+
+    /**
+     * 创建连接列表
+     *
+     * @return
+     */
+    private Tree createConnectionTree() {
         connectionTree = new Tree();
         connectionTree.setAlignmentX(Component.LEFT_ALIGNMENT);
-        // 默认展开
-//        tree.expandPath(new TreePath(root));
-        connectionTree.setBorder(new LineBorder(Color.RED, 1));
-
-        // 右键菜单
-        JPopupMenu popupMenu = createConnectionPopupMenu();
         connectionTree.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -112,17 +166,23 @@ public class ARedisToolWindow {
                             // 刷新节点
                             connectionTreeModel.reload(connectionNode);
                             // 展开当前连接
-                            JTreeUtil.expandAll(connectionTree, new TreePath(new Object[]{connectionTreeRoot, connectionNode}));
+                            JTreeUtil.expandAll(connectionTree, new TreePath(new Object[]{connectionTreeRoot, connectionNode}), true);
                         }
                     }
 
                     // 双击DB事件
                     if (path.length == 3) {
-                        // todo 打开编辑器
+                        // 打开编辑器
                         DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) path[1];
                         DefaultMutableTreeNode dbNode = (DefaultMutableTreeNode) path[2];
 
-                        ARedisFileSystem.getInstance(project).openEditor(new ARedisVirtualFile("name", project));
+                        ConnectionInfo connectionInfo = (ConnectionInfo) connectionNode.getUserObject();
+                        DbInfo dbInfo = (DbInfo) dbNode.getUserObject();
+                        ARedisFileSystem.getInstance(project).openEditor(new ARedisVirtualFile(connectionInfo.getName() + "-DB" + dbInfo.getIndex(),
+                                project,
+                                connectionInfo,
+                                dbInfo,
+                                connectionRedisMap.get(connectionInfo.getId())));
                     }
                 }
 
@@ -130,49 +190,47 @@ public class ARedisToolWindow {
                     // 获取右键点击所在connectionNodede路径
                     TreePath pathForLocation = connectionTree.getSelectionPath();
                     if (pathForLocation != null && pathForLocation.getPathCount() == 2) {
-                        popupMenu.show(connectionTree, x, y);
+                        createConnectionPopupMenu().getComponent().show(connectionTree, x, y);
                     }
                 }
             }
         });
-
-        // 添加连接按钮
-        ToolbarDecorator decorator = ToolbarDecorator.createDecorator(connectionTree);
-        decorator.setAddAction(new AnActionButtonRunnable() {
-            @Override
-            public void run(AnActionButton anActionButton) {
-                // 弹出连接配置窗口
-                ConnectionSettingsDialog connectionSettingsDialog = new ConnectionSettingsDialog(project, null, connectionTree);
-                connectionSettingsDialog.show();
-            }
-        });
-
-        // 移除连接按钮
-        decorator.setRemoveAction(new AnActionButtonRunnable() {
-            @Override
-            public void run(AnActionButton anActionButton) {
-                // 弹出删除确认对话框
-                RemoveConnectionDialog removeConnectionDialog = new RemoveConnectionDialog(project, connectionTree, connectionRedisMap);
-                removeConnectionDialog.show();
-            }
-        });
-
-        JPanel panel = decorator.createPanel();
-        connectionPanel.add(panel);
-        connectionPanel.add(connectionTree);
+        return connectionTree;
     }
 
     /**
-     * 创建一个连接右键菜单
+     * 创建添加按钮
      *
      * @return
      */
-    @NotNull
-    private JPopupMenu createConnectionPopupMenu() {
-        // 连接的右键菜单
-        JMenuItem reloadServerItem = new JMenuItem("Reload Server");
-        reloadServerItem.setIcon(AllIcons.Actions.Refresh);
-        reloadServerItem.addActionListener(e -> {
+    private AddAction createAddAction() {
+        AddAction addAction = new AddAction();
+        addAction.setAction(e -> {
+            // 弹出连接配置窗口
+            ConnectionSettingsDialog connectionSettingsDialog = new ConnectionSettingsDialog(project, null, connectionTree);
+            connectionSettingsDialog.show();
+        });
+        return addAction;
+    }
+
+    /**
+     * 创建移除按钮
+     *
+     * @return
+     */
+    private DeleteAction createDeleteAction() {
+        DeleteAction deleteAction = new DeleteAction();
+        deleteAction.setAction(e -> {
+            // 弹出删除确认对话框
+            RemoveConnectionDialog removeConnectionDialog = new RemoveConnectionDialog(project, connectionTree, connectionRedisMap);
+            removeConnectionDialog.show();
+        });
+        return deleteAction;
+    }
+
+    private RefreshAction createRefreshAction() {
+        RefreshAction refreshAction = new RefreshAction();
+        refreshAction.setAction(e -> {
             // reload server function
             TreePath[] selectionPaths = connectionTree.getSelectionPaths();
             if (selectionPaths == null) {
@@ -189,12 +247,13 @@ public class ARedisToolWindow {
                 addDbs2Connection(connectionNode);
                 connectionTreeModel.reload(connectionNode);
             }
-
         });
+        return refreshAction;
+    }
 
-        JMenuItem editItem = new JMenuItem("Edit");
-        editItem.setIcon(AllIcons.Actions.Edit);
-        editItem.addActionListener(e -> {
+    private EditAction createEditAction() {
+        EditAction editAction = new EditAction();
+        editAction.setAction(e -> {
             TreePath selectionPath = connectionTree.getSelectionPath();
             if (selectionPath == null || selectionPath.getPathCount() != 2) {
                 return;
@@ -206,11 +265,13 @@ public class ARedisToolWindow {
             ConnectionSettingsDialog connectionSettingsDialog = new ConnectionSettingsDialog(project, connectionInfo.getId(), connectionTree);
             connectionSettingsDialog.show();
         });
+        return editAction;
+    }
 
-        JMenuItem duplicateItem = new JMenuItem("Duplicate");
-        duplicateItem.setIcon(AllIcons.Actions.Copy);
-        duplicateItem.addActionListener(e -> {
-            // todo 复制按钮功能
+    private DuplicateAction createDuplicateAction() {
+        DuplicateAction duplicateAction = new DuplicateAction();
+        duplicateAction.setAction(e -> {
+            // 复制按钮功能
             TreePath selectionPath = connectionTree.getSelectionPath();
             if (selectionPath == null || selectionPath.getPathCount() != 2) {
                 return;
@@ -218,30 +279,71 @@ public class ARedisToolWindow {
 
             ConnectionInfo newConnectionInfo = duplicateConnections(connectionTree);
             propertyUtil.saveConnection(newConnectionInfo);
-
         });
-
-        JMenuItem deleteItem = new JMenuItem("Delete");
-        deleteItem.setIcon(AllIcons.Actions.DeleteTagHover);
-        deleteItem.addActionListener(e -> {
-            // 弹出删除确认对话框
-            RemoveConnectionDialog removeConnectionDialog = new RemoveConnectionDialog(project, connectionTree, connectionRedisMap);
-            removeConnectionDialog.show();
-        });
-
-        JMenuItem openConsoleItem = new JMenuItem("Open Console");
-        openConsoleItem.setIcon(AllIcons.Debugger.Console);
-        openConsoleItem.addActionListener(e -> {
-            // todo 打开控制台的功能
-        });
-        JPopupMenu popupMenu = new JPopupMenu();
-        popupMenu.setPreferredSize(new Dimension(200, 160));
-        popupMenu.add(reloadServerItem);
-        popupMenu.add(editItem);
-        popupMenu.add(duplicateItem);
-        popupMenu.add(deleteItem);
-        popupMenu.add(openConsoleItem);
-        return popupMenu;
+        return duplicateAction;
     }
 
+    private ConsoleAction createConsoleAction() {
+        ConsoleAction consoleAction = new ConsoleAction();
+        consoleAction.setAction(e -> {
+            // todo console
+        });
+        return consoleAction;
+    }
+
+    private CloseAction createCloseAction() {
+        CloseAction closeAction = new CloseAction();
+        closeAction.setAction(e -> {
+            TreePath selectionPath = connectionTree.getSelectionPath();
+            if (selectionPath == null || selectionPath.getPathCount() != 2) {
+                return;
+            }
+
+            DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) selectionPath.getPath()[1];
+            ConnectionInfo connectionInfo = (ConnectionInfo) connectionNode.getUserObject();
+
+            // 关闭连接池
+            RedisPoolMgr redisPoolMgr = connectionRedisMap.get(connectionInfo.getId());
+            if (redisPoolMgr != null) {
+                redisPoolMgr.invalidate();
+            }
+
+            // 清除connectionNode子节点
+            connectionNode.removeAllChildren();
+            connectionTreeModel.reload(connectionNode);
+        });
+        return closeAction;
+    }
+
+    /**
+     * 创建一个连接右键菜单
+     *
+     * @return
+     */
+    @NotNull
+    private ActionPopupMenu createConnectionPopupMenu() {
+        DefaultActionGroup actionGroup = new DefaultActionGroup();
+        actionGroup.add(createRefreshAction());
+        actionGroup.addSeparator();
+        actionGroup.add(createEditAction());
+        actionGroup.add(createDuplicateAction());
+        actionGroup.add(createDeleteAction());
+        actionGroup.addSeparator();
+        actionGroup.add(createConsoleAction());
+        actionGroup.addSeparator();
+        actionGroup.add(createCloseAction());
+        ActionPopupMenu menu = ActionManager.getInstance().createActionPopupMenu(ActionPlaces.POPUP, actionGroup);
+        menu.setTargetComponent(connectionTree);
+        return menu;
+    }
+
+    @Override
+    public void dispose() {
+        // 关闭所有连接
+        for (RedisPoolMgr redisPoolMgr : connectionRedisMap.values()) {
+            if (redisPoolMgr != null) {
+                redisPoolMgr.invalidate();
+            }
+        }
+    }
 }

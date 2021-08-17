@@ -2,7 +2,7 @@ package com.mzyupc.aredis.utils;
 
 import com.intellij.ui.treeStructure.Tree;
 import com.mzyupc.aredis.vo.ConnectionInfo;
-import com.mzyupc.aredis.vo.RedisDbInfo;
+import com.mzyupc.aredis.vo.DbInfo;
 import org.apache.commons.collections.CollectionUtils;
 import org.jetbrains.annotations.Nullable;
 
@@ -36,8 +36,8 @@ public class ConnectionListUtil {
         root.add(new DefaultMutableTreeNode(connection));
 
         // 保存这个连接的redisPool
-        RedisPoolMgr redisPoolMgr = new RedisPoolMgr(connection);
-        connectionRedisMap.put(connection.getId(), redisPoolMgr);
+        RedisPoolMgr poolMgr = new RedisPoolMgr(connection);
+        connectionRedisMap.put(connection.getId(), poolMgr);
 
         treeModel.reload();
     }
@@ -55,7 +55,7 @@ public class ConnectionListUtil {
         // 创建db列表
         for (int i = 0; i < dbCount; i++) {
             Long keyCount = redisPoolMgr.dbSize(i);
-            RedisDbInfo dbInfo = RedisDbInfo.builder()
+            DbInfo dbInfo = DbInfo.builder()
                     .index(i)
                     .keyCount(keyCount)
                     .build();
