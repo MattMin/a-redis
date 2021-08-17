@@ -1,3 +1,3 @@
 # An IDEA Redis Plugin
 
-IDEA Redis可视化插件
+IDEA Redis 可视化插件
