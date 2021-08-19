@@ -20,6 +20,7 @@ import com.mzyupc.aredis.action.DeleteAction;
 import com.mzyupc.aredis.action.RefreshAction;
 import com.mzyupc.aredis.utils.RedisPoolMgr;
 import com.mzyupc.aredis.view.dialog.ConfirmDialog;
+import com.mzyupc.aredis.view.dialog.NewKeyDialog;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import com.mzyupc.aredis.vo.DbInfo;
 import lombok.SneakyThrows;
@@ -189,13 +190,16 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
         ClearAction clearAction = new ClearAction();
         clearAction.setAction(e -> {
             // todo
-            ConfirmDialog confirmDialog = new ConfirmDialog(project, "Confirm", "Are you sure you want to delete all the keys of the currently selected DB?");
-            confirmDialog.setCustomOkAction(actionEvent -> {
-                try (Jedis jedis = redisPoolMgr.getJedis(dbInfo.getIndex())) {
-                    jedis.flushDB();
-                }
-                renderKeyTree();
-            });
+            ConfirmDialog confirmDialog = new ConfirmDialog(
+                    project,
+                    "Confirm",
+                    "Are you sure you want to delete all the keys of the currently selected DB?",
+                    actionEvent -> {
+                        try (Jedis jedis = redisPoolMgr.getJedis(dbInfo.getIndex())) {
+                            jedis.flushDB();
+                        }
+                        renderKeyTree();
+                    });
             confirmDialog.show();
         });
         return clearAction;
@@ -210,6 +214,13 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
         AddAction addAction = new AddAction();
         addAction.setAction(e -> {
             // todo
+            NewKeyDialog newKeyDialog = new NewKeyDialog(
+                    project,
+                    actionEvent -> {
+                        // todo
+
+                    });
+            newKeyDialog.show();
             System.out.println("add action performed");
         });
         return addAction;
@@ -228,27 +239,30 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
             if (selectionPaths != null && selectionPaths.length == 1 && selectionPaths[0].getPathCount() == 1) {
                 return;
             }
-            ConfirmDialog confirmDialog = new ConfirmDialog(project, "Confirm", "Are you sure you want to delete these keys?");
-            confirmDialog.setCustomOkAction(actionEvent -> {
-                // 删除选中的key, 如果选中的是上层
-                if (selectionPaths != null) {
-                    for (TreePath selectionPath : selectionPaths) {
-                        if (selectionPath.getPathCount() <= 1) {
-                            return;
-                        } else {
-                            DefaultMutableTreeNode selectNode = (DefaultMutableTreeNode) selectionPath.getLastPathComponent();
-                            List<String> keys = new ArrayList<>();
-                            findDeleteKeys(selectNode, keys);
-                            if (CollectionUtils.isNotEmpty(keys)) {
-                                try (Jedis jedis = redisPoolMgr.getJedis(dbInfo.getIndex())) {
-                                    jedis.del(keys.toArray(new String[]{}));
+            ConfirmDialog confirmDialog = new ConfirmDialog(
+                    project,
+                    "Confirm",
+                    "Are you sure you want to delete these keys?",
+                    actionEvent -> {
+                        // 删除选中的key, 如果选中的是上层
+                        if (selectionPaths != null) {
+                            for (TreePath selectionPath : selectionPaths) {
+                                if (selectionPath.getPathCount() <= 1) {
+                                    return;
+                                } else {
+                                    DefaultMutableTreeNode selectNode = (DefaultMutableTreeNode) selectionPath.getLastPathComponent();
+                                    List<String> keys = new ArrayList<>();
+                                    findDeleteKeys(selectNode, keys);
+                                    if (CollectionUtils.isNotEmpty(keys)) {
+                                        try (Jedis jedis = redisPoolMgr.getJedis(dbInfo.getIndex())) {
+                                            jedis.del(keys.toArray(new String[]{}));
+                                        }
+                                        renderKeyTree();
+                                    }
                                 }
-                                renderKeyTree();
                             }
                         }
-                    }
-                }
-            });
+                    });
             confirmDialog.show();
         });
         return deleteAction;
@@ -267,11 +281,15 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
         }
     }
 
+    /**
+     * 重新加载keyTree
+     *
+     * @return
+     */
     private RefreshAction createRefreshAction() {
         RefreshAction refreshAction = new RefreshAction();
         refreshAction.setAction(e -> {
-            // todo
-            System.out.println("refresh action performed");
+            renderKeyTree();
         });
         return refreshAction;
     }

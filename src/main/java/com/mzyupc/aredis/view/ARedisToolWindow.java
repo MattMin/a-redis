@@ -4,6 +4,7 @@ import com.intellij.ide.CommonActionsManager;
 import com.intellij.ide.TreeExpander;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.*;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.LoadingDecorator;
 import com.intellij.openapi.wm.ToolWindow;
@@ -153,7 +154,7 @@ public class ARedisToolWindow implements Disposable {
 
                 // connectionTree的双击事件
                 if (e.getClickCount() == 2) {
-                    connectionTreeLoadingDecorator.startLoading(false);
+
                     // 第一个选中的节点路径
                     TreePath selectionPath = connectionTree.getSelectionPath();
                     if (selectionPath == null) {
@@ -166,13 +167,15 @@ public class ARedisToolWindow implements Disposable {
                         DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) path[1];
                         if (connectionNode.getChildCount() == 0) {
                             // 添加DB子节点
-                            addDbs2Connection(connectionNode);
-                            // 刷新节点
-                            connectionTreeModel.reload(connectionNode);
-                            // 展开当前连接
-                            JTreeUtil.expandAll(connectionTree, new TreePath(new Object[]{connectionTreeRoot, connectionNode}), true);
+                            connectionTreeLoadingDecorator.startLoading(false);
+                            ApplicationManager.getApplication().invokeLater(() -> {
+                                addDbs2Connection(connectionNode);
+                                // 刷新节点
+                                connectionTreeModel.reload(connectionNode);
+                                // 展开当前连接
+                                JTreeUtil.expandAll(connectionTree, new TreePath(new Object[]{connectionTreeRoot, connectionNode}), true);
+                            });
                         }
-
                     }
 
                     // 双击DB事件
@@ -183,11 +186,14 @@ public class ARedisToolWindow implements Disposable {
 
                         ConnectionInfo connectionInfo = (ConnectionInfo) connectionNode.getUserObject();
                         DbInfo dbInfo = (DbInfo) dbNode.getUserObject();
-                        ARedisFileSystem.getInstance(project).openEditor(new ARedisVirtualFile(connectionInfo.getName() + "-DB" + dbInfo.getIndex(),
-                                project,
-                                connectionInfo,
-                                dbInfo,
-                                connectionRedisMap.get(connectionInfo.getId())));
+                        connectionTreeLoadingDecorator.startLoading(false);
+                        ApplicationManager.getApplication().invokeLater(() -> {
+                            ARedisFileSystem.getInstance(project).openEditor(new ARedisVirtualFile(connectionInfo.getName() + "-DB" + dbInfo.getIndex(),
+                                    project,
+                                    connectionInfo,
+                                    dbInfo,
+                                    connectionRedisMap.get(connectionInfo.getId())));
+                        });
                     }
 
                     connectionTreeLoadingDecorator.stopLoading();
@@ -229,11 +235,14 @@ public class ARedisToolWindow implements Disposable {
         DeleteAction deleteAction = new DeleteAction();
         deleteAction.setAction(e -> {
             // 弹出删除确认对话框
-            ConfirmDialog removeConnectionDialog = new ConfirmDialog(project, "Confirm", "Are you sure you want to delete these connections?");
-            removeConnectionDialog.setCustomOkAction(actionEvent -> {
-                // connection列表中移除
-                ConnectionListUtil.removeConnectionFromTree(connectionTree, connectionRedisMap, propertyUtil);
-            });
+            ConfirmDialog removeConnectionDialog = new ConfirmDialog(
+                    project,
+                    "Confirm",
+                    "Are you sure you want to delete these connections?",
+                    actionEvent -> {
+                        // connection列表中移除
+                        ConnectionListUtil.removeConnectionFromTree(connectionTree, connectionRedisMap, propertyUtil);
+                    });
             removeConnectionDialog.show();
         });
         return deleteAction;
@@ -255,8 +264,10 @@ public class ARedisToolWindow implements Disposable {
                 }
 
                 DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) selectionPath.getPath()[1];
-                removeAllDbs(connectionNode);
-                addDbs2Connection(connectionNode);
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    removeAllDbs(connectionNode);
+                    addDbs2Connection(connectionNode);
+                });
                 connectionTreeModel.reload(connectionNode);
             }
             connectionTreeLoadingDecorator.stopLoading();

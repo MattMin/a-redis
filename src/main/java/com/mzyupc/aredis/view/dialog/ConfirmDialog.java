@@ -13,14 +13,23 @@ import java.util.function.Consumer;
 /**
  * @author mzyupc@163.com
  * @date 2021/8/7 5:33 下午
+ *
+ * 确认提醒窗口
  */
 public class ConfirmDialog extends DialogWrapper {
     private final String centerPanelText;
-    private Consumer<ActionEvent> okActionConsumer;
+    private final Consumer<ActionEvent> customOkFunction;
 
-    public ConfirmDialog(@NotNull Project project, String title, String centerPanelText) {
+    /**
+     * @param project
+     * @param title            对话框标题
+     * @param centerPanelText  要提示的内容
+     * @param customOkFunction 自定义的ok按钮功能
+     */
+    public ConfirmDialog(@NotNull Project project, String title, String centerPanelText, Consumer<ActionEvent> customOkFunction) {
         super(project);
         this.centerPanelText = centerPanelText;
+        this.customOkFunction = customOkFunction;
         this.setTitle(title);
         this.setResizable(false);
         this.setAutoAdjustable(true);
@@ -56,15 +65,6 @@ public class ConfirmDialog extends DialogWrapper {
     }
 
     /**
-     * 设置ok按钮的自定义功能
-     *
-     * @param okActionConsumer
-     */
-    public void setCustomOkAction(Consumer<ActionEvent> okActionConsumer) {
-        this.okActionConsumer = okActionConsumer;
-    }
-
-    /**
      * 自定义 ok Action
      */
     protected class CustomOKAction extends DialogWrapperAction {
@@ -74,8 +74,8 @@ public class ConfirmDialog extends DialogWrapper {
 
         @Override
         protected void doAction(ActionEvent e) {
-            if (okActionConsumer != null) {
-                okActionConsumer.accept(e);
+            if (customOkFunction != null) {
+                customOkFunction.accept(e);
             }
             close(CANCEL_EXIT_CODE);
         }
