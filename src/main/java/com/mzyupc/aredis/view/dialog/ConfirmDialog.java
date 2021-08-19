@@ -2,34 +2,28 @@ package com.mzyupc.aredis.view.dialog;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
-import com.intellij.ui.treeStructure.Tree;
-import com.mzyupc.aredis.utils.ConnectionListUtil;
-import com.mzyupc.aredis.utils.PropertyUtil;
-import com.mzyupc.aredis.utils.RedisPoolMgr;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import java.awt.event.ActionEvent;
-import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * @author mzyupc@163.com
  * @date 2021/8/7 5:33 下午
  */
-public class RemoveConnectionDialog extends DialogWrapper {
-    private CustomOKAction okAction;
-    private PropertyUtil propertyUtil;
-    private Tree connectionTree;
-    private Map<String, RedisPoolMgr> connectionRedisMap;
+public class ConfirmDialog extends DialogWrapper {
+    private final String centerPanelText;
+    private Consumer<ActionEvent> okActionConsumer;
 
-    public RemoveConnectionDialog(@Nullable Project project, Tree connectionTree, Map<String, RedisPoolMgr> connectionRedisMap) {
+    public ConfirmDialog(@NotNull Project project, String title, String centerPanelText) {
         super(project);
-        this.propertyUtil = PropertyUtil.getInstance(project);
-        this.connectionRedisMap = connectionRedisMap;
-        this.connectionTree = connectionTree;
-
-        this.setTitle("Confirm");
+        this.centerPanelText = centerPanelText;
+        this.setTitle(title);
+        this.setResizable(false);
+        this.setAutoAdjustable(true);
         this.init();
     }
 
@@ -41,7 +35,9 @@ public class RemoveConnectionDialog extends DialogWrapper {
     @Override
     protected @Nullable
     JComponent createCenterPanel() {
-        return new JLabel("Are you sure you want to delete the connection?");
+        JLabel jLabel = new JLabel(centerPanelText);
+        jLabel.setBorder(new EmptyBorder(10, 0, 10, 0));
+        return jLabel;
     }
 
     /**
@@ -53,10 +49,19 @@ public class RemoveConnectionDialog extends DialogWrapper {
     @Override
     protected Action[] createActions() {
         DialogWrapperExitAction exitAction = new DialogWrapperExitAction("Cancel", CANCEL_EXIT_CODE);
-        okAction = new CustomOKAction();
+        CustomOKAction okAction = new CustomOKAction();
         // 设置默认的焦点按钮
         okAction.putValue(DialogWrapper.DEFAULT_ACTION, true);
         return new Action[]{exitAction, okAction};
+    }
+
+    /**
+     * 设置ok按钮的自定义功能
+     *
+     * @param okActionConsumer
+     */
+    public void setCustomOkAction(Consumer<ActionEvent> okActionConsumer) {
+        this.okActionConsumer = okActionConsumer;
     }
 
     /**
@@ -69,9 +74,9 @@ public class RemoveConnectionDialog extends DialogWrapper {
 
         @Override
         protected void doAction(ActionEvent e) {
-            // connection列表中移除
-            ConnectionListUtil.removeConnectionFromTree(connectionTree, connectionRedisMap, propertyUtil);
-
+            if (okActionConsumer != null) {
+                okActionConsumer.accept(e);
+            }
             close(CANCEL_EXIT_CODE);
         }
     }

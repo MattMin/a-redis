@@ -5,14 +5,17 @@ import com.intellij.ide.TreeExpander;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.LoadingDecorator;
 import com.intellij.openapi.wm.ToolWindow;
+import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.treeStructure.Tree;
 import com.mzyupc.aredis.action.*;
+import com.mzyupc.aredis.utils.ConnectionListUtil;
 import com.mzyupc.aredis.utils.JTreeUtil;
 import com.mzyupc.aredis.utils.PropertyUtil;
 import com.mzyupc.aredis.utils.RedisPoolMgr;
+import com.mzyupc.aredis.view.dialog.ConfirmDialog;
 import com.mzyupc.aredis.view.dialog.ConnectionSettingsDialog;
-import com.mzyupc.aredis.view.dialog.RemoveConnectionDialog;
 import com.mzyupc.aredis.view.editor.ARedisFileSystem;
 import com.mzyupc.aredis.view.editor.ARedisVirtualFile;
 import com.mzyupc.aredis.vo.ConnectionInfo;
@@ -45,11 +48,41 @@ public class ARedisToolWindow implements Disposable {
     private Tree connectionTree;
     private DefaultMutableTreeNode connectionTreeRoot;
     private DefaultTreeModel connectionTreeModel;
+    private LoadingDecorator connectionTreeLoadingDecorator;
 
     public ARedisToolWindow(Project project, ToolWindow toolWindow) {
         this.project = project;
         this.propertyUtil = PropertyUtil.getInstance(project);
         initConnections();
+    }
+
+    private static TreeExpander getTreeExpander(JTree tree) {
+        return new TreeExpander() {
+            @Override
+            public void expandAll() {
+                expandTree(tree, true);
+            }
+
+            @Override
+            public boolean canExpand() {
+                return true;
+            }
+
+            @Override
+            public void collapseAll() {
+                DefaultMutableTreeNode root = (DefaultMutableTreeNode) tree.getModel().getRoot();
+                for (int i = 0; i < root.getChildCount(); i++) {
+                    DefaultMutableTreeNode child = (DefaultMutableTreeNode) root.getChildAt(i);
+                    JTreeUtil.expandAll(tree, new TreePath(child.getPath()), false);
+                }
+            }
+
+            @Override
+            public boolean canCollapse() {
+                return true;
+            }
+
+        };
     }
 
     public JPanel getContent() {
@@ -98,38 +131,8 @@ public class ARedisToolWindow implements Disposable {
         actionToolbar.adjustTheSameSize(true);
 
         connectionPanel.add(actionToolbar.getComponent(), BorderLayout.NORTH);
-        ScrollPane scrollPane = new ScrollPane();
-        scrollPane.add(connectionTree);
-        connectionPanel.add(scrollPane, BorderLayout.CENTER);
-    }
-
-    private static TreeExpander getTreeExpander(JTree tree) {
-        return new TreeExpander() {
-            @Override
-            public void expandAll() {
-                expandTree(tree, true);
-            }
-
-            @Override
-            public boolean canExpand() {
-                return true;
-            }
-
-            @Override
-            public void collapseAll() {
-                DefaultMutableTreeNode root = (DefaultMutableTreeNode) tree.getModel().getRoot();
-                for (int i = 0; i < root.getChildCount(); i++) {
-                    DefaultMutableTreeNode child = (DefaultMutableTreeNode) root.getChildAt(i);
-                    JTreeUtil.expandAll(tree, new TreePath(child.getPath()), false);
-                }
-            }
-
-            @Override
-            public boolean canCollapse() {
-                return true;
-            }
-
-        };
+        connectionTreeLoadingDecorator = new LoadingDecorator(new JBScrollPane(connectionTree), this, 0);
+        connectionPanel.add(connectionTreeLoadingDecorator.getComponent(), BorderLayout.CENTER);
     }
 
     /**
@@ -150,6 +153,7 @@ public class ARedisToolWindow implements Disposable {
 
                 // connectionTree的双击事件
                 if (e.getClickCount() == 2) {
+                    connectionTreeLoadingDecorator.startLoading(false);
                     // 第一个选中的节点路径
                     TreePath selectionPath = connectionTree.getSelectionPath();
                     if (selectionPath == null) {
@@ -168,6 +172,7 @@ public class ARedisToolWindow implements Disposable {
                             // 展开当前连接
                             JTreeUtil.expandAll(connectionTree, new TreePath(new Object[]{connectionTreeRoot, connectionNode}), true);
                         }
+
                     }
 
                     // 双击DB事件
@@ -184,6 +189,8 @@ public class ARedisToolWindow implements Disposable {
                                 dbInfo,
                                 connectionRedisMap.get(connectionInfo.getId())));
                     }
+
+                    connectionTreeLoadingDecorator.stopLoading();
                 }
 
                 if (e.getButton() == MouseEvent.BUTTON3) {
@@ -222,7 +229,11 @@ public class ARedisToolWindow implements Disposable {
         DeleteAction deleteAction = new DeleteAction();
         deleteAction.setAction(e -> {
             // 弹出删除确认对话框
-            RemoveConnectionDialog removeConnectionDialog = new RemoveConnectionDialog(project, connectionTree, connectionRedisMap);
+            ConfirmDialog removeConnectionDialog = new ConfirmDialog(project, "Confirm", "Are you sure you want to delete these connections?");
+            removeConnectionDialog.setCustomOkAction(actionEvent -> {
+                // connection列表中移除
+                ConnectionListUtil.removeConnectionFromTree(connectionTree, connectionRedisMap, propertyUtil);
+            });
             removeConnectionDialog.show();
         });
         return deleteAction;
@@ -231,6 +242,7 @@ public class ARedisToolWindow implements Disposable {
     private RefreshAction createRefreshAction() {
         RefreshAction refreshAction = new RefreshAction();
         refreshAction.setAction(e -> {
+            connectionTreeLoadingDecorator.startLoading(false);
             // reload server function
             TreePath[] selectionPaths = connectionTree.getSelectionPaths();
             if (selectionPaths == null) {
@@ -247,6 +259,7 @@ public class ARedisToolWindow implements Disposable {
                 addDbs2Connection(connectionNode);
                 connectionTreeModel.reload(connectionNode);
             }
+            connectionTreeLoadingDecorator.stopLoading();
         });
         return refreshAction;
     }

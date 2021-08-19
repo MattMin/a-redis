@@ -40,7 +40,7 @@ public class ARedisVirtualFile extends VirtualFile {
         this.name = name;
         this.connectionInfo = connectionInfo;
         this.dbInfo = dbInfo;
-        this.aRedisKeyValueDisplayPanel = new ARedisKeyValueDisplayPanel(connectionInfo, dbInfo, redisPoolMgr);
+        this.aRedisKeyValueDisplayPanel = new ARedisKeyValueDisplayPanel(project, connectionInfo, dbInfo, redisPoolMgr);
     }
 
     @Override

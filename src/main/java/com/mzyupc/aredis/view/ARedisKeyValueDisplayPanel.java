@@ -1,34 +1,42 @@
 package com.mzyupc.aredis.view;
 
 import com.intellij.ide.CommonActionsManager;
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.ActionPlaces;
 import com.intellij.openapi.actionSystem.ActionToolbar;
 import com.intellij.openapi.actionSystem.DefaultActionGroup;
-import com.intellij.openapi.ui.Splitter;
-import com.intellij.ui.JBColor;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.LoadingDecorator;
 import com.intellij.ui.JBSplitter;
 import com.intellij.ui.SearchTextField;
+import com.intellij.ui.components.JBScrollPane;
+import com.intellij.ui.components.JBTextField;
 import com.intellij.ui.treeStructure.Tree;
 import com.mzyupc.aredis.action.AddAction;
 import com.mzyupc.aredis.action.ClearAction;
 import com.mzyupc.aredis.action.DeleteAction;
 import com.mzyupc.aredis.action.RefreshAction;
-import com.mzyupc.aredis.layout.VFlowLayout;
 import com.mzyupc.aredis.utils.RedisPoolMgr;
+import com.mzyupc.aredis.view.dialog.ConfirmDialog;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import com.mzyupc.aredis.vo.DbInfo;
+import lombok.SneakyThrows;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang.StringUtils;
+import redis.clients.jedis.Jedis;
 import redis.clients.jedis.ScanParams;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-import javax.swing.border.LineBorder;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.TreePath;
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.util.ArrayList;
 import java.util.List;
 
 import static com.mzyupc.aredis.utils.JTreeUtil.getTreeExpander;
@@ -38,17 +46,19 @@ import static com.mzyupc.aredis.utils.JTreeUtil.getTreeExpander;
  * <p>
  * key-value展示
  */
-public class ARedisKeyValueDisplayPanel extends JPanel {
+public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
     private static final String DEFAULT_FILTER = "*";
     private static final String DEFAULT_GROUP_SYMBOL = ":";
     private static final Integer DEFAULT_PAGE_SIZE = 500;
 
+    private Project project;
     private JPanel formPanel;
     private JBSplitter splitterContainer;
     /**
      * key展示区域 包括key工具栏区域, key树状图区域
      */
     private JPanel keyDisplayPanel;
+    private LoadingDecorator keyDisplayLoadingDecorator;
 
     private JPanel valueDisplayPanel;
     private JPanel valuePreviewPanel;
@@ -63,7 +73,7 @@ public class ARedisKeyValueDisplayPanel extends JPanel {
     private RedisPoolMgr redisPoolMgr;
 
     private Tree keyTree;
-    private ScrollPane keyTreeScrollPane;
+    private JBScrollPane keyTreeScrollPane;
     private DefaultTreeModel treeModel;
     /**
      * 用来给Key分组的符号
@@ -84,7 +94,8 @@ public class ARedisKeyValueDisplayPanel extends JPanel {
     private String cursor = ScanParams.SCAN_POINTER_START;
 
 
-    public ARedisKeyValueDisplayPanel(ConnectionInfo connectionInfo, DbInfo dbInfo, RedisPoolMgr redisPoolMgr) {
+    public ARedisKeyValueDisplayPanel(Project project, ConnectionInfo connectionInfo, DbInfo dbInfo, RedisPoolMgr redisPoolMgr) {
+        this.project = project;
         this.connectionInfo = connectionInfo;
         this.dbInfo = dbInfo;
         this.redisPoolMgr = redisPoolMgr;
@@ -95,8 +106,6 @@ public class ARedisKeyValueDisplayPanel extends JPanel {
     private void initPanel() {
         initKeyToolBarPanel();
         initKeyTreePanel();
-
-
     }
 
     /**
@@ -114,6 +123,7 @@ public class ARedisKeyValueDisplayPanel extends JPanel {
         // 删除key
         actions.add(createDeleteAction());
         // 清空key
+        actions.addSeparator();
         actions.add(createClearAction());
         // 展开, 折叠
         actions.addSeparator();
@@ -123,42 +133,36 @@ public class ARedisKeyValueDisplayPanel extends JPanel {
                 .createActionToolbar(ActionPlaces.TOOLBAR, actions, true);
         actionToolbar.setTargetComponent(keyDisplayPanel);
 
-
-        JPanel toolbar1 = new JPanel();
-        toolbar1.setLayout(new FlowLayout(FlowLayout.LEFT));
         // key过滤器
         JPanel searchTextField = createSearchBox();
-        toolbar1.add(searchTextField);
 
         // key分组器
         JPanel groupTextField = createGroupByPanel();
-        toolbar1.add(groupTextField);
 
-        keyToolBarPanel = new JPanel(new VFlowLayout());
+        keyToolBarPanel.add(searchTextField);
+        keyToolBarPanel.add(groupTextField);
         keyToolBarPanel.add(actionToolbar.getComponent());
-        keyToolBarPanel.add(toolbar1);
-
-        keyDisplayPanel.add(keyToolBarPanel, BorderLayout.NORTH);
     }
 
     private void initKeyTreePanel() {
-        // todo
-        renderKeyTree();
-//        ScrollPane scrollPane = new ScrollPane();
-//        scrollPane.add(keyTree);
-//        keyDisplayPanel.add(scrollPane, BorderLayout.CENTER);
+        ApplicationManager.getApplication().invokeLater(this::renderKeyTree);
     }
 
     /**
      * todo 渲染keyTree
      */
+    @SneakyThrows
     private void renderKeyTree() {
+        keyDisplayLoadingDecorator.startLoading(false);
 
         DefaultMutableTreeNode root = new DefaultMutableTreeNode();
+        Long dbSize = redisPoolMgr.dbSize(dbInfo.getIndex());
+        dbInfo.setKeyCount(dbSize);
         root.setUserObject(dbInfo);
         treeModel = new DefaultTreeModel(root);
 
         // redis 查询前pageSize个key
+        // todo
         List<String> scan = redisPoolMgr.scan(cursor, keyFilter, pageSize, dbInfo.getIndex());
         if (!CollectionUtils.isEmpty(scan)) {
             for (String key : scan) {
@@ -166,24 +170,42 @@ public class ARedisKeyValueDisplayPanel extends JPanel {
                 root.add(keyNode);
             }
         }
+
         keyTree.setModel(treeModel);
-        keyTree.setBorder(new LineBorder(JBColor.RED, 1));
         keyTree.setScrollsOnExpand(true);
-        treeModel.reload();
-        keyTreeScrollPane.removeAll();
-        keyTreeScrollPane.add(keyTree);
+        keyTreeScrollPane = new JBScrollPane(keyTree);
+        keyDisplayPanel.removeAll();
         keyDisplayPanel.add(keyTreeScrollPane, BorderLayout.CENTER);
+        keyDisplayPanel.updateUI();
+        keyDisplayLoadingDecorator.stopLoading();
     }
 
+    /**
+     * 清空Key
+     *
+     * @return
+     */
     private ClearAction createClearAction() {
         ClearAction clearAction = new ClearAction();
         clearAction.setAction(e -> {
             // todo
-            System.out.println("clear action performed");
+            ConfirmDialog confirmDialog = new ConfirmDialog(project, "Confirm", "Are you sure you want to delete all the keys of the currently selected DB?");
+            confirmDialog.setCustomOkAction(actionEvent -> {
+                try (Jedis jedis = redisPoolMgr.getJedis(dbInfo.getIndex())) {
+                    jedis.flushDB();
+                }
+                renderKeyTree();
+            });
+            confirmDialog.show();
         });
         return clearAction;
     }
 
+    /**
+     * 添加key
+     *
+     * @return
+     */
     private AddAction createAddAction() {
         AddAction addAction = new AddAction();
         addAction.setAction(e -> {
@@ -193,13 +215,56 @@ public class ARedisKeyValueDisplayPanel extends JPanel {
         return addAction;
     }
 
+    /**
+     * 删除key
+     *
+     * @return
+     */
     private DeleteAction createDeleteAction() {
         DeleteAction deleteAction = new DeleteAction();
         deleteAction.setAction(e -> {
-            // todo
-            System.out.println("delete action performed");
+            TreePath[] selectionPaths = keyTree.getSelectionPaths();
+            // 根节点
+            if (selectionPaths != null && selectionPaths.length == 1 && selectionPaths[0].getPathCount() == 1) {
+                return;
+            }
+            ConfirmDialog confirmDialog = new ConfirmDialog(project, "Confirm", "Are you sure you want to delete these keys?");
+            confirmDialog.setCustomOkAction(actionEvent -> {
+                // 删除选中的key, 如果选中的是上层
+                if (selectionPaths != null) {
+                    for (TreePath selectionPath : selectionPaths) {
+                        if (selectionPath.getPathCount() <= 1) {
+                            return;
+                        } else {
+                            DefaultMutableTreeNode selectNode = (DefaultMutableTreeNode) selectionPath.getLastPathComponent();
+                            List<String> keys = new ArrayList<>();
+                            findDeleteKeys(selectNode, keys);
+                            if (CollectionUtils.isNotEmpty(keys)) {
+                                try (Jedis jedis = redisPoolMgr.getJedis(dbInfo.getIndex())) {
+                                    jedis.del(keys.toArray(new String[]{}));
+                                }
+                                renderKeyTree();
+                            }
+                        }
+                    }
+                }
+            });
+            confirmDialog.show();
         });
         return deleteAction;
+    }
+
+
+    private void findDeleteKeys(DefaultMutableTreeNode treeNode, List<String> keys) {
+        if (treeNode.isLeaf()) {
+            String key = (String) treeNode.getUserObject();
+            keys.add(key);
+        } else {
+            for (int i = 0; i < treeNode.getChildCount(); i++) {
+                DefaultMutableTreeNode child = (DefaultMutableTreeNode) treeNode.getChildAt(i);
+                findDeleteKeys(child, keys);
+            }
+        }
     }
 
     private RefreshAction createRefreshAction() {
@@ -232,8 +297,14 @@ public class ARedisKeyValueDisplayPanel extends JPanel {
                     // 调用搜索功能
                     // todo 根据输入的key, 重新渲染keyTree
                     keyFilter = searchTextField.getText();
+                    if (StringUtils.isEmpty(keyFilter)) {
+                        keyFilter = DEFAULT_FILTER;
+                        searchTextField.setText(keyFilter);
+                    } else {
+                        searchTextField.addCurrentTextToHistory();
+                    }
+
                     renderKeyTree();
-                    searchTextField.addCurrentTextToHistory();
                 }
             }
 
@@ -251,7 +322,7 @@ public class ARedisKeyValueDisplayPanel extends JPanel {
         JPanel groupByPanel = new JPanel();
         groupByPanel.setBorder(new EmptyBorder(0, 0, 0, 0));
 
-        JTextField groupText = new JTextField(DEFAULT_GROUP_SYMBOL);
+        JBTextField groupText = new JBTextField(DEFAULT_GROUP_SYMBOL);
         groupText.addKeyListener(new KeyListener() {
             @Override
             public void keyTyped(KeyEvent e) {
@@ -264,8 +335,12 @@ public class ARedisKeyValueDisplayPanel extends JPanel {
                     // 调用分组功能
                     // todo 根据输入的key, 重新渲染keyTree
                     groupSymbol = groupText.getText();
+                    if (StringUtils.isEmpty(groupSymbol)) {
+                        groupSymbol = DEFAULT_GROUP_SYMBOL;
+                        groupText.setText(groupSymbol);
+                    }
                     renderKeyTree();
-                    System.out.println("enter pressed");
+
                 }
             }
 
@@ -285,26 +360,31 @@ public class ARedisKeyValueDisplayPanel extends JPanel {
         this.setLayout(new BorderLayout());
         this.add(formPanel);
 
-        keyDisplayPanel = new JPanel(new BorderLayout());
-        keyDisplayPanel.setBorder(new EmptyBorder(0, 10, 10, 10));
-        keyDisplayPanel.setMinimumSize(new Dimension(200, 500));
+        keyToolBarPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
 
         keyTree = new Tree();
 
-        keyTreeScrollPane = new ScrollPane();
+        keyDisplayPanel = new JPanel(new BorderLayout());
+        keyDisplayPanel.setMinimumSize(new Dimension(100, 100));
+
+        keyDisplayLoadingDecorator = new LoadingDecorator(keyDisplayPanel, this, 0);
 
         valueDisplayPanel = new JPanel();
+        valueDisplayPanel.setMinimumSize(new Dimension(100, 100));
 
-        splitterContainer = new JBSplitter(false, 0.3f);
-        formPanel.add(splitterContainer, BorderLayout.CENTER);
-
-        splitterContainer.setFirstComponent(keyDisplayPanel);
+        splitterContainer = new JBSplitter(false, 0.35f);
+        splitterContainer.setFirstComponent(keyDisplayLoadingDecorator.getComponent());
         splitterContainer.setSecondComponent(valueDisplayPanel);
-        splitterContainer.setDoubleBuffered(true);
         splitterContainer.setDividerWidth(2);
         splitterContainer.setShowDividerControls(true);
-        splitterContainer.setDividerPositionStrategy(Splitter.DividerPositionStrategy.KEEP_FIRST_SIZE);
         splitterContainer.setSplitterProportionKey("aRedis.keyValue.splitter");
+
+        formPanel.add(keyToolBarPanel, BorderLayout.NORTH);
+        formPanel.add(splitterContainer, BorderLayout.CENTER);
+    }
+
+    @Override
+    public void dispose() {
 
     }
 }
