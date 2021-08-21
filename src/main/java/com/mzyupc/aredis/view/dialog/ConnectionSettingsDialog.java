@@ -5,6 +5,7 @@ import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.ui.JBColor;
+import com.intellij.ui.NumberDocument;
 import com.intellij.ui.treeStructure.Tree;
 import com.mzyupc.aredis.utils.ConnectionListUtil;
 import com.mzyupc.aredis.utils.PropertyUtil;
@@ -81,6 +82,7 @@ public class ConnectionSettingsDialog extends DialogWrapper {
         hostField.setToolTipText("Host");
         portField = new JTextField(newConnection ? null : connection.getPort());
         portField.setToolTipText("Port");
+        portField.setDocument(new NumberDocument());
 
         // password输入框
         passwordField = new JPasswordField(newConnection ? null : connection.getPassword());
@@ -335,7 +337,7 @@ public class ConnectionSettingsDialog extends DialogWrapper {
                     propertyUtil.removeConnection(connectionId);
                     propertyUtil.saveConnection(connectionInfo);
 
-                    close(CANCEL_EXIT_CODE);
+                    close(OK_EXIT_CODE);
                 }
             }
         }

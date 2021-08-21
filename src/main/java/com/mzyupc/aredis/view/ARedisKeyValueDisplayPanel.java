@@ -1,5 +1,6 @@
 package com.mzyupc.aredis.view;
 
+import com.alibaba.fastjson.JSON;
 import com.intellij.ide.CommonActionsManager;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.ActionManager;
@@ -20,9 +21,11 @@ import com.mzyupc.aredis.action.DeleteAction;
 import com.mzyupc.aredis.action.RefreshAction;
 import com.mzyupc.aredis.utils.RedisPoolMgr;
 import com.mzyupc.aredis.view.dialog.ConfirmDialog;
+import com.mzyupc.aredis.view.dialog.ErrorDialog;
 import com.mzyupc.aredis.view.dialog.NewKeyDialog;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import com.mzyupc.aredis.vo.DbInfo;
+import com.mzyupc.aredis.vo.KeyInfo;
 import lombok.SneakyThrows;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
@@ -40,6 +43,7 @@ import java.awt.event.KeyListener;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.intellij.openapi.ui.DialogWrapper.OK_EXIT_CODE;
 import static com.mzyupc.aredis.utils.JTreeUtil.getTreeExpander;
 
 /**
@@ -51,6 +55,8 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
     private static final String DEFAULT_FILTER = "*";
     private static final String DEFAULT_GROUP_SYMBOL = ":";
     private static final Integer DEFAULT_PAGE_SIZE = 500;
+    private static final String REMOVED_KEY_PREFIX = "(Removed) ";
+
 
     private Project project;
     private JPanel formPanel;
@@ -105,8 +111,8 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
     }
 
     private void initPanel() {
-        initKeyToolBarPanel();
-        initKeyTreePanel();
+        ApplicationManager.getApplication().invokeLater(this::initKeyToolBarPanel);
+        ApplicationManager.getApplication().invokeLater(this::initKeyTreePanel);
     }
 
     /**
@@ -146,7 +152,7 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
     }
 
     private void initKeyTreePanel() {
-        ApplicationManager.getApplication().invokeLater(this::renderKeyTree);
+        renderKeyTree();
     }
 
     /**
@@ -154,30 +160,40 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
      */
     @SneakyThrows
     private void renderKeyTree() {
-        keyDisplayLoadingDecorator.startLoading(false);
-
-        DefaultMutableTreeNode root = new DefaultMutableTreeNode();
-        Long dbSize = redisPoolMgr.dbSize(dbInfo.getIndex());
-        dbInfo.setKeyCount(dbSize);
-        root.setUserObject(dbInfo);
-        treeModel = new DefaultTreeModel(root);
-
-        // redis 查询前pageSize个key
-        // todo
-        List<String> scan = redisPoolMgr.scan(cursor, keyFilter, pageSize, dbInfo.getIndex());
-        if (!CollectionUtils.isEmpty(scan)) {
-            for (String key : scan) {
-                DefaultMutableTreeNode keyNode = new DefaultMutableTreeNode(key);
-                root.add(keyNode);
-            }
+        if (dbInfo.getKeyCount() > 10000) {
+            keyDisplayLoadingDecorator.startLoading(true);
+        } else {
+            keyDisplayLoadingDecorator.startLoading(false);
         }
 
-        keyTree.setModel(treeModel);
-        keyTree.setScrollsOnExpand(true);
-        keyTreeScrollPane = new JBScrollPane(keyTree);
-        keyDisplayPanel.removeAll();
-        keyDisplayPanel.add(keyTreeScrollPane, BorderLayout.CENTER);
-        keyDisplayPanel.updateUI();
+        ApplicationManager.getApplication().invokeLater(() -> {
+            DefaultMutableTreeNode root = new DefaultMutableTreeNode();
+            Long dbSize = redisPoolMgr.dbSize(dbInfo.getIndex());
+            dbInfo.setKeyCount(dbSize);
+            root.setUserObject(dbInfo);
+            treeModel = new DefaultTreeModel(root);
+
+            // redis 查询前pageSize个key
+            // todo
+            List<String> scan = redisPoolMgr.scan(cursor, keyFilter, pageSize, dbInfo.getIndex());
+            if (!CollectionUtils.isEmpty(scan)) {
+                for (String key : scan) {
+                    DefaultMutableTreeNode keyNode = new DefaultMutableTreeNode(KeyInfo.builder()
+                            .key(key)
+                            .del(false)
+                            .build());
+                    root.add(keyNode);
+                }
+            }
+
+            keyTree.setModel(treeModel);
+            keyTree.setScrollsOnExpand(true);
+            keyTreeScrollPane = new JBScrollPane(keyTree);
+            keyDisplayPanel.removeAll();
+            keyDisplayPanel.add(keyTreeScrollPane, BorderLayout.CENTER);
+            keyDisplayPanel.updateUI();
+        });
+
         keyDisplayLoadingDecorator.stopLoading();
     }
 
@@ -213,15 +229,82 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
     private AddAction createAddAction() {
         AddAction addAction = new AddAction();
         addAction.setAction(e -> {
-            // todo
-            NewKeyDialog newKeyDialog = new NewKeyDialog(
-                    project,
-                    actionEvent -> {
-                        // todo
+            NewKeyDialog newKeyDialog = new NewKeyDialog(project);
+            newKeyDialog.setCustomOkAction(actionEvent -> {
+                try {
+                    String key = newKeyDialog.getKeyTextField().getText();
+                    if (StringUtils.isEmpty(key)) {
+                        ErrorDialog.show("Key can not be empty");
+                    }
+                    String valueString;
+                    // 判断数据类型, 并存入
+                    switch (newKeyDialog.getSelectedType()) {
+                        case String:
+                            valueString = newKeyDialog.getStringValueTextArea().getText();
+                            if (StringUtils.isEmpty(valueString)) {
+                                ErrorDialog.show("Value can not be empty");
+                            }
+                            redisPoolMgr.set(key, valueString, 0, dbInfo.getIndex());
+                            break;
 
-                    });
+                        case List:
+                            valueString = newKeyDialog.getListValueTextArea().getText();
+                            if (StringUtils.isEmpty(valueString)) {
+                                ErrorDialog.show("Value can not be empty");
+                            }
+                            try {
+                                List<String> strings = JSON.parseArray(valueString, String.class);
+                                redisPoolMgr.lpush(key, strings.toArray(new String[]{}), dbInfo.getIndex());
+                            } catch (Exception exception) {
+                                redisPoolMgr.lpush(key, new String[]{valueString}, dbInfo.getIndex());
+                            }
+                            break;
+
+                        case Set:
+                            valueString = newKeyDialog.getSetValueTextArea().getText();
+                            if (StringUtils.isEmpty(valueString)) {
+                                ErrorDialog.show("Value can not be empty");
+                            }
+                            try {
+                                List<String> strings = JSON.parseArray(valueString, String.class);
+                                redisPoolMgr.sadd(key, dbInfo.getIndex(), strings.toArray(new String[]{}));
+                            } catch (Exception exception) {
+                                redisPoolMgr.sadd(key, dbInfo.getIndex(), valueString);
+                            }
+                            break;
+
+                        case Zset:
+                            valueString = newKeyDialog.getZsetValueTextArea().getText();
+                            if (StringUtils.isEmpty(valueString)) {
+                                ErrorDialog.show("Value can not be empty");
+                            }
+                            String score = newKeyDialog.getScoreTextField().getText();
+                            try (Jedis jedis = redisPoolMgr.getJedis(dbInfo.getIndex())) {
+                                jedis.zadd(key, Double.parseDouble(score), valueString);
+                            }
+                            break;
+
+                        default:
+                            // Hash
+                            valueString = newKeyDialog.getHashValueTextArea().getText();
+                            if (StringUtils.isEmpty(valueString)) {
+                                ErrorDialog.show("Value can not be empty");
+                            }
+                            String field = newKeyDialog.getFieldTextField().getText();
+                            if (StringUtils.isEmpty(field)) {
+                                ErrorDialog.show("Field can not be empty");
+                            }
+                            redisPoolMgr.hset(key, field, valueString, dbInfo.getIndex());
+                    }
+                    // 关闭对话框
+                    newKeyDialog.close(OK_EXIT_CODE);
+                    // 重新渲染keyTree
+                    renderKeyTree();
+                } catch (Exception exp) {
+                    ErrorDialog.show(exp.getMessage() + "");
+                }
+            });
             newKeyDialog.show();
-            System.out.println("add action performed");
         });
         return addAction;
     }
@@ -247,20 +330,19 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
                         // 删除选中的key, 如果选中的是上层
                         if (selectionPaths != null) {
                             for (TreePath selectionPath : selectionPaths) {
-                                if (selectionPath.getPathCount() <= 1) {
-                                    return;
-                                } else {
+                                if (selectionPath.getPathCount() > 1) {
                                     DefaultMutableTreeNode selectNode = (DefaultMutableTreeNode) selectionPath.getLastPathComponent();
                                     List<String> keys = new ArrayList<>();
                                     findDeleteKeys(selectNode, keys);
                                     if (CollectionUtils.isNotEmpty(keys)) {
                                         try (Jedis jedis = redisPoolMgr.getJedis(dbInfo.getIndex())) {
                                             jedis.del(keys.toArray(new String[]{}));
+                                            dbInfo.setKeyCount(dbInfo.getKeyCount() - keys.size());
                                         }
-                                        renderKeyTree();
                                     }
                                 }
                             }
+                            treeModel.reload();
                         }
                     });
             confirmDialog.show();
@@ -271,8 +353,12 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
 
     private void findDeleteKeys(DefaultMutableTreeNode treeNode, List<String> keys) {
         if (treeNode.isLeaf()) {
-            String key = (String) treeNode.getUserObject();
-            keys.add(key);
+            KeyInfo keyInfo = (KeyInfo) treeNode.getUserObject();
+            if (!keyInfo.isDel()) {
+                keyInfo.setDel(true);
+                treeNode.setUserObject(keyInfo);
+                keys.add(keyInfo.getKey());
+            }
         } else {
             for (int i = 0; i < treeNode.getChildCount(); i++) {
                 DefaultMutableTreeNode child = (DefaultMutableTreeNode) treeNode.getChildAt(i);

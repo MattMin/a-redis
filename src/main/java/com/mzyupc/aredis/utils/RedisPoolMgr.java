@@ -130,7 +130,7 @@ public class RedisPoolMgr extends CloseTranscoder implements Disposable {
             Messages.showMessageDialog(
                     "Failed to initialize the Redis pool." + "\n" + e.getMessage(),
                     "Error",
-                    Messages.getInformationIcon());
+                    Messages.getErrorIcon());
         }
     }
 
