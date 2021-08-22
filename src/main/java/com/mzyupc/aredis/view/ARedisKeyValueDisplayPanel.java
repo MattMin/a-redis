@@ -23,6 +23,7 @@ import com.mzyupc.aredis.utils.RedisPoolMgr;
 import com.mzyupc.aredis.view.dialog.ConfirmDialog;
 import com.mzyupc.aredis.view.dialog.ErrorDialog;
 import com.mzyupc.aredis.view.dialog.NewKeyDialog;
+import com.mzyupc.aredis.view.tree.KeyTreeCellRenderer;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import com.mzyupc.aredis.vo.DbInfo;
 import com.mzyupc.aredis.vo.KeyInfo;
@@ -54,7 +55,7 @@ import static com.mzyupc.aredis.utils.JTreeUtil.getTreeExpander;
 public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
     private static final String DEFAULT_FILTER = "*";
     private static final String DEFAULT_GROUP_SYMBOL = ":";
-    private static final Integer DEFAULT_PAGE_SIZE = 500;
+    private static final Integer DEFAULT_PAGE_SIZE = 10000;
     private static final String REMOVED_KEY_PREFIX = "(Removed) ";
 
 
@@ -187,6 +188,7 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
             }
 
             keyTree.setModel(treeModel);
+            keyTree.setCellRenderer(new KeyTreeCellRenderer());
             keyTree.setScrollsOnExpand(true);
             keyTreeScrollPane = new JBScrollPane(keyTree);
             keyDisplayPanel.removeAll();
@@ -235,6 +237,7 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
                     String key = newKeyDialog.getKeyTextField().getText();
                     if (StringUtils.isEmpty(key)) {
                         ErrorDialog.show("Key can not be empty");
+                        return;
                     }
                     String valueString;
                     // 判断数据类型, 并存入
@@ -243,20 +246,35 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
                             valueString = newKeyDialog.getStringValueTextArea().getText();
                             if (StringUtils.isEmpty(valueString)) {
                                 ErrorDialog.show("Value can not be empty");
+                            } else {
+                                redisPoolMgr.set(key, valueString, 0, dbInfo.getIndex());
+                                // 关闭对话框
+                                newKeyDialog.close(OK_EXIT_CODE);
+
+                                if (newKeyDialog.isReloadSelected()) {
+                                    // 重新渲染keyTree
+                                    renderKeyTree();
+                                }
                             }
-                            redisPoolMgr.set(key, valueString, 0, dbInfo.getIndex());
                             break;
 
                         case List:
                             valueString = newKeyDialog.getListValueTextArea().getText();
                             if (StringUtils.isEmpty(valueString)) {
                                 ErrorDialog.show("Value can not be empty");
-                            }
-                            try {
-                                List<String> strings = JSON.parseArray(valueString, String.class);
-                                redisPoolMgr.lpush(key, strings.toArray(new String[]{}), dbInfo.getIndex());
-                            } catch (Exception exception) {
-                                redisPoolMgr.lpush(key, new String[]{valueString}, dbInfo.getIndex());
+                            } else {
+                                try {
+                                    List<String> strings = JSON.parseArray(valueString, String.class);
+                                    redisPoolMgr.lpush(key, strings.toArray(new String[]{}), dbInfo.getIndex());
+                                } catch (Exception exception) {
+                                    redisPoolMgr.lpush(key, new String[]{valueString}, dbInfo.getIndex());
+                                }
+                                // 关闭对话框
+                                newKeyDialog.close(OK_EXIT_CODE);
+                                if (newKeyDialog.isReloadSelected()) {
+                                    // 重新渲染keyTree
+                                    renderKeyTree();
+                                }
                             }
                             break;
 
@@ -264,42 +282,61 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
                             valueString = newKeyDialog.getSetValueTextArea().getText();
                             if (StringUtils.isEmpty(valueString)) {
                                 ErrorDialog.show("Value can not be empty");
-                            }
-                            try {
-                                List<String> strings = JSON.parseArray(valueString, String.class);
-                                redisPoolMgr.sadd(key, dbInfo.getIndex(), strings.toArray(new String[]{}));
-                            } catch (Exception exception) {
-                                redisPoolMgr.sadd(key, dbInfo.getIndex(), valueString);
+                            } else {
+                                try {
+                                    List<String> strings = JSON.parseArray(valueString, String.class);
+                                    redisPoolMgr.sadd(key, dbInfo.getIndex(), strings.toArray(new String[]{}));
+                                } catch (Exception exception) {
+                                    redisPoolMgr.sadd(key, dbInfo.getIndex(), valueString);
+                                }
+                                // 关闭对话框
+                                newKeyDialog.close(OK_EXIT_CODE);
+                                if (newKeyDialog.isReloadSelected()) {
+                                    // 重新渲染keyTree
+                                    renderKeyTree();
+                                }
                             }
                             break;
 
                         case Zset:
                             valueString = newKeyDialog.getZsetValueTextArea().getText();
+                            String score = newKeyDialog.getScoreTextField().getText();
                             if (StringUtils.isEmpty(valueString)) {
                                 ErrorDialog.show("Value can not be empty");
-                            }
-                            String score = newKeyDialog.getScoreTextField().getText();
-                            try (Jedis jedis = redisPoolMgr.getJedis(dbInfo.getIndex())) {
-                                jedis.zadd(key, Double.parseDouble(score), valueString);
+                            } else if (StringUtils.isEmpty(score)) {
+                                ErrorDialog.show("Score can not be empty");
+                            } else {
+                                try (Jedis jedis = redisPoolMgr.getJedis(dbInfo.getIndex())) {
+                                    jedis.zadd(key, Double.parseDouble(score), valueString);
+                                }
+                                // 关闭对话框
+                                newKeyDialog.close(OK_EXIT_CODE);
+                                if (newKeyDialog.isReloadSelected()) {
+                                    // 重新渲染keyTree
+                                    renderKeyTree();
+                                }
                             }
                             break;
 
                         default:
                             // Hash
                             valueString = newKeyDialog.getHashValueTextArea().getText();
+                            String field = newKeyDialog.getFieldTextField().getText();
                             if (StringUtils.isEmpty(valueString)) {
                                 ErrorDialog.show("Value can not be empty");
-                            }
-                            String field = newKeyDialog.getFieldTextField().getText();
-                            if (StringUtils.isEmpty(field)) {
+                            } else if (StringUtils.isEmpty(field)) {
                                 ErrorDialog.show("Field can not be empty");
+                            } else {
+                                redisPoolMgr.hset(key, field, valueString, dbInfo.getIndex());
+                                // 关闭对话框
+                                newKeyDialog.close(OK_EXIT_CODE);
+                                if (newKeyDialog.isReloadSelected()) {
+                                    // 重新渲染keyTree
+                                    renderKeyTree();
+                                }
                             }
-                            redisPoolMgr.hset(key, field, valueString, dbInfo.getIndex());
                     }
-                    // 关闭对话框
-                    newKeyDialog.close(OK_EXIT_CODE);
-                    // 重新渲染keyTree
-                    renderKeyTree();
+
                 } catch (Exception exp) {
                     ErrorDialog.show(exp.getMessage() + "");
                 }

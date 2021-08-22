@@ -11,7 +11,7 @@ import redis.clients.util.Pool;
 
 import java.io.*;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -602,7 +602,7 @@ public class RedisPoolMgr extends CloseTranscoder implements Disposable {
     }
 
     public List<String> scan(String cursor, String pattern, int count, int db) {
-        List<String> list = new ArrayList<>();
+        List<String> list = new LinkedList<>();
         Jedis jedis = null;
         try {
             jedis = getJedis(db);

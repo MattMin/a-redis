@@ -2,10 +2,12 @@ package com.mzyupc.aredis.view.dialog;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
-import com.intellij.ui.EditorTextField;
+import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
+import com.intellij.ui.components.JBTextArea;
 import com.mzyupc.aredis.utils.FormatUtil;
+import com.mzyupc.aredis.utils.PropertyUtil;
 import com.mzyupc.aredis.view.dialog.enums.RedisValueTypeEnum;
 import com.mzyupc.aredis.view.dialog.enums.ValueFormatEnum;
 import lombok.Getter;
@@ -15,6 +17,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ItemEvent;
@@ -60,14 +64,23 @@ public class NewKeyDialog extends DialogWrapper {
      */
     private JTextField fieldTextField;
 
-    private EditorTextField stringValueTextArea;
-    private EditorTextField listValueTextArea;
-    private EditorTextField setValueTextArea;
-    private EditorTextField zsetValueTextArea;
-    private EditorTextField hashValueTextArea;
+    private JBTextArea stringValueTextArea;
+    private JBTextArea listValueTextArea;
+    private JBTextArea setValueTextArea;
+    private JBTextArea zsetValueTextArea;
+    private JBTextArea hashValueTextArea;
+
+    /**
+     * Reload after adding the key
+     */
+    private boolean reloadSelected;
+
+    private PropertyUtil propertyUtil;
 
     public NewKeyDialog(@Nullable Project project) {
         super(project);
+        propertyUtil = PropertyUtil.getInstance(project);
+        reloadSelected = propertyUtil.getReloadAfterAddingTheKey();
         this.init();
     }
 
@@ -89,10 +102,23 @@ public class NewKeyDialog extends DialogWrapper {
         keyAndTypePanel.add(keyPanel, BorderLayout.NORTH);
         keyAndTypePanel.add(typePanel, BorderLayout.SOUTH);
 
+        JBCheckBox reloadCheckBox = new JBCheckBox("Reload after adding the key", reloadSelected);
+        reloadCheckBox.addChangeListener(new ChangeListener() {
+            @Override
+            public void stateChanged(ChangeEvent e) {
+                reloadSelected = reloadCheckBox.isSelected();
+                propertyUtil.setReloadAfterAddingTheKey(reloadSelected);
+            }
+        });
+        JPanel reloadPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        reloadPanel.add(reloadCheckBox);
+
         JPanel container = new JPanel(new BorderLayout());
         container.setMinimumSize(new Dimension(500, 250));
         container.add(keyAndTypePanel, BorderLayout.NORTH);
         container.add(valuePanel, BorderLayout.CENTER);
+        container.add(reloadPanel, BorderLayout.AFTER_LAST_LINE);
+
         return container;
     }
 
@@ -192,41 +218,46 @@ public class NewKeyDialog extends DialogWrapper {
     @NotNull
     private JPanel createSimpleValuePanel(RedisValueTypeEnum valueTypeEnum) {
         JBScrollPane valueArea;
-        EditorTextField valueTextArea;
+        JBTextArea valueTextArea;
         switch (valueTypeEnum) {
             case List:
-                listValueTextArea = new EditorTextField();
-                listValueTextArea.setOneLineMode(false);
+                listValueTextArea = new JBTextArea();
+                listValueTextArea.setRows(5);
+                listValueTextArea.setLineWrap(true);
                 listValueTextArea.setAutoscrolls(true);
-                valueArea = new JBScrollPane(listValueTextArea.getComponent());
+                valueArea = new JBScrollPane(listValueTextArea);
                 valueTextArea = listValueTextArea;
                 break;
             case Set:
-                setValueTextArea = new EditorTextField();
-                setValueTextArea.setOneLineMode(false);
+                setValueTextArea = new JBTextArea();
+                setValueTextArea.setRows(5);
+                setValueTextArea.setLineWrap(true);
                 setValueTextArea.setAutoscrolls(true);
-                valueArea = new JBScrollPane(setValueTextArea.getComponent());
+                valueArea = new JBScrollPane(setValueTextArea);
                 valueTextArea = setValueTextArea;
                 break;
             case Zset:
-                zsetValueTextArea = new EditorTextField();
-                zsetValueTextArea.setOneLineMode(false);
+                zsetValueTextArea = new JBTextArea();
+                zsetValueTextArea.setRows(5);
+                zsetValueTextArea.setLineWrap(true);
                 zsetValueTextArea.setAutoscrolls(true);
-                valueArea = new JBScrollPane(zsetValueTextArea.getComponent());
+                valueArea = new JBScrollPane(zsetValueTextArea);
                 valueTextArea = zsetValueTextArea;
                 break;
             case Hash:
-                hashValueTextArea = new EditorTextField();
-                hashValueTextArea.setOneLineMode(false);
+                hashValueTextArea = new JBTextArea();
+                hashValueTextArea.setRows(5);
+                hashValueTextArea.setLineWrap(true);
                 hashValueTextArea.setAutoscrolls(true);
-                valueArea = new JBScrollPane(hashValueTextArea.getComponent());
+                valueArea = new JBScrollPane(hashValueTextArea);
                 valueTextArea = hashValueTextArea;
                 break;
             default:
-                stringValueTextArea = new EditorTextField();
-                stringValueTextArea.setOneLineMode(false);
+                stringValueTextArea = new JBTextArea();
+                stringValueTextArea.setRows(5);
+                stringValueTextArea.setLineWrap(true);
                 stringValueTextArea.setAutoscrolls(true);
-                valueArea = new JBScrollPane(stringValueTextArea.getComponent());
+                valueArea = new JBScrollPane(stringValueTextArea);
                 valueTextArea = stringValueTextArea;
         }
 

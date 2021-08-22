@@ -19,6 +19,7 @@ import com.mzyupc.aredis.view.dialog.ConfirmDialog;
 import com.mzyupc.aredis.view.dialog.ConnectionSettingsDialog;
 import com.mzyupc.aredis.view.editor.ARedisFileSystem;
 import com.mzyupc.aredis.view.editor.ARedisVirtualFile;
+import com.mzyupc.aredis.view.tree.ConnectionTreeCellRenderer;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import com.mzyupc.aredis.vo.DbInfo;
 import lombok.Getter;
@@ -143,6 +144,7 @@ public class ARedisToolWindow implements Disposable {
      */
     private Tree createConnectionTree() {
         connectionTree = new Tree();
+        connectionTree.setCellRenderer(new ConnectionTreeCellRenderer());
         connectionTree.setAlignmentX(Component.LEFT_ALIGNMENT);
         connectionTree.addMouseListener(new MouseAdapter() {
             @Override

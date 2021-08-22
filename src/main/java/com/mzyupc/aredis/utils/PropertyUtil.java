@@ -22,6 +22,8 @@ public class PropertyUtil {
      */
     private static final String CONNECTION_ID_LIST_KEY = "connectionIds";
 
+    private static final String RELOAD_AFTER_ADDING_THE_KEY = "reloadAfterAddingTheKey";
+
     private static PropertiesComponent properties;
 
     private static PropertyUtil instance = new PropertyUtil();
@@ -121,5 +123,13 @@ public class PropertyUtil {
         }
 
         return JSON.parseObject(value, ConnectionInfo.class);
+    }
+
+    public boolean getReloadAfterAddingTheKey() {
+        return properties.getBoolean(RELOAD_AFTER_ADDING_THE_KEY, false);
+    }
+
+    public void setReloadAfterAddingTheKey(boolean reloadAfterAddingTheKey) {
+        properties.setValue(RELOAD_AFTER_ADDING_THE_KEY, reloadAfterAddingTheKey);
     }
 }
