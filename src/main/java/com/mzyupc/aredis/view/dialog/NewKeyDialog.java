@@ -176,6 +176,7 @@ public class NewKeyDialog extends DialogWrapper {
         keyLabel.setPreferredSize(new Dimension(50, 25));
         keyPanel.add(keyLabel, BorderLayout.WEST);
         keyTextField = new JTextField();
+        keyTextField.requestFocusInWindow();
         keyPanel.add(keyTextField, BorderLayout.CENTER);
         return keyPanel;
     }
