@@ -255,10 +255,9 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
     }
 
     /**
-     * todo 根据groupSymbol更新树节点
+     * 根据groupSymbol更新树节点
      */
     private void updateKeyTree() {
-        // todo
         if (StringUtils.isEmpty(groupSymbol)) {
             treeModel = new DefaultTreeModel(flatRootNode);
 
@@ -295,7 +294,6 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
     private ClearAction createClearAction() {
         ClearAction clearAction = new ClearAction();
         clearAction.setAction(e -> {
-            // todo
             ConfirmDialog confirmDialog = new ConfirmDialog(
                     project,
                     "Confirm",
