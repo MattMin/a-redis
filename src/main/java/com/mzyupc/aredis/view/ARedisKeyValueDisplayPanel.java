@@ -33,6 +33,8 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.ScanParams;
+import redis.clients.jedis.ScanResult;
+import redis.clients.jedis.Tuple;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -40,14 +42,15 @@ import javax.swing.tree.*;
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Enumeration;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.intellij.openapi.ui.DialogWrapper.OK_EXIT_CODE;
 import static com.mzyupc.aredis.utils.JTreeUtil.getTreeExpander;
+import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
 
 /**
  * @author mzyupc@163.com
@@ -58,8 +61,6 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
     private static final String DEFAULT_FILTER = "*";
     private static final String DEFAULT_GROUP_SYMBOL = "";
     private static final Integer DEFAULT_PAGE_SIZE = 10000;
-    private static final String REMOVED_KEY_PREFIX = "(Removed) ";
-
 
     private Project project;
     private JPanel formPanel;
@@ -70,10 +71,10 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
     private JPanel keyDisplayPanel;
     private LoadingDecorator keyDisplayLoadingDecorator;
 
-    private JPanel valueDisplayPanel;
-    private JPanel valuePreviewPanel;
-    private JPanel valueFunctionPanel;
-    private JPanel valueViewPanel;
+    /**
+     * value 展示区
+     */
+    private ValueDisplayPanel valueDisplayPanel;
 
     private JPanel keyToolBarPanel;
     private ActionToolbar actionToolbar;
@@ -101,7 +102,7 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
     /**
      * redis scan 初始游标
      */
-    private String cursor = ScanParams.SCAN_POINTER_START;
+    private String cursor = SCAN_POINTER_START;
 
     private DefaultMutableTreeNode rootNode;
 
@@ -119,6 +120,51 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
         this.redisPoolMgr = redisPoolMgr;
 
         initPanel();
+    }
+
+    private static void updateTree(DefaultMutableTreeNode parentTargetNode, DefaultMutableTreeNode originalChildNode, String[] explodedKey, KeyInfo key) {
+        if (explodedKey.length == 0) {
+            addChildren(parentTargetNode, originalChildNode);
+            return;
+        }
+        String keyFragment = explodedKey[0];
+        DefaultMutableTreeNode node = findNodeByKey(parentTargetNode, keyFragment);
+        if (node == null) {
+            if (explodedKey.length == 1) {
+                node = new DefaultMutableTreeNode(key);
+            } else {
+                node = new DefaultMutableTreeNode(FragmentedKey.builder()
+                        .fragmentedKey(keyFragment)
+                        .build());
+            }
+        }
+        updateTree(node, originalChildNode, Arrays.copyOfRange(explodedKey, 1, explodedKey.length), key);
+
+        parentTargetNode.add(node);
+    }
+
+    private static DefaultMutableTreeNode findNodeByKey(DefaultMutableTreeNode parentTargetNode, String keyFragment) {
+        for (int i = 0; i < parentTargetNode.getChildCount(); i++) {
+            DefaultMutableTreeNode currentChild = (DefaultMutableTreeNode) parentTargetNode.getChildAt(i);
+            Object keyObj = currentChild.getUserObject();
+            String nodeKey;
+            // 中间节点
+            if (keyObj instanceof FragmentedKey) {
+                nodeKey = ((FragmentedKey) keyObj).getFragmentedKey();
+                if (keyFragment.equals(nodeKey)) {
+                    return currentChild;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static void addChildren(DefaultMutableTreeNode parentNode, DefaultMutableTreeNode originalChildNode) {
+        Enumeration<TreeNode> children = originalChildNode.children();
+        while (children.hasMoreElements()) {
+            DefaultMutableTreeNode childNode = (DefaultMutableTreeNode) children.nextElement();
+            parentNode.add((MutableTreeNode) childNode.clone());
+        }
     }
 
     private void initPanel() {
@@ -238,55 +284,9 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
         treeModel.reload();
 
 
-
 //        keyDisplayPanel.updateUI();
     }
 
-
-    private static void updateTree(DefaultMutableTreeNode parentTargetNode, DefaultMutableTreeNode originalChildNode, String[] explodedKey, KeyInfo key) {
-        if (explodedKey.length == 0) {
-            addChildren(parentTargetNode, originalChildNode);
-            return;
-        }
-        String keyFragment = explodedKey[0];
-        DefaultMutableTreeNode node = findNodeByKey(parentTargetNode, keyFragment);
-        if (node == null) {
-            if (explodedKey.length == 1) {
-                node = new DefaultMutableTreeNode(key);
-            } else {
-                node = new DefaultMutableTreeNode(FragmentedKey.builder()
-                        .fragmentedKey(keyFragment)
-                        .build());
-            }
-        }
-        updateTree(node, originalChildNode, Arrays.copyOfRange(explodedKey, 1, explodedKey.length), key);
-
-        parentTargetNode.add(node);
-    }
-
-    private static DefaultMutableTreeNode findNodeByKey(DefaultMutableTreeNode parentTargetNode, String keyFragment) {
-        for (int i = 0; i < parentTargetNode.getChildCount(); i++) {
-            DefaultMutableTreeNode currentChild = (DefaultMutableTreeNode) parentTargetNode.getChildAt(i);
-            Object keyObj = currentChild.getUserObject();
-            String nodeKey;
-            // 中间节点
-            if (keyObj instanceof FragmentedKey) {
-                nodeKey = ((FragmentedKey) keyObj).getFragmentedKey();
-                if (keyFragment.equals(nodeKey)) {
-                    return currentChild;
-                }
-            }
-        }
-        return null;
-    }
-
-    private static void addChildren(DefaultMutableTreeNode parentNode, DefaultMutableTreeNode originalChildNode) {
-        Enumeration<TreeNode> children = originalChildNode.children();
-        while (children.hasMoreElements()) {
-            DefaultMutableTreeNode childNode = (DefaultMutableTreeNode) children.nextElement();
-            parentNode.add((MutableTreeNode) childNode.clone());
-        }
-    }
     /**
      * 清空Key
      *
@@ -516,17 +516,14 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
         searchTextField.addKeyboardListener(new KeyListener() {
             @Override
             public void keyTyped(KeyEvent e) {
-                System.out.println("key typed");
             }
 
             @Override
             public void keyPressed(KeyEvent e) {
-                System.out.println("key pressed");
             }
 
             @Override
             public void keyReleased(KeyEvent e) {
-                System.out.println("key released");
                 keyFilter = searchTextField.getText();
                 if (e.getKeyCode() == KeyEvent.VK_ENTER) {
                     // 根据输入的filter, 重新渲染keyTree
@@ -579,6 +576,32 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
 
         keyTree = new Tree();
         keyTree.setCellRenderer(new KeyTreeCellRenderer());
+        keyTree.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                super.mouseClicked(e);
+
+                int x = e.getX();
+                int y = e.getY();
+
+                if (e.getClickCount() == 2) {
+                    // 第一个选中的节点路径
+                    TreePath selectionPath = keyTree.getSelectionPath();
+                    if (selectionPath == null) {
+                        return;
+                    }
+                    Object[] path = selectionPath.getPath();
+                    // 双击key事件
+                    if (selectionPath.getPathCount() >= 2) {
+                        DefaultMutableTreeNode lastNode = (DefaultMutableTreeNode) selectionPath.getLastPathComponent();
+                        // 双击叶子节点才处理
+                        if (lastNode.isLeaf()) {
+                            renderValueDisplayPanel((KeyInfo) lastNode.getUserObject());
+                        }
+                    }
+                }
+            }
+        });
 
         keyTreeScrollPane = new JBScrollPane(keyTree);
 
@@ -588,18 +611,70 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
 
         keyDisplayLoadingDecorator = new LoadingDecorator(keyDisplayPanel, this, 0);
 
-        valueDisplayPanel = new JPanel();
-        valueDisplayPanel.setMinimumSize(new Dimension(100, 100));
+//        valueDisplayPanel = ValueDisplayPanel.getInstance();
+//        valueDisplayPanel.setMinimumSize(new Dimension(100, 100));
 
         splitterContainer = new JBSplitter(false, 0.35f);
         splitterContainer.setFirstComponent(keyDisplayLoadingDecorator.getComponent());
-        splitterContainer.setSecondComponent(valueDisplayPanel);
+        JPanel emptyPanel = new JPanel();
+        emptyPanel.setMinimumSize(new Dimension(100, 100));
+        splitterContainer.setSecondComponent(emptyPanel);
         splitterContainer.setDividerWidth(2);
         splitterContainer.setShowDividerControls(true);
         splitterContainer.setSplitterProportionKey("aRedis.keyValue.splitter");
 
         formPanel.add(keyToolBarPanel, BorderLayout.NORTH);
         formPanel.add(splitterContainer, BorderLayout.CENTER);
+    }
+
+    /**
+     * todo 渲染valueDisplayPanel
+     *
+     * @param keyInfo
+     */
+    private void renderValueDisplayPanel(KeyInfo keyInfo) {
+        // 根据key的不同类型, 组装不同的valueDisplayPanel
+        String key = keyInfo.getKey();
+        try (Jedis jedis = redisPoolMgr.getJedis(dbInfo.getIndex())) {
+            String type = jedis.type(key);
+
+            // 初始化
+            valueDisplayPanel = ValueDisplayPanel.getInstance();
+            ScanParams scanParams = new ScanParams();
+            scanParams.count(30);
+            scanParams.match("*");
+            switch (type) {
+                case "string":
+                    valueDisplayPanel.initWithString(key, jedis.get(key), jedis.ttl(key));
+                    break;
+
+                case "list":
+                    valueDisplayPanel.initWithList(key, jedis.lrange(key, 0, 100), jedis.ttl(key));
+                    break;
+
+                case "set":
+                    ScanResult<String> sscanResult = jedis.sscan(key, SCAN_POINTER_START, scanParams);
+                    valueDisplayPanel.initWithSet(key, sscanResult, jedis.ttl(key));
+                    break;
+
+                case "zset":
+                    ScanResult<Tuple> zscanResult = jedis.zscan(key, SCAN_POINTER_START, scanParams);
+                    valueDisplayPanel.initWithZset(key, zscanResult, jedis.ttl(key));
+                    break;
+
+                case "hash":
+                    ScanResult<Map.Entry<String, String>> hscanResult = jedis.hscan(key, SCAN_POINTER_START, scanParams);
+                    valueDisplayPanel.initWithHash(key, hscanResult, jedis.ttl(key));
+                    break;
+
+                default:
+                    return;
+            }
+            valueDisplayPanel.setMinimumSize(new Dimension(100, 100));
+            JBScrollPane valueDisplayScrollPanel = new JBScrollPane(valueDisplayPanel);
+            splitterContainer.setSecondComponent(valueDisplayScrollPanel);
+
+        }
     }
 
     @Override
