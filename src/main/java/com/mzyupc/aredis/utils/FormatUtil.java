@@ -19,7 +19,7 @@ public class FormatUtil {
 
         switch (formatEnum) {
             case JSON: return format2Json(text);
-            case Plain: return text;
+            case PLAIN: return text;
             default:
                 throw new IllegalArgumentException("Unsupported format");
         }

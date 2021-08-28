@@ -5,6 +5,25 @@ package com.mzyupc.aredis.view.dialog.enums;
  * @date 2021/8/19 9:46 下午
  */
 public enum ValueFormatEnum {
-    Plain,
-    JSON
+    /**
+     *
+     */
+    PLAIN("Plain text"),
+    JSON("JSON");
+
+    private String description;
+
+    public String getDescription() {
+        return description;
+    }
+
+    private ValueFormatEnum (String description) {
+        this.description = description;
+    }
+
+    @Override
+    public String toString() {
+        return this.description;
+    }
+
 }

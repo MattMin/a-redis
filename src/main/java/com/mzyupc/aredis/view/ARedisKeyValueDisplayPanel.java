@@ -32,9 +32,6 @@ import lombok.SneakyThrows;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import redis.clients.jedis.Jedis;
-import redis.clients.jedis.ScanParams;
-import redis.clients.jedis.ScanResult;
-import redis.clients.jedis.Tuple;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -44,8 +41,10 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.List;
-import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.intellij.openapi.ui.DialogWrapper.OK_EXIT_CODE;
@@ -633,46 +632,11 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
     private void renderValueDisplayPanel(KeyInfo keyInfo) {
         // 根据key的不同类型, 组装不同的valueDisplayPanel
         String key = keyInfo.getKey();
-        try (Jedis jedis = redisPoolMgr.getJedis(dbInfo.getIndex())) {
-            String type = jedis.type(key);
-
-            // 初始化
-            valueDisplayPanel = ValueDisplayPanel.getInstance();
-            ScanParams scanParams = new ScanParams();
-            scanParams.count(30);
-            scanParams.match("*");
-            switch (type) {
-                case "string":
-                    valueDisplayPanel.initWithString(key, jedis.get(key), jedis.ttl(key));
-                    break;
-
-                case "list":
-                    valueDisplayPanel.initWithList(key, jedis.lrange(key, 0, 100), jedis.ttl(key));
-                    break;
-
-                case "set":
-                    ScanResult<String> sscanResult = jedis.sscan(key, SCAN_POINTER_START, scanParams);
-                    valueDisplayPanel.initWithSet(key, sscanResult, jedis.ttl(key));
-                    break;
-
-                case "zset":
-                    ScanResult<Tuple> zscanResult = jedis.zscan(key, SCAN_POINTER_START, scanParams);
-                    valueDisplayPanel.initWithZset(key, zscanResult, jedis.ttl(key));
-                    break;
-
-                case "hash":
-                    ScanResult<Map.Entry<String, String>> hscanResult = jedis.hscan(key, SCAN_POINTER_START, scanParams);
-                    valueDisplayPanel.initWithHash(key, hscanResult, jedis.ttl(key));
-                    break;
-
-                default:
-                    return;
-            }
-            valueDisplayPanel.setMinimumSize(new Dimension(100, 100));
-            JBScrollPane valueDisplayScrollPanel = new JBScrollPane(valueDisplayPanel);
-            splitterContainer.setSecondComponent(valueDisplayScrollPanel);
-
-        }
+        valueDisplayPanel = ValueDisplayPanel.getInstance(redisPoolMgr);
+        valueDisplayPanel.init(key, dbInfo.getIndex());
+        valueDisplayPanel.setMinimumSize(new Dimension(100, 100));
+        JBScrollPane valueDisplayScrollPanel = new JBScrollPane(valueDisplayPanel);
+        splitterContainer.setSecondComponent(valueDisplayScrollPanel);
     }
 
     @Override
