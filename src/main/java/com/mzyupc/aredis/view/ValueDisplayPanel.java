@@ -1,10 +1,13 @@
 package com.mzyupc.aredis.view;
 
 import com.intellij.ui.DocumentAdapter;
+import com.intellij.ui.JBSplitter;
+import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.ui.table.JBTable;
+import com.mzyupc.aredis.layout.VFlowLayout;
 import com.mzyupc.aredis.utils.RedisPoolMgr;
 import com.mzyupc.aredis.view.dialog.enums.RedisValueTypeEnum;
 import com.mzyupc.aredis.view.dialog.enums.ValueFormatEnum;
@@ -78,13 +81,12 @@ public class ValueDisplayPanel extends JPanel {
      */
     private int selectedRow;
 
-    public ValueDisplayPanel(LayoutManager layout, RedisPoolMgr redisPoolMgr) {
+    public ValueDisplayPanel(LayoutManager layout) {
         super(layout);
-        this.redisPoolMgr = redisPoolMgr;
     }
 
-    public static ValueDisplayPanel getInstance(RedisPoolMgr redisPoolMgr) {
-        return new ValueDisplayPanel(new BorderLayout(), redisPoolMgr);
+    public static ValueDisplayPanel getInstance() {
+        return new ValueDisplayPanel(new BorderLayout());
     }
 
     /**
@@ -93,7 +95,8 @@ public class ValueDisplayPanel extends JPanel {
      * @param key
      * @param db
      */
-    public void init(String key, int db) {
+    public void init(String key, int db, RedisPoolMgr redisPoolMgr) {
+        this.redisPoolMgr = redisPoolMgr;
         try (Jedis jedis = redisPoolMgr.getJedis(db)) {
             Boolean exists = exists = jedis.exists(key);
             if (exists == null || !exists) {
@@ -240,7 +243,7 @@ public class ValueDisplayPanel extends JPanel {
 
             case Hash:
                 List<Map.Entry<String, String>> hashValue = value.getHashValue();
-                tableModel = new DefaultTableModel(hashValueListTo2DimensionalArray(hashValue), new String[]{"Row", "Key", "Value"});
+                tableModel = new DefaultTableModel(hashValueListTo2DimensionalArray(hashValue), new String[]{"Row", "Field", "Value"});
                 valueColumnIndex = 2;
                 break;
 
@@ -249,8 +252,9 @@ public class ValueDisplayPanel extends JPanel {
         }
 
         JBTextArea valueTextArea = new JBTextArea();
+        valueViewPanel = new JBScrollPane(valueTextArea);
         JPanel innerPreviewAndFunctionPanel = new JPanel(new BorderLayout());
-        JLabel valueSizeLabel = new JLabel();
+        JBLabel valueSizeLabel = new JBLabel();
 
         // 需要表格预览
         if (tableModel != null) {
@@ -260,7 +264,6 @@ public class ValueDisplayPanel extends JPanel {
                     return false;
                 }
             };
-            valueTable.setMaximumSize(new Dimension(300, 100));
             // 设置第一列的最大宽度
             TableColumn column = valueTable.getColumnModel().getColumn(0);
             column.setMaxWidth(150);
@@ -284,21 +287,37 @@ public class ValueDisplayPanel extends JPanel {
             });
 
             JBScrollPane valueTableScrollPane = new JBScrollPane(valueTable);
-            valueTableScrollPane.setPreferredSize(new Dimension(300, 200));
 
-            JPanel valueTableButtonPanel = new JPanel(new GridLayout(3, 1));
-            valueTableButtonPanel.add(new JButton("Add row"));
-            valueTableButtonPanel.add(new JButton("Delete row"));
+            JPanel valueTableButtonPanel = new JPanel(new VFlowLayout());
+//            BoxLayout boxLayout = new BoxLayout(valueTableButtonPanel, BoxLayout.Y_AXIS);
+//            valueTableButtonPanel.setLayout(boxLayout);
+            JButton addRowButton = new JButton("Add row");
+            addRowButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+//            addRowButton.setPreferredSize(new Dimension(100, 27));
+            JButton deleteRowButton = new JButton("Delete row");
+            deleteRowButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+            valueTableButtonPanel.add(addRowButton);
+            valueTableButtonPanel.add(deleteRowButton);
 
             valueInnerPreviewPanel = new JPanel(new BorderLayout());
             valueInnerPreviewPanel.add(valueTableScrollPane, BorderLayout.CENTER);
             valueInnerPreviewPanel.add(valueTableButtonPanel, BorderLayout.AFTER_LINE_ENDS);
 
-            innerPreviewAndFunctionPanel.add(valueInnerPreviewPanel, BorderLayout.NORTH);
+            innerPreviewAndFunctionPanel.add(valueInnerPreviewPanel, BorderLayout.CENTER);
+
+            JBSplitter valuePreviewSplitter = new JBSplitter(true, 0.35f);
+            valuePreviewSplitter.setFirstComponent(innerPreviewAndFunctionPanel);
+            valuePreviewSplitter.setSecondComponent(valueViewPanel);
+            this.add(valuePreviewSplitter, BorderLayout.CENTER);
         } else {
             updateSelected(0, value.getStringValue());
             valueTextArea.setText(getSelectedValue());
             updateValueSize(valueSizeLabel);
+
+            valuePreviewPanel = new JPanel(new BorderLayout());
+            valuePreviewPanel.add(innerPreviewAndFunctionPanel, BorderLayout.NORTH);
+            valuePreviewPanel.add(valueViewPanel, BorderLayout.CENTER);
+            this.add(valuePreviewPanel, BorderLayout.CENTER);
         }
 
         // 初始化valueFunctionPanel
@@ -324,13 +343,6 @@ public class ValueDisplayPanel extends JPanel {
                 saveValueButton.setEnabled(true);
             }
         });
-        valueViewPanel = new JBScrollPane(valueTextArea);
-
-        valuePreviewPanel = new JPanel(new BorderLayout());
-        valuePreviewPanel.add(innerPreviewAndFunctionPanel, BorderLayout.NORTH);
-        valuePreviewPanel.add(valueViewPanel, BorderLayout.CENTER);
-
-        this.add(valuePreviewPanel, BorderLayout.CENTER);
     }
 
     /**

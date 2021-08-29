@@ -175,27 +175,6 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
      * 初始化Key工具栏
      */
     private void initKeyToolBarPanel() {
-        // toolbar
-        final CommonActionsManager actionManager = CommonActionsManager.getInstance();
-        final DefaultActionGroup actions = new DefaultActionGroup();
-
-        // 刷新
-        actions.add(createRefreshAction());
-        // 增加key
-        actions.add(createAddAction());
-        // 删除key
-        actions.add(createDeleteAction());
-        // 清空key
-        actions.addSeparator();
-        actions.add(createClearAction());
-        // 展开, 折叠
-        actions.addSeparator();
-        actions.add(actionManager.createExpandAllAction(getTreeExpander(keyTree), keyTree));
-        actions.add(actionManager.createCollapseAllAction(getTreeExpander(keyTree), keyTree));
-        actionToolbar = ActionManager.getInstance()
-                .createActionToolbar(ActionPlaces.TOOLBAR, actions, true);
-        actionToolbar.setTargetComponent(keyDisplayPanel);
-
         // key过滤器
         JPanel searchTextField = createSearchBox();
 
@@ -204,7 +183,7 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
 
         keyToolBarPanel.add(searchTextField);
         keyToolBarPanel.add(groupTextField);
-        keyToolBarPanel.add(actionToolbar.getComponent());
+//        keyToolBarPanel.add(actionToolbar.getComponent());
     }
 
     private void initKeyTreePanel() {
@@ -571,6 +550,8 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
 
         keyToolBarPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
 
+
+
         keyTree = new Tree();
         keyTree.setCellRenderer(new KeyTreeCellRenderer());
         keyTree.addMouseListener(new MouseAdapter() {
@@ -599,18 +580,36 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
                 }
             }
         });
-
         keyTreeScrollPane = new JBScrollPane(keyTree);
 
+
+
+        // toolbar
+        final CommonActionsManager actionManager = CommonActionsManager.getInstance();
+        final DefaultActionGroup actions = new DefaultActionGroup();
+        // 刷新
+        actions.add(createRefreshAction());
+        // 增加key
+        actions.add(createAddAction());
+        // 删除key
+        actions.add(createDeleteAction());
+        // 清空key
+        actions.addSeparator();
+        actions.add(createClearAction());
+        // 展开, 折叠
+        actions.addSeparator();
+        actions.add(actionManager.createExpandAllAction(getTreeExpander(keyTree), keyTree));
+        actions.add(actionManager.createCollapseAllAction(getTreeExpander(keyTree), keyTree));
+        actionToolbar = ActionManager.getInstance()
+                .createActionToolbar(ActionPlaces.TOOLBAR, actions, true);
+
         keyDisplayPanel = new JPanel(new BorderLayout());
+        actionToolbar.setTargetComponent(keyDisplayPanel);
+        keyDisplayPanel.add(actionToolbar.getComponent(), BorderLayout.NORTH);
         keyDisplayPanel.setMinimumSize(new Dimension(100, 100));
         keyDisplayPanel.add(keyTreeScrollPane, BorderLayout.CENTER);
 
         keyDisplayLoadingDecorator = new LoadingDecorator(keyDisplayPanel, this, 0);
-
-//        valueDisplayPanel = ValueDisplayPanel.getInstance();
-//        valueDisplayPanel.setMinimumSize(new Dimension(100, 100));
-
         splitterContainer = new JBSplitter(false, 0.35f);
         splitterContainer.setFirstComponent(keyDisplayLoadingDecorator.getComponent());
         JPanel emptyPanel = new JPanel();
@@ -625,15 +624,15 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
     }
 
     /**
-     * todo 渲染valueDisplayPanel
+     * 渲染valueDisplayPanel
      *
      * @param keyInfo
      */
     private void renderValueDisplayPanel(KeyInfo keyInfo) {
         // 根据key的不同类型, 组装不同的valueDisplayPanel
         String key = keyInfo.getKey();
-        valueDisplayPanel = ValueDisplayPanel.getInstance(redisPoolMgr);
-        valueDisplayPanel.init(key, dbInfo.getIndex());
+        valueDisplayPanel = ValueDisplayPanel.getInstance();
+        valueDisplayPanel.init(key, dbInfo.getIndex(), redisPoolMgr);
         valueDisplayPanel.setMinimumSize(new Dimension(100, 100));
         JBScrollPane valueDisplayScrollPanel = new JBScrollPane(valueDisplayPanel);
         splitterContainer.setSecondComponent(valueDisplayScrollPanel);
