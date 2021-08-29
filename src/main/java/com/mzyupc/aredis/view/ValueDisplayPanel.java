@@ -72,7 +72,7 @@ public class ValueDisplayPanel extends JPanel {
     /**
      * value内部预览区 选中的value
      */
-    private String selectedValue;
+    private String selectedValue = "";
     /**
      * value内部预览区 选中的行
      */
@@ -114,35 +114,35 @@ public class ValueDisplayPanel extends JPanel {
                     typeEnum = RedisValueTypeEnum.String;
                     String stringValue = jedis.get(key);
                     value = new Value(stringValue);
-                    this.initWithString();
+                    this.initWithValue();
                     break;
 
                 case "list":
                     typeEnum = RedisValueTypeEnum.List;
                     List<String> listValue = jedis.lrange(key, 0, 30);
                     value = new Value(listValue);
-                    this.initWithList();
+                    this.initWithValue();
                     break;
 
                 case "set":
                     typeEnum = RedisValueTypeEnum.Set;
                     ScanResult<String> sscanResult = jedis.sscan(key, SCAN_POINTER_START, scanParams);
                     value = new Value(sscanResult.getResult());
-                    this.initWithSet();
+                    this.initWithValue();
                     break;
 
                 case "zset":
                     typeEnum = RedisValueTypeEnum.Zset;
                     ScanResult<Tuple> zscanResult = jedis.zscan(key, SCAN_POINTER_START, scanParams);
                     value = new Value(zscanResult.getResult());
-                    this.initWithZset();
+                    this.initWithValue();
                     break;
 
                 case "hash":
                     typeEnum = RedisValueTypeEnum.Hash;
                     ScanResult<Map.Entry<String, String>> hscanResult = jedis.hscan(key, SCAN_POINTER_START, scanParams);
                     value = new Value(hscanResult.getResult());
-                    this.initWithHash();
+                    this.initWithValue();
                     break;
 
                 default:
@@ -150,7 +150,7 @@ public class ValueDisplayPanel extends JPanel {
         }
     }
 
-    public void initWithString() {
+    private void initWithValue() {
         // key 不存在
         if (value == null) {
             return;
@@ -160,99 +160,12 @@ public class ValueDisplayPanel extends JPanel {
         initValuePreviewToolbarPanel();
 
         // 初始化value预览区
-        initValuePreviewPanel(value.getStringValue());
+        initValuePreviewPanel();
     }
 
-    public void initWithList() {
-        // 初始化value预览工具栏区
-        initValuePreviewToolbarPanel();
-
-        // 初始化valueInnerPreviewPanel
-
-        List<String> valueList = value.getListValue();
-
-        DefaultTableModel tableModel = new DefaultTableModel(to2DimensionalArray(valueList), new String[]{"Row", "Value"});
-        // 数据局中
-        DefaultTableCellRenderer tableCellRenderer = new DefaultTableCellRenderer();
-        tableCellRenderer.setHorizontalAlignment(SwingConstants.CENTER);
-        JBTable valueTable = new JBTable(tableModel) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-        };
-        valueTable.setMaximumSize(new Dimension(300, 100));
-        TableColumn column = valueTable.getColumnModel().getColumn(0);
-        column.setMaxWidth(150);
-        valueTable.setDefaultRenderer(Object.class, tableCellRenderer);
-        // 表头居中
-        valueTable.getTableHeader().setDefaultRenderer(tableCellRenderer);
-
-        JBTextArea valueTextArea = new JBTextArea();
-        valueTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
-            @Override
-            public void valueChanged(ListSelectionEvent e) {
-                int selectedRow = valueTable.getSelectedRow();
-                updateSelected(selectedRow, tableModel.getValueAt(selectedRow, 1).toString());
-                valueTextArea.setText(getSelectedValue());
-            }
-        });
-
-        JBScrollPane valueTableScrollPane = new JBScrollPane(valueTable);
-        valueTableScrollPane.setPreferredSize(new Dimension(300, 200));
-
-        JPanel valueTableButtonPanel = new JPanel(new GridLayout(3, 1));
-        valueTableButtonPanel.add(new JButton("Add row"));
-        valueTableButtonPanel.add(new JButton("Delete row"));
-
-        valueInnerPreviewPanel = new JPanel(new BorderLayout());
-        valueInnerPreviewPanel.add(valueTableScrollPane, BorderLayout.CENTER);
-        valueInnerPreviewPanel.add(valueTableButtonPanel, BorderLayout.AFTER_LINE_ENDS);
-
-        // 初始化valueFunctionPanel
-        JComboBox<ValueFormatEnum> valueFormatEnumJComboBox = new JComboBox<>(ValueFormatEnum.values());
-        JButton saveValueButton = new JButton("Save");
-        saveValueButton.setEnabled(false);
-        JPanel viewAsAndSavePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        viewAsAndSavePanel.add(new JLabel("View as:"));
-        viewAsAndSavePanel.add(valueFormatEnumJComboBox);
-        viewAsAndSavePanel.add(saveValueButton);
-        valueFunctionPanel = new JPanel(new BorderLayout());
-        valueFunctionPanel.add(new JLabel("Value size: " + String.join("", valueList).getBytes(StandardCharsets.UTF_8).length + "bytes"), BorderLayout.WEST);
-        valueFunctionPanel.add(viewAsAndSavePanel, BorderLayout.AFTER_LINE_ENDS);
-
-        JPanel innerPreviewAndFunctionPanel = new JPanel(new BorderLayout());
-        innerPreviewAndFunctionPanel.add(valueInnerPreviewPanel, BorderLayout.NORTH);
-        innerPreviewAndFunctionPanel.add(valueFunctionPanel, BorderLayout.SOUTH);
-
-
-        valueTextArea.setRows(5);
-        valueTextArea.setLineWrap(true);
-        valueTextArea.getDocument().addDocumentListener(new DocumentAdapter() {
-            @Override
-            protected void textChanged(@NotNull DocumentEvent documentEvent) {
-                saveValueButton.setEnabled(true);
-            }
-        });
-        valueViewPanel = new JBScrollPane(valueTextArea);
-
-        valuePreviewPanel = new JPanel(new BorderLayout());
-        valuePreviewPanel.add(innerPreviewAndFunctionPanel, BorderLayout.NORTH);
-        valuePreviewPanel.add(valueViewPanel, BorderLayout.CENTER);
-
-        this.add(valuePreviewPanel, BorderLayout.CENTER);
-
-    }
-
-    public void initWithSet() {
-    }
-
-    public void initWithZset() {
-    }
-
-    public void initWithHash() {
-    }
-
+    /**
+     * 初始化value预览工具栏区
+     */
     private void initValuePreviewToolbarPanel() {
         JBTextField keyTextField = new JBTextField(key);
         keyTextField.setPreferredSize(new Dimension(200, 28));
@@ -295,9 +208,101 @@ public class ValueDisplayPanel extends JPanel {
         this.add(valuePreviewToolbarPanel, BorderLayout.NORTH);
     }
 
-    private void initValuePreviewPanel(String value) {
-        JComboBox<ValueFormatEnum> valueFormatEnumJComboBox = new JComboBox<>(ValueFormatEnum.values());
+    /**
+     * 初始化value预览区
+     */
+    private void initValuePreviewPanel() {
+        DefaultTableModel tableModel;
+        final int valueColumnIndex;
+        switch (typeEnum) {
+            case String:
+                tableModel = null;
+                valueColumnIndex = -1;
+                break;
 
+            case List:
+                List<String> listValue = value.getListValue();
+                tableModel = new DefaultTableModel(to2DimensionalArray(listValue), new String[]{"Row", "Value"});
+                valueColumnIndex = 1;
+                break;
+
+            case Set:
+                List<String> setValue = value.getSetValue();
+                tableModel = new DefaultTableModel(to2DimensionalArray(setValue), new String[]{"Row", "Value"});
+                valueColumnIndex = 1;
+                break;
+
+            case Zset:
+                List<Tuple> zsetValue = value.getZsetValue();
+                tableModel = new DefaultTableModel(zsetValueListTo2DimensionalArray(zsetValue), new String[]{"Row", "Value", "Score"});
+                valueColumnIndex = 1;
+                break;
+
+            case Hash:
+                List<Map.Entry<String, String>> hashValue = value.getHashValue();
+                tableModel = new DefaultTableModel(hashValueListTo2DimensionalArray(hashValue), new String[]{"Row", "Key", "Value"});
+                valueColumnIndex = 2;
+                break;
+
+            default:
+                return;
+        }
+
+        JBTextArea valueTextArea = new JBTextArea();
+        JPanel innerPreviewAndFunctionPanel = new JPanel(new BorderLayout());
+        JLabel valueSizeLabel = new JLabel();
+
+        // 需要表格预览
+        if (tableModel != null) {
+            JBTable valueTable = new JBTable(tableModel) {
+                @Override
+                public boolean isCellEditable(int row, int column) {
+                    return false;
+                }
+            };
+            valueTable.setMaximumSize(new Dimension(300, 100));
+            // 设置第一列的最大宽度
+            TableColumn column = valueTable.getColumnModel().getColumn(0);
+            column.setMaxWidth(150);
+
+            DefaultTableCellRenderer tableCellRenderer = new DefaultTableCellRenderer();
+            tableCellRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+            // 数据局中
+            valueTable.setDefaultRenderer(Object.class, tableCellRenderer);
+            // 表头居中
+            valueTable.getTableHeader().setDefaultRenderer(tableCellRenderer);
+
+            // value视图区展示选中的行
+            valueTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
+                @Override
+                public void valueChanged(ListSelectionEvent e) {
+                    int selectedRow = valueTable.getSelectedRow();
+                    updateSelected(selectedRow, tableModel.getValueAt(selectedRow, valueColumnIndex).toString());
+                    valueTextArea.setText(getSelectedValue());
+                    updateValueSize(valueSizeLabel);
+                }
+            });
+
+            JBScrollPane valueTableScrollPane = new JBScrollPane(valueTable);
+            valueTableScrollPane.setPreferredSize(new Dimension(300, 200));
+
+            JPanel valueTableButtonPanel = new JPanel(new GridLayout(3, 1));
+            valueTableButtonPanel.add(new JButton("Add row"));
+            valueTableButtonPanel.add(new JButton("Delete row"));
+
+            valueInnerPreviewPanel = new JPanel(new BorderLayout());
+            valueInnerPreviewPanel.add(valueTableScrollPane, BorderLayout.CENTER);
+            valueInnerPreviewPanel.add(valueTableButtonPanel, BorderLayout.AFTER_LINE_ENDS);
+
+            innerPreviewAndFunctionPanel.add(valueInnerPreviewPanel, BorderLayout.NORTH);
+        } else {
+            updateSelected(0, value.getStringValue());
+            valueTextArea.setText(getSelectedValue());
+            updateValueSize(valueSizeLabel);
+        }
+
+        // 初始化valueFunctionPanel
+        JComboBox<ValueFormatEnum> valueFormatEnumJComboBox = new JComboBox<>(ValueFormatEnum.values());
         JButton saveValueButton = new JButton("Save");
         saveValueButton.setEnabled(false);
 
@@ -307,11 +312,10 @@ public class ValueDisplayPanel extends JPanel {
         viewAsAndSavePanel.add(saveValueButton);
 
         valueFunctionPanel = new JPanel(new BorderLayout());
-        valueFunctionPanel.add(new JLabel("Value size: " + value.getBytes(StandardCharsets.UTF_8).length + "bytes"), BorderLayout.WEST);
+        valueFunctionPanel.add(valueSizeLabel, BorderLayout.WEST);
         valueFunctionPanel.add(viewAsAndSavePanel, BorderLayout.AFTER_LINE_ENDS);
+        innerPreviewAndFunctionPanel.add(valueFunctionPanel, BorderLayout.SOUTH);
 
-        updateSelected(0, value);
-        JBTextArea valueTextArea = new JBTextArea(getSelectedValue());
         valueTextArea.setRows(5);
         valueTextArea.setLineWrap(true);
         valueTextArea.getDocument().addDocumentListener(new DocumentAdapter() {
@@ -323,10 +327,18 @@ public class ValueDisplayPanel extends JPanel {
         valueViewPanel = new JBScrollPane(valueTextArea);
 
         valuePreviewPanel = new JPanel(new BorderLayout());
-        valuePreviewPanel.add(valueFunctionPanel, BorderLayout.NORTH);
+        valuePreviewPanel.add(innerPreviewAndFunctionPanel, BorderLayout.NORTH);
         valuePreviewPanel.add(valueViewPanel, BorderLayout.CENTER);
 
         this.add(valuePreviewPanel, BorderLayout.CENTER);
+    }
+
+    /**
+     * 更新value size标签
+     * @param valueSizeLabel
+     */
+    private void updateValueSize (JLabel valueSizeLabel) {
+        valueSizeLabel.setText("Value size: " + getSelectedValue().getBytes(StandardCharsets.UTF_8).length + "bytes");
     }
 
     /**
@@ -344,6 +356,39 @@ public class ValueDisplayPanel extends JPanel {
         return result;
     }
 
+    /**
+     * zset value 转为2维数组
+     * @param list
+     * @return
+     */
+    private Object[][] zsetValueListTo2DimensionalArray(List<Tuple> list) {
+        Object[][] result = new Object[list.size()][3];
+        for (int i = 0; i < list.size(); i++) {
+            result[i][0] = i;
+            Tuple tuple = list.get(i);
+            result[i][1] = tuple.getElement();
+            result[i][2] = tuple.getScore();
+        }
+        return result;
+    }
+
+    /**
+     * hash value 转为2维数组
+     *
+     * @param list
+     * @return
+     */
+    private Object[][] hashValueListTo2DimensionalArray(List<Map.Entry<String, String>> list) {
+        Object[][] result = new Object[list.size()][3];
+        for (int i = 0; i < list.size(); i++) {
+            result[i][0] = i;
+            Map.Entry<String, String> entry = list.get(i);
+            result[i][1] = entry.getKey();
+            result[i][2] = entry.getValue();
+        }
+        return result;
+    }
+
     private String getSelectedValue() {
         return this.selectedValue;
     }
@@ -353,7 +398,7 @@ public class ValueDisplayPanel extends JPanel {
         this.selectedRow = selectedRow;
     }
 
-    public static class Value {
+    private static class Value {
         private Object valueData;
 
         public Value(Object valueData) {
