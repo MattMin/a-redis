@@ -16,7 +16,11 @@ import redis.clients.jedis.Tuple;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableColumn;
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
@@ -29,7 +33,7 @@ import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
 /**
  * @author mzyupc@163.com
  * @date 2021/8/26 8:43 下午
- *
+ * <p>
  * Value展示区
  */
 public class ValueDisplayPanel extends JPanel {
@@ -57,11 +61,22 @@ public class ValueDisplayPanel extends JPanel {
 
     private String key;
 
+    private Value value;
+
     private Long ttl;
 
     private RedisValueTypeEnum typeEnum;
 
     private RedisPoolMgr redisPoolMgr;
+
+    /**
+     * value内部预览区 选中的value
+     */
+    private String selectedValue;
+    /**
+     * value内部预览区 选中的行
+     */
+    private int selectedRow;
 
     public ValueDisplayPanel(LayoutManager layout, RedisPoolMgr redisPoolMgr) {
         super(layout);
@@ -72,6 +87,12 @@ public class ValueDisplayPanel extends JPanel {
         return new ValueDisplayPanel(new BorderLayout(), redisPoolMgr);
     }
 
+    /**
+     * 初始化
+     *
+     * @param key
+     * @param db
+     */
     public void init(String key, int db) {
         try (Jedis jedis = redisPoolMgr.getJedis(db)) {
             Boolean exists = exists = jedis.exists(key);
@@ -79,9 +100,11 @@ public class ValueDisplayPanel extends JPanel {
                 return;
             }
 
+            this.key = key;
+            this.ttl = jedis.ttl(key);
             String type = jedis.type(key);
 
-            // 初始化
+
             ScanParams scanParams = new ScanParams();
             scanParams.count(30);
             scanParams.match("*");
@@ -89,67 +112,92 @@ public class ValueDisplayPanel extends JPanel {
             switch (type) {
                 case "string":
                     typeEnum = RedisValueTypeEnum.String;
-                    this.initWithString(key, jedis.get(key), jedis.ttl(key));
+                    String stringValue = jedis.get(key);
+                    value = new Value(stringValue);
+                    this.initWithString();
                     break;
 
                 case "list":
                     typeEnum = RedisValueTypeEnum.List;
-                    this.initWithList(key, jedis.lrange(key, 0, 30), jedis.ttl(key));
+                    List<String> listValue = jedis.lrange(key, 0, 30);
+                    value = new Value(listValue);
+                    this.initWithList();
                     break;
 
                 case "set":
                     typeEnum = RedisValueTypeEnum.Set;
                     ScanResult<String> sscanResult = jedis.sscan(key, SCAN_POINTER_START, scanParams);
-                    this.initWithSet(key, sscanResult, jedis.ttl(key));
+                    value = new Value(sscanResult.getResult());
+                    this.initWithSet();
                     break;
 
                 case "zset":
                     typeEnum = RedisValueTypeEnum.Zset;
                     ScanResult<Tuple> zscanResult = jedis.zscan(key, SCAN_POINTER_START, scanParams);
-                    this.initWithZset(key, zscanResult, jedis.ttl(key));
+                    value = new Value(zscanResult.getResult());
+                    this.initWithZset();
                     break;
 
                 case "hash":
                     typeEnum = RedisValueTypeEnum.Hash;
                     ScanResult<Map.Entry<String, String>> hscanResult = jedis.hscan(key, SCAN_POINTER_START, scanParams);
-                    this.initWithHash(key, hscanResult, jedis.ttl(key));
+                    value = new Value(hscanResult.getResult());
+                    this.initWithHash();
                     break;
 
                 default:
-                    return;
             }
         }
     }
 
-    public void initWithString(String key, String value, Long ttl) {
+    public void initWithString() {
         // key 不存在
         if (value == null) {
             return;
         }
 
-        this.key = key;
-        this.ttl = ttl;
-
         // 初始化value预览工具栏区
         initValuePreviewToolbarPanel();
 
         // 初始化value预览区
-        initValuePreviewPanel(value);
+        initValuePreviewPanel(value.getStringValue());
     }
 
-    public void initWithList(String key, List<String> valueList, Long ttl) {
-        this.key = key;
-        this.ttl = ttl;
-
+    public void initWithList() {
         // 初始化value预览工具栏区
         initValuePreviewToolbarPanel();
 
         // 初始化valueInnerPreviewPanel
 
+        List<String> valueList = value.getListValue();
 
         DefaultTableModel tableModel = new DefaultTableModel(to2DimensionalArray(valueList), new String[]{"Row", "Value"});
-        JBTable valueTable = new JBTable(tableModel);
+        // 数据局中
+        DefaultTableCellRenderer tableCellRenderer = new DefaultTableCellRenderer();
+        tableCellRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+        JBTable valueTable = new JBTable(tableModel) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
         valueTable.setMaximumSize(new Dimension(300, 100));
+        TableColumn column = valueTable.getColumnModel().getColumn(0);
+        column.setMaxWidth(150);
+        valueTable.setDefaultRenderer(Object.class, tableCellRenderer);
+        // 表头居中
+        valueTable.getTableHeader().setDefaultRenderer(tableCellRenderer);
+
+        JBTextArea valueTextArea = new JBTextArea();
+        valueTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
+            @Override
+            public void valueChanged(ListSelectionEvent e) {
+                int selectedRow = valueTable.getSelectedRow();
+                updateSelected(selectedRow, tableModel.getValueAt(selectedRow, 1).toString());
+                valueTextArea.setText(getSelectedValue());
+            }
+        });
+
         JBScrollPane valueTableScrollPane = new JBScrollPane(valueTable);
         valueTableScrollPane.setPreferredSize(new Dimension(300, 200));
 
@@ -177,7 +225,7 @@ public class ValueDisplayPanel extends JPanel {
         innerPreviewAndFunctionPanel.add(valueInnerPreviewPanel, BorderLayout.NORTH);
         innerPreviewAndFunctionPanel.add(valueFunctionPanel, BorderLayout.SOUTH);
 
-        JBTextArea valueTextArea = new JBTextArea(valueList.get(0));
+
         valueTextArea.setRows(5);
         valueTextArea.setLineWrap(true);
         valueTextArea.getDocument().addDocumentListener(new DocumentAdapter() {
@@ -195,27 +243,29 @@ public class ValueDisplayPanel extends JPanel {
         this.add(valuePreviewPanel, BorderLayout.CENTER);
 
     }
-    public void initWithSet(String key, ScanResult<String> scanResult, Long ttl) {
-        this.key = key;
+
+    public void initWithSet() {
     }
-    public void initWithZset(String key, ScanResult<Tuple> scanResult, Long ttl) {
-        this.key = key;
+
+    public void initWithZset() {
     }
-    public void initWithHash(String key, ScanResult<Map.Entry<String, String>> scanResult, Long ttl) {
-        this.key = key;
+
+    public void initWithHash() {
     }
 
     private void initValuePreviewToolbarPanel() {
         JBTextField keyTextField = new JBTextField(key);
-        keyTextField.setPreferredSize(new Dimension(200,28));
+        keyTextField.setPreferredSize(new Dimension(200, 28));
         keyTextField.setToolTipText(keyTextField.getText());
         keyTextField.addKeyListener(new KeyListener() {
             @Override
             public void keyTyped(KeyEvent e) {
             }
+
             @Override
             public void keyPressed(KeyEvent e) {
             }
+
             @Override
             public void keyReleased(KeyEvent e) {
                 keyTextField.setToolTipText(keyTextField.getText());
@@ -260,7 +310,8 @@ public class ValueDisplayPanel extends JPanel {
         valueFunctionPanel.add(new JLabel("Value size: " + value.getBytes(StandardCharsets.UTF_8).length + "bytes"), BorderLayout.WEST);
         valueFunctionPanel.add(viewAsAndSavePanel, BorderLayout.AFTER_LINE_ENDS);
 
-        JBTextArea valueTextArea = new JBTextArea(value);
+        updateSelected(0, value);
+        JBTextArea valueTextArea = new JBTextArea(getSelectedValue());
         valueTextArea.setRows(5);
         valueTextArea.setLineWrap(true);
         valueTextArea.getDocument().addDocumentListener(new DocumentAdapter() {
@@ -291,5 +342,42 @@ public class ValueDisplayPanel extends JPanel {
             result[i][1] = list.get(i);
         }
         return result;
+    }
+
+    private String getSelectedValue() {
+        return this.selectedValue;
+    }
+
+    private void updateSelected(int selectedRow, String selectedValue) {
+        this.selectedValue = selectedValue;
+        this.selectedRow = selectedRow;
+    }
+
+    public static class Value {
+        private Object valueData;
+
+        public Value(Object valueData) {
+            this.valueData = valueData;
+        }
+
+        public String getStringValue() {
+            return valueData.toString();
+        }
+
+        public List<String> getListValue() {
+            return (List<String>) valueData;
+        }
+
+        public List<String> getSetValue() {
+            return getListValue();
+        }
+
+        public List<Tuple> getZsetValue() {
+            return (List<Tuple>) valueData;
+        }
+
+        public List<Map.Entry<String, String>> getHashValue() {
+            return (List<Map.Entry<String, String>>) valueData;
+        }
     }
 }
