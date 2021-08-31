@@ -2,14 +2,13 @@ package com.mzyupc.aredis.view.dialog;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
-import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.NumberDocument;
 import com.intellij.ui.treeStructure.Tree;
-import com.mzyupc.aredis.utils.ConnectionListUtil;
 import com.mzyupc.aredis.utils.PropertyUtil;
-import com.mzyupc.aredis.utils.RedisPoolMgr;
+import com.mzyupc.aredis.utils.RedisPoolManager;
+import com.mzyupc.aredis.view.ConnectionManager;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import org.apache.commons.lang.StringUtils;
 import org.jetbrains.annotations.NotNull;
@@ -21,11 +20,8 @@ import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-
-import static com.mzyupc.aredis.utils.ConnectionListUtil.connectionRedisMap;
 
 /**
  * @author mzyupc@163.com
@@ -40,6 +36,7 @@ public class ConnectionSettingsDialog extends DialogWrapper {
     private String connectionId;
     private CustomOKAction okAction;
     private Tree connectionTree;
+    private ConnectionManager connectionManager;
 
     /**
      * if connectionId is blank ? New Connection : Edit Connection
@@ -47,11 +44,12 @@ public class ConnectionSettingsDialog extends DialogWrapper {
      * @param connectionId
      * @param connectionTree
      */
-    public ConnectionSettingsDialog(Project project, String connectionId, Tree connectionTree) {
+    public ConnectionSettingsDialog(Project project, String connectionId, Tree connectionTree, ConnectionManager connectionManager) {
         super(project);
         this.propertyUtil = PropertyUtil.getInstance(project);
         this.connectionId = connectionId;
         this.connectionTree = connectionTree;
+        this.connectionManager = connectionManager;
         this.setTitle("New Connection Settings");
         this.setSize(600, 300);
         this.init();
@@ -107,18 +105,18 @@ public class ConnectionSettingsDialog extends DialogWrapper {
         testResult.setFocusable(false);
         testResult.setAlignmentX(SwingConstants.LEFT);
 
-        testButton.addMouseListener(new MouseAdapter() {
+        testButton.addActionListener(new ActionListener() {
             @Override
-            public void mouseClicked(MouseEvent e) {
+            public void actionPerformed(ActionEvent e) {
                 ValidationInfo validationInfo = doValidate(true);
                 if (validationInfo != null) {
-                    Messages.showMessageDialog(validationInfo.message, "Verification Failed", Messages.getErrorIcon());
+                    ErrorDialog.show(validationInfo.message);
                 } else {
                     String password = null;
                     if (StringUtils.isNotBlank(new String(passwordField.getPassword()))) {
                         password = new String(passwordField.getPassword());
                     }
-                    RedisPoolMgr.TestConnectionResult testConnectionResult = RedisPoolMgr.getTestConnectionResult(hostField.getText(), Integer.parseInt(portField.getText()), password);
+                    RedisPoolManager.TestConnectionResult testConnectionResult = RedisPoolManager.getTestConnectionResult(hostField.getText(), Integer.parseInt(portField.getText()), password);
                     testResult.setText(testConnectionResult.getMsg());
                     if (testConnectionResult.isSuccess()) {
                         testResult.setForeground(JBColor.GREEN);
@@ -290,7 +288,7 @@ public class ConnectionSettingsDialog extends DialogWrapper {
             // 点击ok的时候进行数据校验
             ValidationInfo validationInfo = doValidate(false);
             if (validationInfo != null) {
-                Messages.showMessageDialog(validationInfo.message, "Verification Failed", Messages.getInformationIcon());
+                ErrorDialog.show(validationInfo.message);
             } else {
                 DefaultTreeModel connectionTreeModel = (DefaultTreeModel) connectionTree.getModel();
                 if (StringUtils.isEmpty(connectionId)) {
@@ -308,7 +306,7 @@ public class ConnectionSettingsDialog extends DialogWrapper {
                             .build();
                     propertyUtil.saveConnection(connectionInfo);
                     // connectionTree 中添加节点
-                    ConnectionListUtil.addConnectionToList(connectionTreeModel, connectionInfo);
+                    connectionManager.addConnectionToList(connectionTreeModel, connectionInfo);
                     close(CANCEL_EXIT_CODE);
 
                 } else {
@@ -325,8 +323,8 @@ public class ConnectionSettingsDialog extends DialogWrapper {
                             .password(password)
                             .build();
                     // 更新redisPoolMgr
-                    RedisPoolMgr redisPoolMgr = new RedisPoolMgr(connectionInfo);
-                    connectionRedisMap.put(connectionId, redisPoolMgr);
+                    RedisPoolManager redisPoolManager = new RedisPoolManager(connectionInfo);
+                    connectionManager.getConnectionRedisMap().put(connectionId, redisPoolManager);
                     // 设置connectionNode的connectionInfo
                     TreePath selectionPath = connectionTree.getSelectionPath();
                     DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) selectionPath.getPath()[1];
@@ -334,7 +332,7 @@ public class ConnectionSettingsDialog extends DialogWrapper {
                     // 重新载入connectionNode
                     connectionTreeModel.reload(connectionNode);
                     // 更新持久化信息
-                    propertyUtil.removeConnection(connectionId);
+                    propertyUtil.removeConnection(connectionId, redisPoolManager);
                     propertyUtil.saveConnection(connectionInfo);
 
                     close(OK_EXIT_CODE);

@@ -24,6 +24,8 @@ public class DbInfo {
      */
     private Long keyCount;
 
+    private String connectionId;
+
     @Override
     public String toString() {
         return String.format("DB%s (%s)", index, keyCount);
@@ -38,11 +40,11 @@ public class DbInfo {
             return false;
         }
         DbInfo dbInfo = (DbInfo) o;
-        return Objects.equal(index, dbInfo.index);
+        return Objects.equal(index, dbInfo.index) && Objects.equal(connectionId, dbInfo.connectionId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(index);
+        return Objects.hashCode(index, connectionId);
     }
 }

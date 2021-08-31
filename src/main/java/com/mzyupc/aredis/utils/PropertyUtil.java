@@ -5,6 +5,7 @@ import com.google.common.collect.Lists;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.project.Project;
 import com.mzyupc.aredis.vo.ConnectionInfo;
+import com.mzyupc.aredis.vo.DbInfo;
 import org.apache.commons.lang.StringUtils;
 
 import java.util.ArrayList;
@@ -23,6 +24,8 @@ public class PropertyUtil {
     private static final String CONNECTION_ID_LIST_KEY = "connectionIds";
 
     private static final String RELOAD_AFTER_ADDING_THE_KEY = "reloadAfterAddingTheKey";
+
+    private static final String DEFAULT_GROUP_SYMBOL = "";
 
     private static PropertiesComponent properties;
 
@@ -89,8 +92,9 @@ public class PropertyUtil {
      * 删除连接
      *
      * @param id 连接ID
+     * @param redisPoolManager
      */
-    public void removeConnection(String id) {
+    public void removeConnection(String id, RedisPoolManager redisPoolManager) {
         String[] ids = properties.getValues(CONNECTION_ID_LIST_KEY);
         if (ids == null || ids.length == 0) {
             return;
@@ -104,6 +108,16 @@ public class PropertyUtil {
         idList.remove(id);
         properties.setValues(CONNECTION_ID_LIST_KEY, idList.toArray(new String[]{}));
         properties.unsetValue(id);
+
+        // 移除groupSymbol
+        if (redisPoolManager != null) {
+            for (int i = 0; i < redisPoolManager.getDbCount(); i++) {
+                removeGroupSymbol(DbInfo.builder()
+                        .connectionId(id)
+                        .index(i)
+                        .build());
+            }
+        }
     }
 
     /**
@@ -131,5 +145,21 @@ public class PropertyUtil {
 
     public void setReloadAfterAddingTheKey(boolean reloadAfterAddingTheKey) {
         properties.setValue(RELOAD_AFTER_ADDING_THE_KEY, reloadAfterAddingTheKey);
+    }
+
+    public void saveGroupSymbol(DbInfo dbInfo, String groupSymbol) {
+        properties.setValue(getGroupSymbolKey(dbInfo), groupSymbol);
+    }
+
+    public String getGroupSymbol(DbInfo dbInfo) {
+        return properties.getValue(getGroupSymbolKey(dbInfo), DEFAULT_GROUP_SYMBOL);
+    }
+
+    public void removeGroupSymbol(DbInfo dbInfo) {
+        properties.unsetValue(getGroupSymbolKey(dbInfo));
+    }
+
+    private String getGroupSymbolKey(DbInfo dbInfo) {
+        return dbInfo.getConnectionId() + ":" + dbInfo.getIndex();
     }
 }

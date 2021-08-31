@@ -6,7 +6,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileSystem;
-import com.mzyupc.aredis.utils.RedisPoolMgr;
+import com.mzyupc.aredis.utils.RedisPoolManager;
 import com.mzyupc.aredis.view.ARedisKeyValueDisplayPanel;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import com.mzyupc.aredis.vo.DbInfo;
@@ -35,12 +35,12 @@ public class ARedisVirtualFile extends VirtualFile {
         return new ARedisFileType();
     }
 
-    public ARedisVirtualFile(String name, Project project, ConnectionInfo connectionInfo, DbInfo dbInfo, RedisPoolMgr redisPoolMgr) {
+    public ARedisVirtualFile(String name, Project project, ConnectionInfo connectionInfo, DbInfo dbInfo, RedisPoolManager redisPoolManager) {
         this.project = project;
         this.name = name;
         this.connectionInfo = connectionInfo;
         this.dbInfo = dbInfo;
-        this.aRedisKeyValueDisplayPanel = new ARedisKeyValueDisplayPanel(project, connectionInfo, dbInfo, redisPoolMgr);
+        this.aRedisKeyValueDisplayPanel = new ARedisKeyValueDisplayPanel(project, connectionInfo, dbInfo, redisPoolManager);
     }
 
     @Override

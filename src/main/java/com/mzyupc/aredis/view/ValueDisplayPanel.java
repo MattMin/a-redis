@@ -1,5 +1,6 @@
 package com.mzyupc.aredis.view;
 
+import com.intellij.openapi.project.Project;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.JBSplitter;
 import com.intellij.ui.components.JBLabel;
@@ -8,9 +9,14 @@ import com.intellij.ui.components.JBTextArea;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.ui.table.JBTable;
 import com.mzyupc.aredis.layout.VFlowLayout;
-import com.mzyupc.aredis.utils.RedisPoolMgr;
+import com.mzyupc.aredis.utils.JTreeUtil;
+import com.mzyupc.aredis.utils.RedisPoolManager;
+import com.mzyupc.aredis.view.dialog.ConfirmDialog;
+import com.mzyupc.aredis.view.dialog.ErrorDialog;
 import com.mzyupc.aredis.view.dialog.enums.RedisValueTypeEnum;
 import com.mzyupc.aredis.view.dialog.enums.ValueFormatEnum;
+import com.mzyupc.aredis.vo.DbInfo;
+import com.mzyupc.aredis.vo.KeyInfo;
 import org.jetbrains.annotations.NotNull;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.ScanParams;
@@ -24,10 +30,18 @@ import javax.swing.event.ListSelectionListener;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.TreeNode;
+import javax.swing.tree.TreePath;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -40,6 +54,8 @@ import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
  * Value展示区
  */
 public class ValueDisplayPanel extends JPanel {
+
+    private Project project;
     /**
      * value预览工具栏区
      */
@@ -70,7 +86,13 @@ public class ValueDisplayPanel extends JPanel {
 
     private RedisValueTypeEnum typeEnum;
 
-    private RedisPoolMgr redisPoolMgr;
+    private RedisPoolManager redisPoolManager;
+
+    private DbInfo dbInfo;
+
+    private ARedisKeyValueDisplayPanel parent;
+
+    private KeyTreeDisplayPanel keyTreeDisplayPanel;
 
     /**
      * value内部预览区 选中的value
@@ -81,7 +103,9 @@ public class ValueDisplayPanel extends JPanel {
      */
     private int selectedRow;
 
-    public ValueDisplayPanel(LayoutManager layout) {
+    private ValueDisplayPanel() {}
+
+    private ValueDisplayPanel(LayoutManager layout) {
         super(layout);
     }
 
@@ -92,13 +116,18 @@ public class ValueDisplayPanel extends JPanel {
     /**
      * 初始化
      *
+     * @param keyTreeDisplayPanel
      * @param key
-     * @param db
      */
-    public void init(String key, int db, RedisPoolMgr redisPoolMgr) {
-        this.redisPoolMgr = redisPoolMgr;
-        try (Jedis jedis = redisPoolMgr.getJedis(db)) {
-            Boolean exists = exists = jedis.exists(key);
+    public void init(Project project, ARedisKeyValueDisplayPanel parent, KeyTreeDisplayPanel keyTreeDisplayPanel, String key, RedisPoolManager redisPoolManager, DbInfo dbInfo) {
+        this.redisPoolManager = redisPoolManager;
+        this.dbInfo = dbInfo;
+        this.project = project;
+        this.parent = parent;
+        this.keyTreeDisplayPanel = keyTreeDisplayPanel;
+
+        try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+            Boolean exists = jedis.exists(key);
             if (exists == null || !exists) {
                 return;
             }
@@ -117,39 +146,37 @@ public class ValueDisplayPanel extends JPanel {
                     typeEnum = RedisValueTypeEnum.String;
                     String stringValue = jedis.get(key);
                     value = new Value(stringValue);
-                    this.initWithValue();
                     break;
 
                 case "list":
                     typeEnum = RedisValueTypeEnum.List;
                     List<String> listValue = jedis.lrange(key, 0, 30);
                     value = new Value(listValue);
-                    this.initWithValue();
                     break;
 
                 case "set":
                     typeEnum = RedisValueTypeEnum.Set;
                     ScanResult<String> sscanResult = jedis.sscan(key, SCAN_POINTER_START, scanParams);
                     value = new Value(sscanResult.getResult());
-                    this.initWithValue();
                     break;
 
                 case "zset":
                     typeEnum = RedisValueTypeEnum.Zset;
                     ScanResult<Tuple> zscanResult = jedis.zscan(key, SCAN_POINTER_START, scanParams);
                     value = new Value(zscanResult.getResult());
-                    this.initWithValue();
                     break;
 
                 case "hash":
                     typeEnum = RedisValueTypeEnum.Hash;
                     ScanResult<Map.Entry<String, String>> hscanResult = jedis.hscan(key, SCAN_POINTER_START, scanParams);
                     value = new Value(hscanResult.getResult());
-                    this.initWithValue();
                     break;
 
                 default:
+                    return;
             }
+
+            this.initWithValue();
         }
     }
 
@@ -158,6 +185,8 @@ public class ValueDisplayPanel extends JPanel {
         if (value == null) {
             return;
         }
+
+        this.removeAll();
 
         // 初始化value预览工具栏区
         initValuePreviewToolbarPanel();
@@ -188,11 +217,37 @@ public class ValueDisplayPanel extends JPanel {
             }
         });
 
-        JButton renameButton = new JButton("Rename Key");
+        JButton renameButton = createRenameButton(keyTextField);
 
-        JButton reloadButton = new JButton("Reload value");
+        JButton reloadButton = createReloadValueButton();
 
         JButton deleteButton = new JButton("Delete");
+        deleteButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                ConfirmDialog confirm = new ConfirmDialog(
+                        project,
+                        "Confirm",
+                        "Are you sure you want to delete this key?",
+                        actionEvent -> {
+                            DefaultTreeModel treeModel = keyTreeDisplayPanel.getTreeModel();
+                            DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
+                            DefaultMutableTreeNode deletedNode = deleteNode(root, key);
+                            treeModel.reload();
+                            if (deletedNode != null) {
+                                dbInfo.setKeyCount(dbInfo.getKeyCount() - 1);
+                                TreeNode[] path = deletedNode.getPath();
+                                JTreeUtil.expandAll(
+                                        keyTreeDisplayPanel.getKeyTree(),
+                                        new TreePath(Arrays.copyOfRange(path, 0, path.length - 2)),
+                                        true);
+                            }
+
+                            parent.removeValueDisplayPanel();
+                        });
+                confirm.show();
+            }
+        });
 
         JBTextField ttlTextField = new JBTextField(ttl + "");
 
@@ -210,6 +265,35 @@ public class ValueDisplayPanel extends JPanel {
 
         this.add(valuePreviewToolbarPanel, BorderLayout.NORTH);
     }
+
+    /**
+     * 根据Key删除节点
+     * @param key
+     */
+    private DefaultMutableTreeNode deleteNode(DefaultMutableTreeNode node, String key) {
+        if (node.isLeaf()) {
+            KeyInfo userObject = (KeyInfo) node.getUserObject();
+            String nodeKey = userObject.getKey();
+            if (key.equals(nodeKey)) {
+                userObject.setDel(true);
+                node.setUserObject(userObject);
+                redisPoolManager.del(key, dbInfo.getIndex());
+                return node;
+            }
+            return null;
+        } else {
+            for (int i = 0; i < node.getChildCount(); i++) {
+                DefaultMutableTreeNode childNode = (DefaultMutableTreeNode) node.getChildAt(i);
+                DefaultMutableTreeNode node1 = deleteNode(childNode, key);
+                if (node1 != null) {
+                    return node1;
+                }
+            }
+        }
+
+        return null;
+    }
+
 
     /**
      * 初始化value预览区
@@ -345,11 +429,53 @@ public class ValueDisplayPanel extends JPanel {
         });
     }
 
+    @NotNull
+    private JButton createRenameButton(JBTextField keyTextField) {
+        JButton renameButton = new JButton("Rename key");
+        renameButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                final String newKey = keyTextField.getText();
+                ConfirmDialog confirmDialog = new ConfirmDialog(
+                        project,
+                        "Confirm",
+                        String.format("Do you want to rename \"%s\" to \"%s\"?", key, newKey),
+                        actionEvent -> {
+                            try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                                final Long renamenx = jedis.renamenx(key, newKey);
+                                if (renamenx == 0) {
+                                    ErrorDialog.show(String.format("\"%s\" already exists!", newKey));
+                                } else {
+                                    key = newKey;
+                                    keyTreeDisplayPanel.renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
+                                }
+                            }
+                        }
+                );
+                confirmDialog.show();
+            }
+        });
+        return renameButton;
+    }
+
+    @NotNull
+    private JButton createReloadValueButton() {
+        JButton reloadButton = new JButton("Reload value");
+        reloadButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                init(project, parent, keyTreeDisplayPanel, key, redisPoolManager, dbInfo);
+            }
+        });
+        return reloadButton;
+    }
+
     /**
      * 更新value size标签
+     *
      * @param valueSizeLabel
      */
-    private void updateValueSize (JLabel valueSizeLabel) {
+    private void updateValueSize(JLabel valueSizeLabel) {
         valueSizeLabel.setText("Value size: " + getSelectedValue().getBytes(StandardCharsets.UTF_8).length + "bytes");
     }
 
@@ -370,6 +496,7 @@ public class ValueDisplayPanel extends JPanel {
 
     /**
      * zset value 转为2维数组
+     *
      * @param list
      * @return
      */
@@ -379,7 +506,7 @@ public class ValueDisplayPanel extends JPanel {
             result[i][0] = i;
             Tuple tuple = list.get(i);
             result[i][1] = tuple.getElement();
-            result[i][2] = tuple.getScore();
+            result[i][2] = BigDecimal.valueOf(tuple.getScore()).toPlainString();
         }
         return result;
     }

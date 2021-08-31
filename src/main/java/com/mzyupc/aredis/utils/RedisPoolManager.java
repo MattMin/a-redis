@@ -1,7 +1,8 @@
 package com.mzyupc.aredis.utils;
 
 import com.intellij.openapi.Disposable;
-import com.intellij.openapi.ui.Messages;
+import com.mzyupc.aredis.view.ARedisToolWindow;
+import com.mzyupc.aredis.view.dialog.ErrorDialog;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import lombok.Builder;
 import lombok.Getter;
@@ -22,7 +23,7 @@ import java.util.Set;
  * todo redis线程池回收
  */
 @Slf4j
-public class RedisPoolMgr extends CloseTranscoder implements Disposable {
+public class RedisPoolManager extends CloseTranscoder implements Disposable {
 
     private String host;
     private Integer port;
@@ -51,7 +52,7 @@ public class RedisPoolMgr extends CloseTranscoder implements Disposable {
         jedisPoolConfig.setTestOnBorrow(true);
     }
 
-    public RedisPoolMgr(ConnectionInfo connectionInfo) {
+    public RedisPoolManager(ConnectionInfo connectionInfo) {
         this.host = connectionInfo.getUrl();
         this.port = Integer.parseInt(connectionInfo.getPort());
         this.password = connectionInfo.getPassword();
@@ -127,10 +128,7 @@ public class RedisPoolMgr extends CloseTranscoder implements Disposable {
             pool = new JedisPool(jedisPoolConfig, host, port, Protocol.DEFAULT_TIMEOUT, password);
         } catch (Exception e) {
             log.error("初始化redis pool失败", e);
-            Messages.showMessageDialog(
-                    "Failed to initialize the Redis pool." + "\n" + e.getMessage(),
-                    "Error",
-                    Messages.getErrorIcon());
+            ErrorDialog.show("Failed to initialize the Redis pool." + "\n" + e.getMessage());
         }
     }
 
@@ -203,14 +201,11 @@ public class RedisPoolMgr extends CloseTranscoder implements Disposable {
             if (db != Protocol.DEFAULT_DATABASE) {
                 resource.select(db);
             }
-            ConnectionListUtil.isConnected = true;
+            ARedisToolWindow.isConnected = true;
             return resource;
         } catch (Exception e) {
             log.warn("Failed to get resource from the pool", e);
-            Messages.showMessageDialog(
-                    e.getCause().getMessage(),
-                    "Error",
-                    Messages.getInformationIcon());
+            ErrorDialog.show(e.getCause().getMessage());
         }
         return null;
     }
