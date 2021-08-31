@@ -30,6 +30,9 @@ import javax.swing.event.ListSelectionListener;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.PlainDocument;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreeNode;
@@ -103,7 +106,8 @@ public class ValueDisplayPanel extends JPanel {
      */
     private int selectedRow;
 
-    private ValueDisplayPanel() {}
+    private ValueDisplayPanel() {
+    }
 
     private ValueDisplayPanel(LayoutManager layout) {
         super(layout);
@@ -129,6 +133,7 @@ public class ValueDisplayPanel extends JPanel {
         try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
             Boolean exists = jedis.exists(key);
             if (exists == null || !exists) {
+                ErrorDialog.show("No such key: " + key);
                 return;
             }
 
@@ -221,6 +226,58 @@ public class ValueDisplayPanel extends JPanel {
 
         JButton reloadButton = createReloadValueButton();
 
+        JButton deleteButton = createDeleteButton();
+
+        JBTextField ttlTextField = new JBTextField();
+        ttlTextField.setDocument(new NumberDocument());
+        ttlTextField.setText(ttl.toString());
+
+        JButton ttlButton = createTTLButton(ttlTextField);
+
+        valuePreviewToolbarPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        valuePreviewToolbarPanel.add(new JLabel(typeEnum.name() + ":"));
+        valuePreviewToolbarPanel.add(keyTextField);
+        valuePreviewToolbarPanel.add(renameButton);
+        valuePreviewToolbarPanel.add(reloadButton);
+        valuePreviewToolbarPanel.add(deleteButton);
+        valuePreviewToolbarPanel.add(new JLabel("TTL:"));
+        valuePreviewToolbarPanel.add(ttlTextField);
+        valuePreviewToolbarPanel.add(ttlButton);
+
+        this.add(valuePreviewToolbarPanel, BorderLayout.NORTH);
+    }
+
+    @NotNull
+    private JButton createTTLButton(JBTextField ttlTextField) {
+        JButton ttlButton = new JButton("Set new TTL");
+        ttlButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String text = ttlTextField.getText();
+                new ConfirmDialog(
+                        project,
+                        "Confirm",
+                        String.format("Are you sure you want to set TTL to %s?", text),
+                        actionEvent -> {
+                            try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                                int newTtl = Integer.parseInt(text);
+                                if (newTtl < 0) {
+                                    newTtl = -1;
+                                }
+                                jedis.expire(key, newTtl);
+                                ttl = (long) newTtl;
+                                ttlTextField.setText(ttl.toString());
+                            } catch (NumberFormatException exception) {
+                                ErrorDialog.show("Wrong TTL format for input: " + text);
+                            }
+                        }).show();
+            }
+        });
+        return ttlButton;
+    }
+
+    @NotNull
+    private JButton createDeleteButton() {
         JButton deleteButton = new JButton("Delete");
         deleteButton.addActionListener(new ActionListener() {
             @Override
@@ -237,10 +294,12 @@ public class ValueDisplayPanel extends JPanel {
                             if (deletedNode != null) {
                                 dbInfo.setKeyCount(dbInfo.getKeyCount() - 1);
                                 TreeNode[] path = deletedNode.getPath();
-                                JTreeUtil.expandAll(
-                                        keyTreeDisplayPanel.getKeyTree(),
-                                        new TreePath(Arrays.copyOfRange(path, 0, path.length - 2)),
-                                        true);
+                                if (path.length > 2) {
+                                    JTreeUtil.expandAll(
+                                            keyTreeDisplayPanel.getKeyTree(),
+                                            new TreePath(Arrays.copyOfRange(path, 0, path.length - 2)),
+                                            true);
+                                }
                             }
 
                             parent.removeValueDisplayPanel();
@@ -248,26 +307,12 @@ public class ValueDisplayPanel extends JPanel {
                 confirm.show();
             }
         });
-
-        JBTextField ttlTextField = new JBTextField(ttl + "");
-
-        JButton setNewTtlButton = new JButton("Set new TTL");
-
-        valuePreviewToolbarPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        valuePreviewToolbarPanel.add(new JLabel(typeEnum.name() + ":"));
-        valuePreviewToolbarPanel.add(keyTextField);
-        valuePreviewToolbarPanel.add(renameButton);
-        valuePreviewToolbarPanel.add(reloadButton);
-        valuePreviewToolbarPanel.add(deleteButton);
-        valuePreviewToolbarPanel.add(new JLabel("TTL:"));
-        valuePreviewToolbarPanel.add(ttlTextField);
-        valuePreviewToolbarPanel.add(setNewTtlButton);
-
-        this.add(valuePreviewToolbarPanel, BorderLayout.NORTH);
+        return deleteButton;
     }
 
     /**
      * 根据Key删除节点
+     *
      * @param key
      */
     private DefaultMutableTreeNode deleteNode(DefaultMutableTreeNode node, String key) {
@@ -293,7 +338,6 @@ public class ValueDisplayPanel extends JPanel {
 
         return null;
     }
-
 
     /**
      * 初始化value预览区
@@ -348,6 +392,11 @@ public class ValueDisplayPanel extends JPanel {
                     return false;
                 }
             };
+
+            // 选中单元格而不是一行
+            valueTable.setColumnSelectionAllowed(true);
+            valueTable.setRowSelectionAllowed(true);
+
             // 设置第一列的最大宽度
             TableColumn column = valueTable.getColumnModel().getColumn(0);
             column.setMaxWidth(150);
@@ -449,6 +498,8 @@ public class ValueDisplayPanel extends JPanel {
                                     key = newKey;
                                     keyTreeDisplayPanel.renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
                                 }
+                            } catch (Exception exception) {
+                                ErrorDialog.show(exception.getMessage());
                             }
                         }
                 );
@@ -562,6 +613,28 @@ public class ValueDisplayPanel extends JPanel {
 
         public List<Map.Entry<String, String>> getHashValue() {
             return (List<Map.Entry<String, String>>) valueData;
+        }
+    }
+
+    class NumberDocument extends PlainDocument {
+        public NumberDocument() {
+        }
+
+        @Override
+        public void insertString(int offs, String str, AttributeSet a) throws BadLocationException {
+            char[] source = str.toCharArray();
+            char[] result = new char[source.length];
+            int j = 0;
+
+            for (int i = 0; i < result.length; ++i) {
+                if (Character.isDigit(source[i]) || source[i] == '-') {
+                    result[j++] = source[i];
+                } else {
+                    Toolkit.getDefaultToolkit().beep();
+                }
+            }
+
+            super.insertString(offs, new String(result, 0, j), a);
         }
     }
 }

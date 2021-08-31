@@ -1,7 +1,10 @@
 package com.mzyupc.aredis.view.dialog;
 
+import com.intellij.openapi.Disposable;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
+import com.intellij.openapi.ui.LoadingDecorator;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.NumberDocument;
@@ -26,7 +29,7 @@ import java.awt.event.ItemEvent;
 /**
  * @author mzyupc@163.com
  */
-public class ConnectionSettingsDialog extends DialogWrapper {
+public class ConnectionSettingsDialog extends DialogWrapper implements Disposable {
 
     JTextField nameTextField;
     JTextField hostField;
@@ -78,9 +81,10 @@ public class ConnectionSettingsDialog extends DialogWrapper {
         // url port 输入框
         hostField = new JTextField(newConnection ? null : connection.getUrl());
         hostField.setToolTipText("Host");
-        portField = new JTextField(newConnection ? null : connection.getPort());
+        portField = new JTextField();
         portField.setToolTipText("Port");
         portField.setDocument(new NumberDocument());
+        portField.setText(newConnection ? null : connection.getPort());
 
         // password输入框
         passwordField = new JPasswordField(newConnection ? null : connection.getPassword());
@@ -98,12 +102,16 @@ public class ConnectionSettingsDialog extends DialogWrapper {
 
         // 测试连接按钮
         JButton testButton = new JButton("Test Connection");
+
         JTextPane testResult = new JTextPane();
         testResult.setMargin(new Insets(0, 10, 0, 0));
         testResult.setOpaque(false);
         testResult.setEditable(false);
         testResult.setFocusable(false);
         testResult.setAlignmentX(SwingConstants.LEFT);
+
+
+        LoadingDecorator loadingDecorator = new LoadingDecorator(testResult, this, 0);
 
         testButton.addActionListener(new ActionListener() {
             @Override
@@ -112,17 +120,24 @@ public class ConnectionSettingsDialog extends DialogWrapper {
                 if (validationInfo != null) {
                     ErrorDialog.show(validationInfo.message);
                 } else {
-                    String password = null;
+                    String password;
                     if (StringUtils.isNotBlank(new String(passwordField.getPassword()))) {
                         password = new String(passwordField.getPassword());
-                    }
-                    RedisPoolManager.TestConnectionResult testConnectionResult = RedisPoolManager.getTestConnectionResult(hostField.getText(), Integer.parseInt(portField.getText()), password);
-                    testResult.setText(testConnectionResult.getMsg());
-                    if (testConnectionResult.isSuccess()) {
-                        testResult.setForeground(JBColor.GREEN);
                     } else {
-                        testResult.setForeground(JBColor.RED);
+                        password = null;
                     }
+
+                    loadingDecorator.startLoading(false);
+                    ApplicationManager.getApplication().invokeLater(()->{
+                        RedisPoolManager.TestConnectionResult testConnectionResult = RedisPoolManager.getTestConnectionResult(hostField.getText(), Integer.parseInt(portField.getText()), password);
+                        testResult.setText(testConnectionResult.getMsg());
+                        if (testConnectionResult.isSuccess()) {
+                            testResult.setForeground(JBColor.GREEN);
+                        } else {
+                            testResult.setForeground(JBColor.RED);
+                        }
+                    });
+                    loadingDecorator.stopLoading();
                 }
             }
         });
@@ -226,7 +241,7 @@ public class ConnectionSettingsDialog extends DialogWrapper {
         row.add(testButton);
         JPanel testConnectionSettingsPanel = new JPanel(new GridLayout(2, 1));
         testConnectionSettingsPanel.add(row);
-        testConnectionSettingsPanel.add(testResult);
+        testConnectionSettingsPanel.add(loadingDecorator.getComponent());
 
         JPanel centerPanel = new JPanel(new BorderLayout());
         centerPanel.add(connectionSettingsPanel, BorderLayout.NORTH);
@@ -234,6 +249,7 @@ public class ConnectionSettingsDialog extends DialogWrapper {
         return centerPanel;
     }
 
+    DialogWrapperExitAction exitAction;
     /**
      * 覆盖默认的ok/cancel按钮
      *
@@ -242,8 +258,9 @@ public class ConnectionSettingsDialog extends DialogWrapper {
     @NotNull
     @Override
     protected Action[] createActions() {
-        DialogWrapperExitAction exitAction = new DialogWrapperExitAction("Cancel", CANCEL_EXIT_CODE);
+        exitAction = new DialogWrapperExitAction("Cancel", CANCEL_EXIT_CODE);
         okAction = new CustomOKAction();
+
         // 设置默认的焦点按钮
         okAction.putValue(DialogWrapper.DEFAULT_ACTION, true);
         return new Action[]{exitAction, okAction};
@@ -272,6 +289,11 @@ public class ConnectionSettingsDialog extends DialogWrapper {
             return new ValidationInfo("Port must be in digital form");
         }
         return null;
+    }
+
+    @Override
+    public void dispose() {
+        super.dispose();
     }
 
     /**
