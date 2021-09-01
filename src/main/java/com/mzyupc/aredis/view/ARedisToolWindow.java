@@ -3,11 +3,15 @@ package com.mzyupc.aredis.view;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindow;
+import com.intellij.ui.TreeSpeedSearch;
 import com.intellij.ui.treeStructure.Tree;
+import com.intellij.util.containers.Convertor;
 import com.mzyupc.aredis.utils.PropertyUtil;
 import lombok.Getter;
 
 import javax.swing.*;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.TreePath;
 import java.awt.*;
 
 /**
@@ -32,6 +36,18 @@ public class ARedisToolWindow implements Disposable {
         this.project = project;
         this.propertyUtil = PropertyUtil.getInstance(project);
         connectionManager.initConnections(connectionTree);
+
+        // connectionTree搜索功能
+        new TreeSpeedSearch(connectionTree, new Convertor<TreePath, String>() {
+            @Override
+            public String convert(final TreePath treePath) {
+                DefaultMutableTreeNode node = (DefaultMutableTreeNode) treePath.getLastPathComponent();
+                if (node.getUserObject() != null) {
+                    return node.getUserObject().toString();
+                }
+                return "";
+            }
+        }, true);
     }
 
     public JPanel getContent() {

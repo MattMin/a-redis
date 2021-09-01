@@ -1,7 +1,8 @@
 package com.mzyupc.aredis.view;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
-import com.intellij.ui.DocumentAdapter;
+import com.intellij.openapi.ui.LoadingDecorator;
 import com.intellij.ui.JBSplitter;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
@@ -17,6 +18,8 @@ import com.mzyupc.aredis.view.dialog.enums.RedisValueTypeEnum;
 import com.mzyupc.aredis.view.dialog.enums.ValueFormatEnum;
 import com.mzyupc.aredis.vo.DbInfo;
 import com.mzyupc.aredis.vo.KeyInfo;
+import org.apache.batik.ext.swing.DoubleDocument;
+import org.apache.commons.lang.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.ScanParams;
@@ -24,7 +27,6 @@ import redis.clients.jedis.ScanResult;
 import redis.clients.jedis.Tuple;
 
 import javax.swing.*;
-import javax.swing.event.DocumentEvent;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -97,14 +99,26 @@ public class ValueDisplayPanel extends JPanel {
 
     private KeyTreeDisplayPanel keyTreeDisplayPanel;
 
+    private LoadingDecorator loadingDecorator;
+
     /**
      * value内部预览区 选中的value
      */
     private String selectedValue = "";
+
+    /**
+     * value内部预览区 选中的field或者score, 依赖于typeEnum
+     */
+    private String selectedFieldOrScore = "";
+
     /**
      * value内部预览区 选中的行
      */
-    private int selectedRow;
+    private int selectedRow = -1;
+
+    private int pageIndex = 1;
+
+    private int pageSize = 100;
 
     private ValueDisplayPanel() {
     }
@@ -119,70 +133,78 @@ public class ValueDisplayPanel extends JPanel {
 
     /**
      * 初始化
-     *
-     * @param keyTreeDisplayPanel
+     *  @param keyTreeDisplayPanel
      * @param key
+     * @param loadingDecorator
      */
-    public void init(Project project, ARedisKeyValueDisplayPanel parent, KeyTreeDisplayPanel keyTreeDisplayPanel, String key, RedisPoolManager redisPoolManager, DbInfo dbInfo) {
+    public void init(Project project, ARedisKeyValueDisplayPanel parent, KeyTreeDisplayPanel keyTreeDisplayPanel, String key, RedisPoolManager redisPoolManager, DbInfo dbInfo, LoadingDecorator loadingDecorator) {
         this.redisPoolManager = redisPoolManager;
         this.dbInfo = dbInfo;
         this.project = project;
         this.parent = parent;
         this.keyTreeDisplayPanel = keyTreeDisplayPanel;
+        this.loadingDecorator  = loadingDecorator;
 
-        try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
-            Boolean exists = jedis.exists(key);
-            if (exists == null || !exists) {
-                ErrorDialog.show("No such key: " + key);
-                return;
-            }
+        loadingDecorator.startLoading(false);
 
-            this.key = key;
-            this.ttl = jedis.ttl(key);
-            String type = jedis.type(key);
-
-
-            ScanParams scanParams = new ScanParams();
-            scanParams.count(30);
-            scanParams.match("*");
-
-            switch (type) {
-                case "string":
-                    typeEnum = RedisValueTypeEnum.String;
-                    String stringValue = jedis.get(key);
-                    value = new Value(stringValue);
-                    break;
-
-                case "list":
-                    typeEnum = RedisValueTypeEnum.List;
-                    List<String> listValue = jedis.lrange(key, 0, 30);
-                    value = new Value(listValue);
-                    break;
-
-                case "set":
-                    typeEnum = RedisValueTypeEnum.Set;
-                    ScanResult<String> sscanResult = jedis.sscan(key, SCAN_POINTER_START, scanParams);
-                    value = new Value(sscanResult.getResult());
-                    break;
-
-                case "zset":
-                    typeEnum = RedisValueTypeEnum.Zset;
-                    ScanResult<Tuple> zscanResult = jedis.zscan(key, SCAN_POINTER_START, scanParams);
-                    value = new Value(zscanResult.getResult());
-                    break;
-
-                case "hash":
-                    typeEnum = RedisValueTypeEnum.Hash;
-                    ScanResult<Map.Entry<String, String>> hscanResult = jedis.hscan(key, SCAN_POINTER_START, scanParams);
-                    value = new Value(hscanResult.getResult());
-                    break;
-
-                default:
+        ApplicationManager.getApplication().invokeLater(() -> {
+            try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                Boolean exists = jedis.exists(key);
+                if (exists == null || !exists) {
+                    ErrorDialog.show("No such key: " + key);
                     return;
-            }
+                }
 
-            this.initWithValue();
-        }
+                this.key = key;
+                this.ttl = jedis.ttl(key);
+                String type = jedis.type(key);
+
+
+                ScanParams scanParams = new ScanParams();
+                scanParams.count(pageSize);
+                scanParams.match("*");
+
+                switch (type) {
+                    case "string":
+                        typeEnum = RedisValueTypeEnum.String;
+                        String stringValue = jedis.get(key);
+                        value = new Value(stringValue);
+                        break;
+
+                    case "list":
+                        typeEnum = RedisValueTypeEnum.List;
+                        int start = (pageIndex - 1) * pageSize;
+                        List<String> listValue = jedis.lrange(key, start, start + pageSize - 1);
+                        value = new Value(listValue);
+                        break;
+
+                    case "set":
+                        typeEnum = RedisValueTypeEnum.Set;
+                        ScanResult<String> sscanResult = jedis.sscan(key, SCAN_POINTER_START, scanParams);
+                        value = new Value(sscanResult.getResult());
+                        break;
+
+                    case "zset":
+                        typeEnum = RedisValueTypeEnum.Zset;
+                        ScanResult<Tuple> zscanResult = jedis.zscan(key, SCAN_POINTER_START, scanParams);
+                        value = new Value(zscanResult.getResult());
+                        break;
+
+                    case "hash":
+                        typeEnum = RedisValueTypeEnum.Hash;
+                        ScanResult<Map.Entry<String, String>> hscanResult = jedis.hscan(key, SCAN_POINTER_START, scanParams);
+                        value = new Value(hscanResult.getResult());
+                        break;
+
+                    default:
+                        return;
+                }
+
+                this.initWithValue();
+            }
+        });
+
+        loadingDecorator.stopLoading();
     }
 
     private void initWithValue() {
@@ -345,45 +367,128 @@ public class ValueDisplayPanel extends JPanel {
     private void initValuePreviewPanel() {
         DefaultTableModel tableModel;
         final int valueColumnIndex;
+        final int fieldOrScoreColumnIndex;
         switch (typeEnum) {
             case String:
                 tableModel = null;
                 valueColumnIndex = -1;
+                fieldOrScoreColumnIndex = 0;
                 break;
 
             case List:
                 List<String> listValue = value.getListValue();
                 tableModel = new DefaultTableModel(to2DimensionalArray(listValue), new String[]{"Row", "Value"});
                 valueColumnIndex = 1;
+                fieldOrScoreColumnIndex = 0;
                 break;
 
             case Set:
                 List<String> setValue = value.getSetValue();
                 tableModel = new DefaultTableModel(to2DimensionalArray(setValue), new String[]{"Row", "Value"});
                 valueColumnIndex = 1;
+                fieldOrScoreColumnIndex = 0;
                 break;
 
             case Zset:
                 List<Tuple> zsetValue = value.getZsetValue();
-                tableModel = new DefaultTableModel(zsetValueListTo2DimensionalArray(zsetValue), new String[]{"Row", "Value", "Score"});
-                valueColumnIndex = 1;
+                tableModel = new DefaultTableModel(zsetValueListTo2DimensionalArray(zsetValue), new String[]{"Row", "Score", "Value"});
+                valueColumnIndex = 2;
+                fieldOrScoreColumnIndex = 1;
                 break;
 
             case Hash:
                 List<Map.Entry<String, String>> hashValue = value.getHashValue();
                 tableModel = new DefaultTableModel(hashValueListTo2DimensionalArray(hashValue), new String[]{"Row", "Field", "Value"});
                 valueColumnIndex = 2;
+                fieldOrScoreColumnIndex = 1;
                 break;
 
             default:
                 return;
         }
 
-        JBTextArea valueTextArea = new JBTextArea();
-        valueViewPanel = new JBScrollPane(valueTextArea);
-        JPanel innerPreviewAndFunctionPanel = new JPanel(new BorderLayout());
-        JBLabel valueSizeLabel = new JBLabel();
+        JBTextArea fieldTextArea = new JBTextArea();
+        fieldTextArea.setLineWrap(true);
+//        fieldTextArea.getDocument().addDocumentListener(new DocumentAdapter() {
+//            @Override
+//            protected void textChanged(@NotNull DocumentEvent documentEvent) {
+//                if (fieldOrScoreColumnIndex != 0) {
+//                    if (!getSelectedFieldOrScore().equals(fieldTextArea.getText())) {
+//                        saveValueButton.setEnabled(true);
+//                    }
+//                }
+//            }
+//        });
 
+        JBTextArea valueTextArea = new JBTextArea();
+        valueTextArea.setLineWrap(true);
+//        valueTextArea.getDocument().addDocumentListener(new DocumentAdapter() {
+//            @Override
+//            protected void textChanged(@NotNull DocumentEvent documentEvent) {
+//                if (!getSelectedValue().equals(valueTextArea.getText())) {
+//                    saveValueButton.setEnabled(true);
+//                }
+//            }
+//        });
+
+        JButton saveValueButton = new JButton("Save");
+        saveValueButton.setEnabled(true);
+        saveValueButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (selectedRow == -1) {
+                    return;
+                }
+
+                String newField = fieldTextArea.getText();
+                if (typeEnum == RedisValueTypeEnum.Hash) {
+                    if (StringUtils.isEmpty(newField)) {
+                        ErrorDialog.show("Please enter a valid Field!");
+                        return;
+                    }
+                }
+
+                if (typeEnum == RedisValueTypeEnum.Hash) {
+                    if (StringUtils.isEmpty(newField)) {
+                        ErrorDialog.show("Please enter a valid Score!");
+                        return;
+                    }
+                }
+
+                String newValue = valueTextArea.getText();
+                if (StringUtils.isEmpty(newValue)) {
+                    ErrorDialog.show("Please enter a valid Value!");
+                    return;
+                }
+
+                new ConfirmDialog(
+                        project,
+                        "Confirm",
+                        "Confirm to save",
+                        actionEvent -> {
+                            saveNewValue(newField, newValue);
+                        }).show();
+            }
+        });
+
+        JPanel viewAsAndSavePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        viewAsAndSavePanel.add(new JLabel("View as:"));
+        viewAsAndSavePanel.add(new JComboBox<>(ValueFormatEnum.values()));
+        viewAsAndSavePanel.add(saveValueButton);
+
+        JBLabel valueSizeLabel = new JBLabel();
+        valueFunctionPanel = new JPanel(new BorderLayout());
+        valueFunctionPanel.add(valueSizeLabel, BorderLayout.WEST);
+        valueFunctionPanel.add(viewAsAndSavePanel, BorderLayout.AFTER_LINE_ENDS);
+
+        valueViewPanel = new JBScrollPane(valueTextArea);
+
+        // value size/view as and value preview
+        JPanel valuePreviewAndFunctionPanel = new JPanel(new BorderLayout());
+        valuePreviewAndFunctionPanel.add(valueFunctionPanel, BorderLayout.NORTH);
+        valuePreviewAndFunctionPanel.add(valueViewPanel, BorderLayout.CENTER);
+
+        JPanel innerPreviewPanel = new JPanel(new BorderLayout());
         // 需要表格预览
         if (tableModel != null) {
             JBTable valueTable = new JBTable(tableModel) {
@@ -394,8 +499,8 @@ public class ValueDisplayPanel extends JPanel {
             };
 
             // 选中单元格而不是一行
-            valueTable.setColumnSelectionAllowed(true);
             valueTable.setRowSelectionAllowed(true);
+            valueTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
             // 设置第一列的最大宽度
             TableColumn column = valueTable.getColumnModel().getColumn(0);
@@ -412,10 +517,15 @@ public class ValueDisplayPanel extends JPanel {
             valueTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
                 @Override
                 public void valueChanged(ListSelectionEvent e) {
-                    int selectedRow = valueTable.getSelectedRow();
-                    updateSelected(selectedRow, tableModel.getValueAt(selectedRow, valueColumnIndex).toString());
-                    valueTextArea.setText(getSelectedValue());
-                    updateValueSize(valueSizeLabel);
+                    if (!e.getValueIsAdjusting()) {
+                        int selectedRow = valueTable.getSelectedRow();
+                        updateSelected(selectedRow,
+                                tableModel.getValueAt(selectedRow, valueColumnIndex).toString(),
+                                tableModel.getValueAt(selectedRow, fieldOrScoreColumnIndex).toString());
+                        fieldTextArea.setText(getSelectedFieldOrScore());
+                        valueTextArea.setText(getSelectedValue());
+                        updateValueSize(valueSizeLabel);
+                    }
                 }
             });
 
@@ -436,46 +546,104 @@ public class ValueDisplayPanel extends JPanel {
             valueInnerPreviewPanel.add(valueTableScrollPane, BorderLayout.CENTER);
             valueInnerPreviewPanel.add(valueTableButtonPanel, BorderLayout.AFTER_LINE_ENDS);
 
-            innerPreviewAndFunctionPanel.add(valueInnerPreviewPanel, BorderLayout.CENTER);
+            innerPreviewPanel.add(valueInnerPreviewPanel, BorderLayout.CENTER);
 
             JBSplitter valuePreviewSplitter = new JBSplitter(true, 0.35f);
-            valuePreviewSplitter.setFirstComponent(innerPreviewAndFunctionPanel);
-            valuePreviewSplitter.setSecondComponent(valueViewPanel);
+            valuePreviewSplitter.setFirstComponent(innerPreviewPanel);
+
+            if (typeEnum == RedisValueTypeEnum.Hash) {
+                JLabel fieldLabel = new JLabel("Field:");
+                JBScrollPane fieldScrollPane = new JBScrollPane(fieldTextArea);
+                JPanel fieldPanel = new JPanel(new BorderLayout());
+                fieldPanel.add(fieldLabel, BorderLayout.NORTH);
+                fieldPanel.add(fieldScrollPane, BorderLayout.CENTER);
+
+                JBSplitter keyValueSplitter = new JBSplitter(true, 0.1f);
+                keyValueSplitter.setFirstComponent(fieldPanel);
+                keyValueSplitter.setSecondComponent(valuePreviewAndFunctionPanel);
+
+                valuePreviewSplitter.setSecondComponent(keyValueSplitter);
+            } else if (typeEnum == RedisValueTypeEnum.Zset) {
+                JLabel fieldLabel = new JLabel("Score:");
+                JBScrollPane fieldScrollPane = new JBScrollPane(fieldTextArea);
+                JPanel fieldPanel = new JPanel(new BorderLayout());
+                fieldPanel.add(fieldLabel, BorderLayout.NORTH);
+                fieldPanel.add(fieldScrollPane, BorderLayout.CENTER);
+                fieldTextArea.setDocument(new DoubleDocument());
+
+                JBSplitter keyValueSplitter = new JBSplitter(true, 0.1f);
+                keyValueSplitter.setFirstComponent(fieldPanel);
+                keyValueSplitter.setSecondComponent(valuePreviewAndFunctionPanel);
+
+                valuePreviewSplitter.setSecondComponent(keyValueSplitter);
+            } else {
+                valuePreviewSplitter.setSecondComponent(valuePreviewAndFunctionPanel);
+            }
+
             this.add(valuePreviewSplitter, BorderLayout.CENTER);
         } else {
-            updateSelected(0, value.getStringValue());
+            updateSelected(-1, value.getStringValue(), null);
             valueTextArea.setText(getSelectedValue());
             updateValueSize(valueSizeLabel);
 
             valuePreviewPanel = new JPanel(new BorderLayout());
-            valuePreviewPanel.add(innerPreviewAndFunctionPanel, BorderLayout.NORTH);
-            valuePreviewPanel.add(valueViewPanel, BorderLayout.CENTER);
+            valuePreviewPanel.add(innerPreviewPanel, BorderLayout.NORTH);
+            valuePreviewPanel.add(valuePreviewAndFunctionPanel, BorderLayout.CENTER);
             this.add(valuePreviewPanel, BorderLayout.CENTER);
         }
+    }
 
-        // 初始化valueFunctionPanel
-        JComboBox<ValueFormatEnum> valueFormatEnumJComboBox = new JComboBox<>(ValueFormatEnum.values());
-        JButton saveValueButton = new JButton("Save");
-        saveValueButton.setEnabled(false);
+    private void saveNewValue(String newFieldOrScore, String newValue) {
+        switch (typeEnum) {
+            case String:
+                try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                    jedis.set(key, newValue);
+                }
+                break;
 
-        JPanel viewAsAndSavePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        viewAsAndSavePanel.add(new JLabel("View as:"));
-        viewAsAndSavePanel.add(valueFormatEnumJComboBox);
-        viewAsAndSavePanel.add(saveValueButton);
+            case List:
+                try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                    int selectedIndex = getSelectedIndex();
+                    if (selectedIndex >= 0) {
+                        jedis.lset(key, selectedIndex, newValue);
+                    }
+                }
+                break;
 
-        valueFunctionPanel = new JPanel(new BorderLayout());
-        valueFunctionPanel.add(valueSizeLabel, BorderLayout.WEST);
-        valueFunctionPanel.add(viewAsAndSavePanel, BorderLayout.AFTER_LINE_ENDS);
-        innerPreviewAndFunctionPanel.add(valueFunctionPanel, BorderLayout.SOUTH);
+            case Set:
+                try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                    if (selectedRow >= 0 && !getSelectedValue().equals(newValue)) {
+                        jedis.srem(key, getSelectedValue());
+                        jedis.sadd(key, newValue);
+                    }
+                }
+                break;
 
-        valueTextArea.setRows(5);
-        valueTextArea.setLineWrap(true);
-        valueTextArea.getDocument().addDocumentListener(new DocumentAdapter() {
-            @Override
-            protected void textChanged(@NotNull DocumentEvent documentEvent) {
-                saveValueButton.setEnabled(true);
-            }
-        });
+            case Zset:
+                try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                    if (selectedRow >= 0 && StringUtils.isNotEmpty(newFieldOrScore)) {
+                        jedis.zrem(key, getSelectedValue());
+                        jedis.zadd(key, Double.parseDouble(newFieldOrScore), newValue);
+                    }
+                }
+                break;
+
+            case Hash:
+                try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                    if (selectedRow >= 0 && StringUtils.isNotEmpty(getSelectedFieldOrScore())) {
+                        jedis.hdel(key, getSelectedFieldOrScore());
+                        jedis.hset(key, newFieldOrScore, newValue);
+                    }
+                }
+                break;
+
+            default:
+                return;
+        }
+
+        // 重新加载
+        init(project, parent, keyTreeDisplayPanel, key, redisPoolManager, dbInfo, loadingDecorator);
+        this.updateUI();
     }
 
     @NotNull
@@ -515,7 +683,7 @@ public class ValueDisplayPanel extends JPanel {
         reloadButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                init(project, parent, keyTreeDisplayPanel, key, redisPoolManager, dbInfo);
+                init(project, parent, keyTreeDisplayPanel, key, redisPoolManager, dbInfo, loadingDecorator);
             }
         });
         return reloadButton;
@@ -556,8 +724,8 @@ public class ValueDisplayPanel extends JPanel {
         for (int i = 0; i < list.size(); i++) {
             result[i][0] = i;
             Tuple tuple = list.get(i);
-            result[i][1] = tuple.getElement();
-            result[i][2] = BigDecimal.valueOf(tuple.getScore()).toPlainString();
+            result[i][1] = BigDecimal.valueOf(tuple.getScore()).toPlainString();
+            result[i][2] = tuple.getElement();
         }
         return result;
     }
@@ -579,13 +747,22 @@ public class ValueDisplayPanel extends JPanel {
         return result;
     }
 
+    private String getSelectedFieldOrScore() {
+        return this.selectedFieldOrScore;
+    }
+
     private String getSelectedValue() {
         return this.selectedValue;
     }
 
-    private void updateSelected(int selectedRow, String selectedValue) {
-        this.selectedValue = selectedValue;
+    private void updateSelected(int selectedRow, String selectedValue, String selectedFieldOrScore) {
         this.selectedRow = selectedRow;
+        this.selectedValue = selectedValue;
+        this.selectedFieldOrScore = selectedFieldOrScore;
+    }
+
+    private int getSelectedIndex() {
+        return (pageIndex - 1) * pageSize + selectedRow;
     }
 
     private static class Value {

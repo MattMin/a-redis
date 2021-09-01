@@ -10,8 +10,10 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.LoadingDecorator;
 import com.intellij.ui.JBSplitter;
+import com.intellij.ui.TreeSpeedSearch;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.treeStructure.Tree;
+import com.intellij.util.containers.Convertor;
 import com.mzyupc.aredis.action.AddAction;
 import com.mzyupc.aredis.action.ClearAction;
 import com.mzyupc.aredis.action.DeleteAction;
@@ -78,6 +80,19 @@ public class KeyTreeDisplayPanel extends JPanel {
         this.parent = parent;
 
         keyTree = new Tree();
+        // 搜索功能
+        new TreeSpeedSearch(keyTree, new Convertor<TreePath, String>() {
+            @Override
+            public String convert(final TreePath treePath) {
+                DefaultMutableTreeNode node = (DefaultMutableTreeNode) treePath.getLastPathComponent();
+                if (node.getUserObject() != null) {
+                    return node.getUserObject().toString();
+                }
+                return "";
+            }
+        }, true);
+
+        // 渲染器
         keyTree.setCellRenderer(new KeyTreeCellRenderer());
         keyTree.addMouseListener(new MouseAdapter() {
             @Override

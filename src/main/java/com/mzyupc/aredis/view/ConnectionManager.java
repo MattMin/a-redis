@@ -33,6 +33,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.List;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 import static com.mzyupc.aredis.utils.JTreeUtil.expandTree;
 
@@ -57,7 +58,7 @@ public class ConnectionManager {
     /**
      * connectionId-editor
      */
-    private Map<String, Set<ARedisVirtualFile>> connectionDbEditorMap = new HashMap<>();
+    private Map<String, CopyOnWriteArraySet<ARedisVirtualFile>> connectionDbEditorMap = new HashMap<>();
 
     private DefaultMutableTreeNode connectionTreeRoot = new DefaultMutableTreeNode();
 
@@ -366,7 +367,7 @@ public class ConnectionManager {
      * 关闭tab时移除connection-editor
      */
     public void removeEditor(String connectionId, ARedisVirtualFile virtualFile) {
-        Set<ARedisVirtualFile> aRedisVirtualFiles = connectionDbEditorMap.get(connectionId);
+        CopyOnWriteArraySet<ARedisVirtualFile> aRedisVirtualFiles = connectionDbEditorMap.get(connectionId);
         if (CollectionUtils.isEmpty(aRedisVirtualFiles)) {
             return;
         }
@@ -379,12 +380,14 @@ public class ConnectionManager {
      * @param connectionId
      */
     private void closeAllEditor(String connectionId) {
-        Set<ARedisVirtualFile> aRedisVirtualFiles = connectionDbEditorMap.get(connectionId);
+        CopyOnWriteArraySet<ARedisVirtualFile> aRedisVirtualFiles = connectionDbEditorMap.get(connectionId);
         if (CollectionUtils.isEmpty(aRedisVirtualFiles)) {
             return;
         }
 
-        for (ARedisVirtualFile aRedisVirtualFile : aRedisVirtualFiles) {
+        Iterator<ARedisVirtualFile> iterator = aRedisVirtualFiles.iterator();
+        while (iterator.hasNext()) {
+            ARedisVirtualFile aRedisVirtualFile = iterator.next();
             // close editor
             FileEditorManager fileEditorManager = FileEditorManager.getInstance(project);
             fileEditorManager.closeFile(aRedisVirtualFile);
@@ -400,9 +403,10 @@ public class ConnectionManager {
      * @param virtualFile
      */
     private void addEditorToMap(String connectionId, ARedisVirtualFile virtualFile) {
-        Set<ARedisVirtualFile> aRedisVirtualFiles = connectionDbEditorMap.get(connectionId);
+        CopyOnWriteArraySet<ARedisVirtualFile> aRedisVirtualFiles = connectionDbEditorMap.get(connectionId);
         if (aRedisVirtualFiles == null) {
-            aRedisVirtualFiles = Sets.newHashSet(virtualFile);
+            aRedisVirtualFiles = Sets.newCopyOnWriteArraySet();
+            aRedisVirtualFiles.add(virtualFile);
             connectionDbEditorMap.put(connectionId, aRedisVirtualFiles);
         } else {
             aRedisVirtualFiles.add(virtualFile);

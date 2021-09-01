@@ -3,6 +3,7 @@ package com.mzyupc.aredis.view;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.LoadingDecorator;
 import com.intellij.ui.JBSplitter;
 import com.intellij.ui.SearchTextField;
 import com.intellij.ui.components.JBScrollPane;
@@ -29,6 +30,8 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
     public static final String DEFAULT_FILTER = "*";
 
     public static final Integer DEFAULT_PAGE_SIZE = 10000;
+    private final DbInfo dbInfo;
+    private final RedisPoolManager redisPoolManager;
     /**
      * 每次查询KEY的数量
      */
@@ -36,8 +39,6 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
     private JPanel formPanel;
     private JBSplitter splitterContainer;
     private JPanel keyToolBarPanel;
-    private final DbInfo dbInfo;
-    private final RedisPoolManager redisPoolManager;
     private PropertyUtil propertyUtil;
     /**
      * 用来给Key分组的符号
@@ -186,14 +187,17 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
     private void renderValueDisplayPanel(KeyInfo keyInfo) {
         // 根据key的不同类型, 组装不同的valueDisplayPanel
         String key = keyInfo.getKey();
+
         /**
          * value 展示区
          */
         ValueDisplayPanel valueDisplayPanel = ValueDisplayPanel.getInstance();
-        valueDisplayPanel.init(project, this, keyTreeDisplayPanel, key, redisPoolManager, dbInfo);
         valueDisplayPanel.setMinimumSize(new Dimension(100, 100));
         JBScrollPane valueDisplayScrollPanel = new JBScrollPane(valueDisplayPanel);
-        splitterContainer.setSecondComponent(valueDisplayScrollPanel);
+
+        LoadingDecorator loadingDecorator = new LoadingDecorator(valueDisplayScrollPanel, this, 0);
+        splitterContainer.setSecondComponent(loadingDecorator.getComponent());
+        valueDisplayPanel.init(project, this, keyTreeDisplayPanel, key, redisPoolManager, dbInfo, loadingDecorator);
     }
 
     private void createUIComponents() {
