@@ -53,7 +53,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         this.connectionId = connectionId;
         this.connectionTree = connectionTree;
         this.connectionManager = connectionManager;
-        this.setTitle("New Connection Settings");
+        this.setTitle("Connection Settings");
         this.setSize(600, 300);
         this.init();
     }
