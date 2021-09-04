@@ -240,6 +240,7 @@ public class ConnectionManager {
         ConnectionInfo connection = (ConnectionInfo) connectionNode.getUserObject();
         RedisPoolManager redisPoolManager = connectionRedisMap.get(connection.getId());
         int dbCount = redisPoolManager.getDbCount();
+        propertyUtil.setDbCount(connection.getId(), dbCount);
 
         // 移除原有节点
         connectionNode.removeAllChildren();

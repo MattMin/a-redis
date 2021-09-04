@@ -25,6 +25,8 @@ public class PropertyUtil {
 
     private static final String RELOAD_AFTER_ADDING_THE_KEY = "reloadAfterAddingTheKey";
 
+    private static final String DB_COUNT_KEY = "dbCount:";
+
     private static final String DEFAULT_GROUP_SYMBOL = "";
 
     private static PropertiesComponent properties;
@@ -111,7 +113,7 @@ public class PropertyUtil {
 
         // 移除groupSymbol
         if (redisPoolManager != null) {
-            for (int i = 0; i < redisPoolManager.getDbCount(); i++) {
+            for (int i = 0; i < getDbCount(id); i++) {
                 removeGroupSymbol(DbInfo.builder()
                         .connectionId(id)
                         .index(i)
@@ -157,6 +159,14 @@ public class PropertyUtil {
 
     public void removeGroupSymbol(DbInfo dbInfo) {
         properties.unsetValue(getGroupSymbolKey(dbInfo));
+    }
+
+    public void setDbCount(String connectionId, int dbCount) {
+        properties.setValue(DB_COUNT_KEY + connectionId, dbCount + "");
+    }
+
+    public int getDbCount(String connectionId) {
+        return properties.getInt(DB_COUNT_KEY + connectionId, 0);
     }
 
     private String getGroupSymbolKey(DbInfo dbInfo) {
