@@ -44,6 +44,7 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -105,15 +106,15 @@ public class ValueDisplayPanel extends JPanel {
      */
     private long total = -1;
 
-    private String scanPointer = SCAN_POINTER_START;
-
-
+    private Map<Integer, String> pageIndexPointerMap;
 
     private ValueDisplayPanel() {
     }
 
     private ValueDisplayPanel(LayoutManager layout) {
         super(layout);
+        pageIndexPointerMap = new HashMap<>();
+        pageIndexPointerMap.put(1, SCAN_POINTER_START);
     }
 
     public static ValueDisplayPanel getInstance() {
@@ -181,28 +182,28 @@ public class ValueDisplayPanel extends JPanel {
                     case "set":
                         typeEnum = RedisValueTypeEnum.Set;
                         total = jedis.scard(key);
-                        ScanResult<String> sscanResult = jedis.sscan(key, scanPointer, scanParams);
-                        scanPointer = sscanResult.getStringCursor();
-                        List<String> result = sscanResult.getResult();
-                        value = new Value(result);
+                        String setPointer = pageIndexPointerMap.get(pageIndex);
+                        ScanResult<String> sscanResult = jedis.sscan(key, setPointer, scanParams);
+                        pageIndexPointerMap.put(pageIndex + 1, sscanResult.getStringCursor());
+                        value = new Value(sscanResult.getResult());
                         break;
 
                     case "zset":
                         typeEnum = RedisValueTypeEnum.Zset;
                         total = jedis.zcard(key);
-                        ScanResult<Tuple> zscanResult = jedis.zscan(key, scanPointer, scanParams);
-                        scanPointer = zscanResult.getStringCursor();
-                        List<Tuple> zsetResult = zscanResult.getResult();
-                        value = new Value(zsetResult);
+                        String zsetPointer = pageIndexPointerMap.get(pageIndex);
+                        ScanResult<Tuple> zscanResult = jedis.zscan(key, zsetPointer, scanParams);
+                        pageIndexPointerMap.put(pageIndex + 1, zscanResult.getStringCursor());
+                        value = new Value(zscanResult.getResult());
                         break;
 
                     case "hash":
                         typeEnum = RedisValueTypeEnum.Hash;
                         total = jedis.hlen(key);
-                        ScanResult<Map.Entry<String, String>> hscanResult = jedis.hscan(key, scanPointer, scanParams);
-                        scanPointer = hscanResult.getStringCursor();
-                        List<Map.Entry<String, String>> hashResult = hscanResult.getResult();
-                        value = new Value(hashResult);
+                        String hashPointer = pageIndexPointerMap.get(pageIndex);
+                        ScanResult<Map.Entry<String, String>> hscanResult = jedis.hscan(key, hashPointer, scanParams);
+                        pageIndexPointerMap.put(pageIndex + 1, hscanResult.getStringCursor());
+                        value = new Value(hscanResult.getResult());
                         break;
 
                     default:
@@ -450,33 +451,15 @@ public class ValueDisplayPanel extends JPanel {
         if (tableModel != null) {
             JBTable valueTable = createValueTable(tableModel, valueColumnIndex, fieldOrScoreColumnIndex, fieldTextArea, valueTextArea, valueSizeLabel);
 
+            // 分页panel
+            JPanel pagePanel = createPagePanel();
+
             JButton addRowButton = createAddRowButton();
             JButton deleteRowButton = createDeleteRowButton();
-
-            // todo 分页panel
-            JPanel pagePanel = new JPanel();
-            pagePanel.setLayout(new VFlowLayout());
-            JBLabel pageSizeLabel = new JBLabel(String.format("Page %s of %s", pageIndex, getPageCount()));
-            pageSizeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-            pageSizeLabel.setBorder(new EmptyBorder(0,10,0,0));
-            pagePanel.add(pageSizeLabel);
-            JBLabel sizeLabel = new JBLabel(String.format("Size: %s", total));
-            sizeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-            sizeLabel.setBorder(new EmptyBorder(0,10,0,0));
-            pagePanel.add(sizeLabel);
-
-            JPanel pageButtonPanel = new JPanel();
-            JButton prevPageButton = new JButton(AllIcons.Actions.Play_back);
-            JButton nextPageButton = new JButton(AllIcons.Actions.Play_forward);
-            pageButtonPanel.add(prevPageButton);
-            pageButtonPanel.add(nextPageButton);
-
-            pagePanel.add(pageButtonPanel);
 
             JPanel rowButtonPanel = new JPanel(new BorderLayout());
             rowButtonPanel.add(addRowButton, BorderLayout.NORTH);
             rowButtonPanel.add(deleteRowButton, BorderLayout.SOUTH);
-
 
             JPanel valueTableButtonPanel = new JPanel(new BorderLayout());
             valueTableButtonPanel.add(rowButtonPanel, BorderLayout.NORTH);
@@ -538,6 +521,68 @@ public class ValueDisplayPanel extends JPanel {
             valuePreviewPanel.add(valuePreviewAndFunctionPanel, BorderLayout.CENTER);
             this.add(valuePreviewPanel, BorderLayout.CENTER);
         }
+    }
+
+    @NotNull
+    private JPanel createPagePanel() {
+        JPanel pagePanel = new JPanel();
+        pagePanel.setLayout(new VFlowLayout());
+        JBLabel pageSizeLabel = new JBLabel(String.format("Page %s of %s", pageIndex, getPageCount()));
+        pageSizeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        pageSizeLabel.setBorder(new EmptyBorder(0,10,0,0));
+        pagePanel.add(pageSizeLabel);
+        JBLabel sizeLabel = new JBLabel(String.format("Size: %s", total));
+        sizeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        sizeLabel.setBorder(new EmptyBorder(0,10,0,0));
+        pagePanel.add(sizeLabel);
+
+        JPanel pageButtonPanel = new JPanel();
+        JButton prevPageButton = new JButton(AllIcons.Actions.Play_back);
+        JButton nextPageButton = new JButton(AllIcons.Actions.Play_forward);
+
+        if (pageIndex <= 1) {
+            prevPageButton.setEnabled(false);
+        }
+        prevPageButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (pageIndex <= 1) {
+                    return;
+                }
+
+                updatePageDataOnPrevButtonClicked();
+                doReload();
+                nextPageButton.setEnabled(true);
+
+                if (pageIndex <= 1) {
+                    prevPageButton.setEnabled(false);
+                }
+            }
+        });
+
+        if (pageIndex >= getPageCount()) {
+            nextPageButton.setEnabled(false);
+        }
+        nextPageButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (pageIndex >= getPageCount()) {
+                    return;
+                }
+
+                updatePageDataOnNextButtonClicked();
+                doReload();
+                prevPageButton.setEnabled(true);
+                if (pageIndex >= getPageCount()) {
+                    nextPageButton.setEnabled(false);
+                }
+            }
+        });
+        pageButtonPanel.add(prevPageButton);
+        pageButtonPanel.add(nextPageButton);
+
+        pagePanel.add(pageButtonPanel);
+        return pagePanel;
     }
 
     @NotNull
@@ -847,7 +892,7 @@ public class ValueDisplayPanel extends JPanel {
     private Object[][] to2DimensionalArray(List<String> list) {
         Object[][] result = new Object[list.size()][2];
         for (int i = 0; i < list.size(); i++) {
-            result[i][0] = i;
+            result[i][0] = (pageIndex - 1) * pageSize + i;
             result[i][1] = list.get(i);
         }
         return result;
@@ -862,7 +907,7 @@ public class ValueDisplayPanel extends JPanel {
     private Object[][] zsetValueListTo2DimensionalArray(List<Tuple> list) {
         Object[][] result = new Object[list.size()][3];
         for (int i = 0; i < list.size(); i++) {
-            result[i][0] = i;
+            result[i][0] = (pageIndex - 1) * pageSize + i;
             Tuple tuple = list.get(i);
             result[i][1] = BigDecimal.valueOf(tuple.getScore()).toPlainString();
             result[i][2] = tuple.getElement();
@@ -879,7 +924,7 @@ public class ValueDisplayPanel extends JPanel {
     private Object[][] hashValueListTo2DimensionalArray(List<Map.Entry<String, String>> list) {
         Object[][] result = new Object[list.size()][3];
         for (int i = 0; i < list.size(); i++) {
-            result[i][0] = i;
+            result[i][0] = (pageIndex - 1) * pageSize + i;
             Map.Entry<String, String> entry = list.get(i);
             result[i][1] = entry.getKey();
             result[i][2] = entry.getValue();
@@ -909,13 +954,12 @@ public class ValueDisplayPanel extends JPanel {
         return this.key;
     }
 
-    /**
-     * 更新分页数据
-     */
-    private void updatePagingData(int pageIndex, int pageSize, int total) {
-        this.pageIndex = pageIndex;
-        this.pageSize = pageSize;
-        this.total = total;
+    private synchronized void updatePageDataOnPrevButtonClicked() {
+        pageIndex--;
+    }
+
+    private synchronized void updatePageDataOnNextButtonClicked() {
+        pageIndex++;
     }
 
     /**
