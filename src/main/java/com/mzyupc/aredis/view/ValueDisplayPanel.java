@@ -1,5 +1,6 @@
 package com.mzyupc.aredis.view;
 
+import com.intellij.icons.AllIcons;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.LoadingDecorator;
@@ -10,14 +11,15 @@ import com.intellij.ui.components.JBTextArea;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.ui.table.JBTable;
 import com.mzyupc.aredis.layout.VFlowLayout;
-import com.mzyupc.aredis.utils.JTreeUtil;
 import com.mzyupc.aredis.utils.RedisPoolManager;
+import com.mzyupc.aredis.view.dialog.AddRowDialog;
 import com.mzyupc.aredis.view.dialog.ConfirmDialog;
 import com.mzyupc.aredis.view.dialog.ErrorDialog;
-import com.mzyupc.aredis.view.dialog.enums.RedisValueTypeEnum;
-import com.mzyupc.aredis.view.dialog.enums.ValueFormatEnum;
+import com.mzyupc.aredis.view.enums.RedisValueTypeEnum;
+import com.mzyupc.aredis.view.enums.ValueFormatEnum;
 import com.mzyupc.aredis.vo.DbInfo;
 import com.mzyupc.aredis.vo.KeyInfo;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.batik.ext.swing.DoubleDocument;
 import org.apache.commons.lang.StringUtils;
 import org.jetbrains.annotations.NotNull;
@@ -27,18 +29,14 @@ import redis.clients.jedis.ScanResult;
 import redis.clients.jedis.Tuple;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
-import javax.swing.text.AttributeSet;
-import javax.swing.text.BadLocationException;
-import javax.swing.text.PlainDocument;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
-import javax.swing.tree.TreeNode;
-import javax.swing.tree.TreePath;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -46,10 +44,10 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import static com.intellij.openapi.ui.DialogWrapper.OK_EXIT_CODE;
 import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
 
 /**
@@ -58,30 +56,12 @@ import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
  * <p>
  * Value展示区
  */
+@Slf4j
 public class ValueDisplayPanel extends JPanel {
 
-    private Project project;
-    /**
-     * value预览工具栏区
-     */
-    private JPanel valuePreviewToolbarPanel;
+    private static final String REMOVED_VALUE = "_VALUE_REMOVED_BY_AREDIS_";
 
-    /**
-     * value预览区
-     */
-    private JPanel valuePreviewPanel;
-    /**
-     * value内部预览区
-     */
-    private JPanel valueInnerPreviewPanel;
-    /**
-     * value功能区
-     */
-    private JPanel valueFunctionPanel;
-    /**
-     * value视图区
-     */
-    private JBScrollPane valueViewPanel;
+    private Project project;
 
     private String key;
 
@@ -120,6 +100,15 @@ public class ValueDisplayPanel extends JPanel {
 
     private int pageSize = 100;
 
+    /**
+     * 一共有多少条数据
+     */
+    private long total = -1;
+
+    private String scanPointer = SCAN_POINTER_START;
+
+
+
     private ValueDisplayPanel() {
     }
 
@@ -133,11 +122,21 @@ public class ValueDisplayPanel extends JPanel {
 
     /**
      * 初始化
-     *  @param keyTreeDisplayPanel
+     * @param project
+     * @param parent
+     * @param keyTreeDisplayPanel
      * @param key
+     * @param redisPoolManager
+     * @param dbInfo
      * @param loadingDecorator
      */
-    public void init(Project project, ARedisKeyValueDisplayPanel parent, KeyTreeDisplayPanel keyTreeDisplayPanel, String key, RedisPoolManager redisPoolManager, DbInfo dbInfo, LoadingDecorator loadingDecorator) {
+    public void init(Project project,
+                     ARedisKeyValueDisplayPanel parent,
+                     KeyTreeDisplayPanel keyTreeDisplayPanel,
+                     String key,
+                     RedisPoolManager redisPoolManager,
+                     DbInfo dbInfo,
+                     LoadingDecorator loadingDecorator) {
         this.redisPoolManager = redisPoolManager;
         this.dbInfo = dbInfo;
         this.project = project;
@@ -174,26 +173,36 @@ public class ValueDisplayPanel extends JPanel {
                     case "list":
                         typeEnum = RedisValueTypeEnum.List;
                         int start = (pageIndex - 1) * pageSize;
+                        total = jedis.llen(key);
                         List<String> listValue = jedis.lrange(key, start, start + pageSize - 1);
                         value = new Value(listValue);
                         break;
 
                     case "set":
                         typeEnum = RedisValueTypeEnum.Set;
-                        ScanResult<String> sscanResult = jedis.sscan(key, SCAN_POINTER_START, scanParams);
-                        value = new Value(sscanResult.getResult());
+                        total = jedis.scard(key);
+                        ScanResult<String> sscanResult = jedis.sscan(key, scanPointer, scanParams);
+                        scanPointer = sscanResult.getStringCursor();
+                        List<String> result = sscanResult.getResult();
+                        value = new Value(result);
                         break;
 
                     case "zset":
                         typeEnum = RedisValueTypeEnum.Zset;
-                        ScanResult<Tuple> zscanResult = jedis.zscan(key, SCAN_POINTER_START, scanParams);
-                        value = new Value(zscanResult.getResult());
+                        total = jedis.zcard(key);
+                        ScanResult<Tuple> zscanResult = jedis.zscan(key, scanPointer, scanParams);
+                        scanPointer = zscanResult.getStringCursor();
+                        List<Tuple> zsetResult = zscanResult.getResult();
+                        value = new Value(zsetResult);
                         break;
 
                     case "hash":
                         typeEnum = RedisValueTypeEnum.Hash;
-                        ScanResult<Map.Entry<String, String>> hscanResult = jedis.hscan(key, SCAN_POINTER_START, scanParams);
-                        value = new Value(hscanResult.getResult());
+                        total = jedis.hlen(key);
+                        ScanResult<Map.Entry<String, String>> hscanResult = jedis.hscan(key, scanPointer, scanParams);
+                        scanPointer = hscanResult.getStringCursor();
+                        List<Map.Entry<String, String>> hashResult = hscanResult.getResult();
+                        value = new Value(hashResult);
                         break;
 
                     default:
@@ -251,12 +260,16 @@ public class ValueDisplayPanel extends JPanel {
         JButton deleteButton = createDeleteButton();
 
         JBTextField ttlTextField = new JBTextField();
-        ttlTextField.setDocument(new NumberDocument());
+        ttlTextField.setDocument(new DoubleDocument());
+        ttlTextField.setPreferredSize(new Dimension(70, 27));
         ttlTextField.setText(ttl.toString());
 
         JButton ttlButton = createTTLButton(ttlTextField);
 
-        valuePreviewToolbarPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        /**
+         * value预览工具栏区
+         */
+        JPanel valuePreviewToolbarPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         valuePreviewToolbarPanel.add(new JLabel(typeEnum.name() + ":"));
         valuePreviewToolbarPanel.add(keyTextField);
         valuePreviewToolbarPanel.add(renameButton);
@@ -312,18 +325,9 @@ public class ValueDisplayPanel extends JPanel {
                             DefaultTreeModel treeModel = keyTreeDisplayPanel.getTreeModel();
                             DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
                             DefaultMutableTreeNode deletedNode = deleteNode(root, key);
-                            treeModel.reload();
                             if (deletedNode != null) {
-                                dbInfo.setKeyCount(dbInfo.getKeyCount() - 1);
-                                TreeNode[] path = deletedNode.getPath();
-                                if (path.length > 2) {
-                                    JTreeUtil.expandAll(
-                                            keyTreeDisplayPanel.getKeyTree(),
-                                            new TreePath(Arrays.copyOfRange(path, 0, path.length - 2)),
-                                            true);
-                                }
+                                treeModel.reload(deletedNode);
                             }
-
                             parent.removeValueDisplayPanel();
                         });
                 confirm.show();
@@ -339,13 +343,16 @@ public class ValueDisplayPanel extends JPanel {
      */
     private DefaultMutableTreeNode deleteNode(DefaultMutableTreeNode node, String key) {
         if (node.isLeaf()) {
-            KeyInfo userObject = (KeyInfo) node.getUserObject();
-            String nodeKey = userObject.getKey();
-            if (key.equals(nodeKey)) {
-                userObject.setDel(true);
-                node.setUserObject(userObject);
-                redisPoolManager.del(key, dbInfo.getIndex());
-                return node;
+            Object userObject = node.getUserObject();
+            if (userObject instanceof KeyInfo) {
+                KeyInfo keyInfo = (KeyInfo) userObject;
+                String nodeKey = keyInfo.getKey();
+                if (key.equals(nodeKey)) {
+                    keyInfo.setDel(true);
+                    node.setUserObject(userObject);
+                    redisPoolManager.del(key, dbInfo.getIndex());
+                    return node;
+                }
             }
             return null;
         } else {
@@ -409,67 +416,9 @@ public class ValueDisplayPanel extends JPanel {
 
         JBTextArea fieldTextArea = new JBTextArea();
         fieldTextArea.setLineWrap(true);
-//        fieldTextArea.getDocument().addDocumentListener(new DocumentAdapter() {
-//            @Override
-//            protected void textChanged(@NotNull DocumentEvent documentEvent) {
-//                if (fieldOrScoreColumnIndex != 0) {
-//                    if (!getSelectedFieldOrScore().equals(fieldTextArea.getText())) {
-//                        saveValueButton.setEnabled(true);
-//                    }
-//                }
-//            }
-//        });
-
         JBTextArea valueTextArea = new JBTextArea();
         valueTextArea.setLineWrap(true);
-//        valueTextArea.getDocument().addDocumentListener(new DocumentAdapter() {
-//            @Override
-//            protected void textChanged(@NotNull DocumentEvent documentEvent) {
-//                if (!getSelectedValue().equals(valueTextArea.getText())) {
-//                    saveValueButton.setEnabled(true);
-//                }
-//            }
-//        });
-
-        JButton saveValueButton = new JButton("Save");
-        saveValueButton.setEnabled(true);
-        saveValueButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                if (selectedRow == -1) {
-                    return;
-                }
-
-                String newField = fieldTextArea.getText();
-                if (typeEnum == RedisValueTypeEnum.Hash) {
-                    if (StringUtils.isEmpty(newField)) {
-                        ErrorDialog.show("Please enter a valid Field!");
-                        return;
-                    }
-                }
-
-                if (typeEnum == RedisValueTypeEnum.Hash) {
-                    if (StringUtils.isEmpty(newField)) {
-                        ErrorDialog.show("Please enter a valid Score!");
-                        return;
-                    }
-                }
-
-                String newValue = valueTextArea.getText();
-                if (StringUtils.isEmpty(newValue)) {
-                    ErrorDialog.show("Please enter a valid Value!");
-                    return;
-                }
-
-                new ConfirmDialog(
-                        project,
-                        "Confirm",
-                        "Confirm to save",
-                        actionEvent -> {
-                            saveNewValue(newField, newValue);
-                        }).show();
-            }
-        });
+        JButton saveValueButton = createSaveValueButton(fieldTextArea, valueTextArea);
 
         JPanel viewAsAndSavePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         viewAsAndSavePanel.add(new JLabel("View as:"));
@@ -477,11 +426,18 @@ public class ValueDisplayPanel extends JPanel {
         viewAsAndSavePanel.add(saveValueButton);
 
         JBLabel valueSizeLabel = new JBLabel();
-        valueFunctionPanel = new JPanel(new BorderLayout());
+        updateValueSize(valueSizeLabel);
+        /**
+         * value功能区
+         */
+        JPanel valueFunctionPanel = new JPanel(new BorderLayout());
         valueFunctionPanel.add(valueSizeLabel, BorderLayout.WEST);
         valueFunctionPanel.add(viewAsAndSavePanel, BorderLayout.AFTER_LINE_ENDS);
 
-        valueViewPanel = new JBScrollPane(valueTextArea);
+        /**
+         * value视图区
+         */
+        JBScrollPane valueViewPanel = new JBScrollPane(valueTextArea);
 
         // value size/view as and value preview
         JPanel valuePreviewAndFunctionPanel = new JPanel(new BorderLayout());
@@ -489,60 +445,48 @@ public class ValueDisplayPanel extends JPanel {
         valuePreviewAndFunctionPanel.add(valueViewPanel, BorderLayout.CENTER);
 
         JPanel innerPreviewPanel = new JPanel(new BorderLayout());
+
         // 需要表格预览
         if (tableModel != null) {
-            JBTable valueTable = new JBTable(tableModel) {
-                @Override
-                public boolean isCellEditable(int row, int column) {
-                    return false;
-                }
-            };
+            JBTable valueTable = createValueTable(tableModel, valueColumnIndex, fieldOrScoreColumnIndex, fieldTextArea, valueTextArea, valueSizeLabel);
 
-            // 选中单元格而不是一行
-            valueTable.setRowSelectionAllowed(true);
-            valueTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            JButton addRowButton = createAddRowButton();
+            JButton deleteRowButton = createDeleteRowButton();
 
-            // 设置第一列的最大宽度
-            TableColumn column = valueTable.getColumnModel().getColumn(0);
-            column.setMaxWidth(150);
+            // todo 分页panel
+            JPanel pagePanel = new JPanel();
+            pagePanel.setLayout(new VFlowLayout());
+            JBLabel pageSizeLabel = new JBLabel(String.format("Page %s of %s", pageIndex, getPageCount()));
+            pageSizeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            pageSizeLabel.setBorder(new EmptyBorder(0,10,0,0));
+            pagePanel.add(pageSizeLabel);
+            JBLabel sizeLabel = new JBLabel(String.format("Size: %s", total));
+            sizeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            sizeLabel.setBorder(new EmptyBorder(0,10,0,0));
+            pagePanel.add(sizeLabel);
 
-            DefaultTableCellRenderer tableCellRenderer = new DefaultTableCellRenderer();
-            tableCellRenderer.setHorizontalAlignment(SwingConstants.CENTER);
-            // 数据局中
-            valueTable.setDefaultRenderer(Object.class, tableCellRenderer);
-            // 表头居中
-            valueTable.getTableHeader().setDefaultRenderer(tableCellRenderer);
+            JPanel pageButtonPanel = new JPanel();
+            JButton prevPageButton = new JButton(AllIcons.Actions.Play_back);
+            JButton nextPageButton = new JButton(AllIcons.Actions.Play_forward);
+            pageButtonPanel.add(prevPageButton);
+            pageButtonPanel.add(nextPageButton);
 
-            // value视图区展示选中的行
-            valueTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
-                @Override
-                public void valueChanged(ListSelectionEvent e) {
-                    if (!e.getValueIsAdjusting()) {
-                        int selectedRow = valueTable.getSelectedRow();
-                        updateSelected(selectedRow,
-                                tableModel.getValueAt(selectedRow, valueColumnIndex).toString(),
-                                tableModel.getValueAt(selectedRow, fieldOrScoreColumnIndex).toString());
-                        fieldTextArea.setText(getSelectedFieldOrScore());
-                        valueTextArea.setText(getSelectedValue());
-                        updateValueSize(valueSizeLabel);
-                    }
-                }
-            });
+            pagePanel.add(pageButtonPanel);
+
+            JPanel rowButtonPanel = new JPanel(new BorderLayout());
+            rowButtonPanel.add(addRowButton, BorderLayout.NORTH);
+            rowButtonPanel.add(deleteRowButton, BorderLayout.SOUTH);
+
+
+            JPanel valueTableButtonPanel = new JPanel(new BorderLayout());
+            valueTableButtonPanel.add(rowButtonPanel, BorderLayout.NORTH);
+            valueTableButtonPanel.add(pagePanel, BorderLayout.SOUTH);
 
             JBScrollPane valueTableScrollPane = new JBScrollPane(valueTable);
-
-            JPanel valueTableButtonPanel = new JPanel(new VFlowLayout());
-//            BoxLayout boxLayout = new BoxLayout(valueTableButtonPanel, BoxLayout.Y_AXIS);
-//            valueTableButtonPanel.setLayout(boxLayout);
-            JButton addRowButton = new JButton("Add row");
-            addRowButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-//            addRowButton.setPreferredSize(new Dimension(100, 27));
-            JButton deleteRowButton = new JButton("Delete row");
-            deleteRowButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-            valueTableButtonPanel.add(addRowButton);
-            valueTableButtonPanel.add(deleteRowButton);
-
-            valueInnerPreviewPanel = new JPanel(new BorderLayout());
+            /**
+             * value内部预览区
+             */
+            JPanel valueInnerPreviewPanel = new JPanel(new BorderLayout());
             valueInnerPreviewPanel.add(valueTableScrollPane, BorderLayout.CENTER);
             valueInnerPreviewPanel.add(valueTableButtonPanel, BorderLayout.AFTER_LINE_ENDS);
 
@@ -586,11 +530,201 @@ public class ValueDisplayPanel extends JPanel {
             valueTextArea.setText(getSelectedValue());
             updateValueSize(valueSizeLabel);
 
-            valuePreviewPanel = new JPanel(new BorderLayout());
+            /**
+             * value预览区
+             */
+            JPanel valuePreviewPanel = new JPanel(new BorderLayout());
             valuePreviewPanel.add(innerPreviewPanel, BorderLayout.NORTH);
             valuePreviewPanel.add(valuePreviewAndFunctionPanel, BorderLayout.CENTER);
             this.add(valuePreviewPanel, BorderLayout.CENTER);
         }
+    }
+
+    @NotNull
+    private JBTable createValueTable(DefaultTableModel tableModel, int valueColumnIndex, int fieldOrScoreColumnIndex, JBTextArea fieldTextArea, JBTextArea valueTextArea, JBLabel valueSizeLabel) {
+        JBTable valueTable = new JBTable(tableModel) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+
+        // 只能选中一行
+        valueTable.setRowSelectionAllowed(true);
+        valueTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+
+        // 设置第一列的最大宽度
+        TableColumn column = valueTable.getColumnModel().getColumn(0);
+        column.setMaxWidth(150);
+
+        DefaultTableCellRenderer tableCellRenderer = new DefaultTableCellRenderer();
+        tableCellRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+        // 数据局中
+        valueTable.setDefaultRenderer(Object.class, tableCellRenderer);
+        // 表头居中
+        valueTable.getTableHeader().setDefaultRenderer(tableCellRenderer);
+
+        // value视图区展示选中的行
+        valueTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
+            @Override
+            public void valueChanged(ListSelectionEvent e) {
+                if (!e.getValueIsAdjusting()) {
+                    int selectedRow = valueTable.getSelectedRow();
+                    updateSelected(selectedRow,
+                            tableModel.getValueAt(selectedRow, valueColumnIndex).toString(),
+                            tableModel.getValueAt(selectedRow, fieldOrScoreColumnIndex).toString());
+                    fieldTextArea.setText(getSelectedFieldOrScore());
+                    valueTextArea.setText(getSelectedValue());
+                    updateValueSize(valueSizeLabel);
+                }
+            }
+        });
+
+        // 单击表头排序
+        valueTable.setAutoCreateRowSorter(true);
+
+        return valueTable;
+    }
+
+    @NotNull
+    private JButton createDeleteRowButton() {
+        JButton deleteRowButton = new JButton("Delete row");
+        deleteRowButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        deleteRowButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (getSelectedIndex() < 0) {
+                    ErrorDialog.show("Please select a row!");
+                    return;
+                }
+                new ConfirmDialog(
+                        project,
+                        "Confirm",
+                        "Do you really want to remove this row?",
+                        actionEvent -> {
+                            try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                                if (!jedis.exists(key)) {
+                                    ErrorDialog.show(String.format("No such key: %s", key));
+                                } else {
+                                    switch (typeEnum) {
+                                        case List:
+                                            jedis.lset(key, getSelectedIndex(), REMOVED_VALUE);
+                                            jedis.lrem(key, 0, REMOVED_VALUE);
+                                            break;
+
+                                        case Set:
+                                            jedis.srem(key, getSelectedValue());
+                                            break;
+
+                                        case Zset:
+                                            jedis.zrem(key, getSelectedValue());
+                                            break;
+
+                                        case Hash:
+                                            jedis.hdel(key, getSelectedFieldOrScore());
+                                            break;
+
+                                        default:
+                                    }
+                                    doReload();
+                                }
+                            } catch (Exception exception) {
+                                log.error("Failed to save value", exception);
+                            }
+                        }).show();
+            }
+        });
+        return deleteRowButton;
+    }
+
+    @NotNull
+    private JButton createAddRowButton() {
+        JButton addRowButton = new JButton("Add row");
+        addRowButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        addRowButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                AddRowDialog addRowDialog = new AddRowDialog(project, typeEnum);
+                addRowDialog.setCustomOkAction(actionEvent -> {
+                    try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                        if (!jedis.exists(key)) {
+                            ErrorDialog.show(String.format("No such key: %s", key));
+                            addRowDialog.close(OK_EXIT_CODE);
+                        } else {
+                            switch (typeEnum) {
+                                case List:
+                                    jedis.lpush(key, addRowDialog.getValue());
+                                    break;
+
+                                case Set:
+                                    jedis.sadd(key, addRowDialog.getValue());
+                                    break;
+
+                                case Zset:
+                                    jedis.zadd(key, Double.parseDouble(addRowDialog.getScoreOrField()), addRowDialog.getValue());
+                                    break;
+
+                                case Hash:
+                                    jedis.hset(key, addRowDialog.getScoreOrField(), addRowDialog.getValue());
+                                    break;
+
+                                default:
+                            }
+                            addRowDialog.close(OK_EXIT_CODE);
+                            doReload();
+                        }
+                    } catch (Exception exception) {
+                        log.error("Failed to save value", exception);
+                    }
+                });
+                addRowDialog.show();
+            }
+        });
+        return addRowButton;
+    }
+
+    @NotNull
+    private JButton createSaveValueButton(JBTextArea fieldTextArea, JBTextArea valueTextArea) {
+        JButton saveValueButton = new JButton("Save");
+        saveValueButton.setEnabled(true);
+        saveValueButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (selectedRow == -1) {
+                    return;
+                }
+
+                String newField = fieldTextArea.getText();
+                if (typeEnum == RedisValueTypeEnum.Hash) {
+                    if (StringUtils.isEmpty(newField)) {
+                        ErrorDialog.show("Please enter a valid Field!");
+                        return;
+                    }
+                }
+
+                if (typeEnum == RedisValueTypeEnum.Hash) {
+                    if (StringUtils.isEmpty(newField)) {
+                        ErrorDialog.show("Please enter a valid Score!");
+                        return;
+                    }
+                }
+
+                String newValue = valueTextArea.getText();
+                if (StringUtils.isEmpty(newValue)) {
+                    ErrorDialog.show("Please enter a valid Value!");
+                    return;
+                }
+
+                new ConfirmDialog(
+                        project,
+                        "Confirm",
+                        "Do you really want to save this?",
+                        actionEvent -> {
+                            saveNewValue(newField, newValue);
+                        }).show();
+            }
+        });
+        return saveValueButton;
     }
 
     private void saveNewValue(String newFieldOrScore, String newValue) {
@@ -642,8 +776,8 @@ public class ValueDisplayPanel extends JPanel {
         }
 
         // 重新加载
-        init(project, parent, keyTreeDisplayPanel, key, redisPoolManager, dbInfo, loadingDecorator);
-        this.updateUI();
+        doReload();
+
     }
 
     @NotNull
@@ -683,10 +817,16 @@ public class ValueDisplayPanel extends JPanel {
         reloadButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                init(project, parent, keyTreeDisplayPanel, key, redisPoolManager, dbInfo, loadingDecorator);
+                doReload();
             }
         });
         return reloadButton;
+    }
+
+    private void doReload() {
+        init(project, parent, keyTreeDisplayPanel, key, redisPoolManager, dbInfo, loadingDecorator);
+        updateSelected(-1, "", "");
+        this.updateUI();
     }
 
     /**
@@ -765,8 +905,31 @@ public class ValueDisplayPanel extends JPanel {
         return (pageIndex - 1) * pageSize + selectedRow;
     }
 
+    public String getKey() {
+        return this.key;
+    }
+
+    /**
+     * 更新分页数据
+     */
+    private void updatePagingData(int pageIndex, int pageSize, int total) {
+        this.pageIndex = pageIndex;
+        this.pageSize = pageSize;
+        this.total = total;
+    }
+
+    /**
+     * 计算页数
+     * @return
+     */
+    private long getPageCount() {
+        long result = total / pageSize;
+        long mod = total % pageSize;
+        return mod > 0 ? result + 1 : result;
+    }
+
     private static class Value {
-        private Object valueData;
+        private final Object valueData;
 
         public Value(Object valueData) {
             this.valueData = valueData;
@@ -790,28 +953,6 @@ public class ValueDisplayPanel extends JPanel {
 
         public List<Map.Entry<String, String>> getHashValue() {
             return (List<Map.Entry<String, String>>) valueData;
-        }
-    }
-
-    class NumberDocument extends PlainDocument {
-        public NumberDocument() {
-        }
-
-        @Override
-        public void insertString(int offs, String str, AttributeSet a) throws BadLocationException {
-            char[] source = str.toCharArray();
-            char[] result = new char[source.length];
-            int j = 0;
-
-            for (int i = 0; i < result.length; ++i) {
-                if (Character.isDigit(source[i]) || source[i] == '-') {
-                    result[j++] = source[i];
-                } else {
-                    Toolkit.getDefaultToolkit().beep();
-                }
-            }
-
-            super.insertString(offs, new String(result, 0, j), a);
         }
     }
 }

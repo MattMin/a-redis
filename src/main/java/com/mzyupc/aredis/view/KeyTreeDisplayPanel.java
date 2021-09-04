@@ -433,6 +433,8 @@ public class KeyTreeDisplayPanel extends JPanel {
         if (selectionPaths != null && selectionPaths.length == 1 && selectionPaths[0].getPathCount() == 1) {
             return;
         }
+
+        final ValueDisplayPanel valueDisplayPanel = parent.getValueDisplayPanel();
         ConfirmDialog confirmDialog = new ConfirmDialog(
                 project,
                 "Confirm",
@@ -444,7 +446,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                             if (selectionPath.getPathCount() > 1) {
                                 DefaultMutableTreeNode selectNode = (DefaultMutableTreeNode) selectionPath.getLastPathComponent();
                                 List<String> keys = new ArrayList<>();
-                                findDeleteKeys(selectNode, keys);
+                                findDeleteKeys(selectNode, keys, valueDisplayPanel);
                                 if (CollectionUtils.isNotEmpty(keys)) {
                                     try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
                                         jedis.del(keys.toArray(new String[]{}));
@@ -453,25 +455,34 @@ public class KeyTreeDisplayPanel extends JPanel {
                                 }
                             }
                         }
-                        treeModel.reload();
                     }
                 });
         confirmDialog.show();
     }
 
 
-    private void findDeleteKeys(DefaultMutableTreeNode treeNode, List<String> keys) {
+    private void findDeleteKeys(DefaultMutableTreeNode treeNode, List<String> keys, ValueDisplayPanel valueDisplayPanel) {
         if (treeNode.isLeaf()) {
             KeyInfo keyInfo = (KeyInfo) treeNode.getUserObject();
             if (!keyInfo.isDel()) {
                 keyInfo.setDel(true);
                 treeNode.setUserObject(keyInfo);
                 keys.add(keyInfo.getKey());
+
+                // 删除key的同时关闭ValueDisplayPanel
+                if (valueDisplayPanel != null) {
+                    final String key = valueDisplayPanel.getKey();
+                    if (keyInfo.getKey().equals(key)) {
+                        parent.removeValueDisplayPanel();
+                    }
+                }
+
+                treeModel.reload(treeNode);
             }
         } else {
             for (int i = 0; i < treeNode.getChildCount(); i++) {
                 DefaultMutableTreeNode child = (DefaultMutableTreeNode) treeNode.getChildAt(i);
-                findDeleteKeys(child, keys);
+                findDeleteKeys(child, keys, valueDisplayPanel);
             }
         }
     }

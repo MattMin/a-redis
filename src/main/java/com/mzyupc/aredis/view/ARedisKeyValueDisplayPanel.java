@@ -53,6 +53,8 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
 
     private KeyTreeDisplayPanel keyTreeDisplayPanel;
 
+    private ValueDisplayPanel valueDisplayPanel;
+
     public ARedisKeyValueDisplayPanel(Project project, ConnectionInfo connectionInfo, DbInfo dbInfo, RedisPoolManager redisPoolManager) {
         this.project = project;
         this.propertyUtil = PropertyUtil.getInstance(project);
@@ -71,6 +73,7 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
         JPanel emptyPanel = new JPanel();
         emptyPanel.setMinimumSize(new Dimension(100, 100));
         splitterContainer.setSecondComponent(emptyPanel);
+        this.valueDisplayPanel = null;
     }
 
     private void initPanel() {
@@ -191,7 +194,7 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
         /**
          * value 展示区
          */
-        ValueDisplayPanel valueDisplayPanel = ValueDisplayPanel.getInstance();
+        valueDisplayPanel = ValueDisplayPanel.getInstance();
         valueDisplayPanel.setMinimumSize(new Dimension(100, 100));
         JBScrollPane valueDisplayScrollPanel = new JBScrollPane(valueDisplayPanel);
 
@@ -226,5 +229,9 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
 
     public String getKeyFilter() {
         return keyFilter;
+    }
+
+    public ValueDisplayPanel getValueDisplayPanel() {
+        return valueDisplayPanel;
     }
 }

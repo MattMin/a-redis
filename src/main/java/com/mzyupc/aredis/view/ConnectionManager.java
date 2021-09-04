@@ -276,9 +276,8 @@ public class ConnectionManager {
      * 移除选中的连接
      *
      * @param connectionTree
-     * @param connectionRedisMap
      */
-    public void removeConnectionFromTree(Tree connectionTree, Map<String, RedisPoolManager> connectionRedisMap) {
+    public void removeConnectionFromTree(Tree connectionTree) {
         // 从connectionTree移除元素
         java.util.List<ConnectionInfo> connectionInfoList = getSelectedConnectionAndRemove(connectionTree);
         if (CollectionUtils.isEmpty(connectionInfoList)) {
@@ -300,6 +299,9 @@ public class ConnectionManager {
             if (redisPoolManager != null) {
                 redisPoolManager.invalidate();
             }
+
+            // 关闭所有KeyValueDisplayPanel
+            closeAllEditor(connectionInfoId);
         }
     }
 
@@ -443,7 +445,7 @@ public class ConnectionManager {
                     "Are you sure you want to delete these connections?",
                     actionEvent -> {
                         // connection列表中移除
-                        removeConnectionFromTree(connectionTree, connectionRedisMap);
+                        removeConnectionFromTree(connectionTree);
                     });
             removeConnectionDialog.show();
         });

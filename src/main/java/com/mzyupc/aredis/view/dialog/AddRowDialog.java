@@ -2,23 +2,18 @@ package com.mzyupc.aredis.view.dialog;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
-import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
 import com.mzyupc.aredis.utils.FormatUtil;
-import com.mzyupc.aredis.utils.PropertyUtil;
 import com.mzyupc.aredis.view.enums.RedisValueTypeEnum;
 import com.mzyupc.aredis.view.enums.ValueFormatEnum;
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.batik.ext.swing.DoubleDocument;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ItemEvent;
@@ -27,60 +22,22 @@ import java.util.function.Consumer;
 
 /**
  * @author mzyupc@163.com
- * <p>
- * 新增key的对话框
  */
 @Slf4j
-@Getter
-public class NewKeyDialog extends DialogWrapper {
+public class AddRowDialog extends DialogWrapper {
 
     private Consumer<ActionEvent> customOkAction;
 
-    private CardLayout cardLayout;
+    private final RedisValueTypeEnum valueTypeEnum;
 
-    // 选中的数据类型
-    private RedisValueTypeEnum selectedType;
+    private JTextField scoreOrFieldTextField;
 
-    /**
-     * key 输入框
-     */
-    private JTextField keyTextField;
+    private JBTextArea valueTextArea;
 
-    /**
-     * zset value
-     */
-    private JPanel zsetValuePanel;
-    /**
-     * zset score
-     */
-    private JTextField scoreTextField;
-
-    /**
-     * hash value
-     */
-    private JPanel hashValuePanel;
-    /**
-     * hash field
-     */
-    private JTextField fieldTextField;
-
-    private JBTextArea stringValueTextArea;
-    private JBTextArea listValueTextArea;
-    private JBTextArea setValueTextArea;
-    private JBTextArea zsetValueTextArea;
-    private JBTextArea hashValueTextArea;
-
-    /**
-     * Reload after adding the key
-     */
-    private boolean reloadSelected;
-
-    private PropertyUtil propertyUtil;
-
-    public NewKeyDialog(@Nullable Project project) {
+    public AddRowDialog(@Nullable Project project, RedisValueTypeEnum valueTypeEnum) {
         super(project);
-        propertyUtil = PropertyUtil.getInstance(project);
-        reloadSelected = propertyUtil.getReloadAfterAddingTheKey();
+        this.valueTypeEnum = valueTypeEnum;
+
         this.init();
     }
 
@@ -89,95 +46,37 @@ public class NewKeyDialog extends DialogWrapper {
         super.init();
     }
 
-
     @Override
     protected @Nullable
     JComponent createCenterPanel() {
-
-        JPanel keyPanel = createKeyPanel();
         JPanel valuePanel = createValuePanel();
-        JPanel typePanel = createTypePanel(valuePanel);
-
-        JPanel keyAndTypePanel = new JPanel(new BorderLayout());
-        keyAndTypePanel.add(keyPanel, BorderLayout.NORTH);
-        keyAndTypePanel.add(typePanel, BorderLayout.SOUTH);
-
-        JBCheckBox reloadCheckBox = new JBCheckBox("Reload after adding the key", reloadSelected);
-        reloadCheckBox.addChangeListener(new ChangeListener() {
-            @Override
-            public void stateChanged(ChangeEvent e) {
-                reloadSelected = reloadCheckBox.isSelected();
-                propertyUtil.setReloadAfterAddingTheKey(reloadSelected);
-            }
-        });
-        JPanel reloadPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        reloadPanel.add(reloadCheckBox);
-
         JPanel container = new JPanel(new BorderLayout());
         container.setMinimumSize(new Dimension(500, 250));
-        container.add(keyAndTypePanel, BorderLayout.NORTH);
         container.add(valuePanel, BorderLayout.CENTER);
-        container.add(reloadPanel, BorderLayout.AFTER_LAST_LINE);
-
         return container;
     }
 
     @NotNull
     private JPanel createValuePanel() {
-        JPanel stringValuePanel = createSimpleValuePanel(RedisValueTypeEnum.String);
-        JPanel listValuePanel = createSimpleValuePanel(RedisValueTypeEnum.List);
-        JPanel setValuePanel = createSimpleValuePanel(RedisValueTypeEnum.Set);
-        zsetValuePanel = createSimpleValuePanel(RedisValueTypeEnum.Zset);
-        hashValuePanel = createSimpleValuePanel(RedisValueTypeEnum.Hash);
+        switch (valueTypeEnum) {
+            case String:
+                return createSimpleValuePanel(RedisValueTypeEnum.String);
 
-        JPanel zsetTypePanel = createZSetValuePanel();
-        JPanel hashTypePanel = createHashValuePanel();
+            case List:
+                return createSimpleValuePanel(RedisValueTypeEnum.List);
 
-        cardLayout = new CardLayout();
-        JPanel valuePanel = new JPanel(cardLayout);
-        valuePanel.add(RedisValueTypeEnum.String.name(), stringValuePanel);
-        valuePanel.add(RedisValueTypeEnum.List.name(), listValuePanel);
-        valuePanel.add(RedisValueTypeEnum.Set.name(), setValuePanel);
-        valuePanel.add(RedisValueTypeEnum.Zset.name(), zsetTypePanel);
-        valuePanel.add(RedisValueTypeEnum.Hash.name(), hashTypePanel);
-        return valuePanel;
-    }
+            case Set:
+                return createSimpleValuePanel(RedisValueTypeEnum.Set);
 
-    @NotNull
-    private JPanel createTypePanel(JPanel valuePanel) {
-        JBLabel typeLabel = new JBLabel("Type:");
-        typeLabel.setPreferredSize(new Dimension(50, 25));
+            case Zset:
+                return createZSetValuePanel();
 
-        JComboBox<RedisValueTypeEnum> redisValueTypeEnumJComboBox = new JComboBox<>(RedisValueTypeEnum.values());
+            case Hash:
+                return createHashValuePanel();
 
-        redisValueTypeEnumJComboBox.addItemListener(new ItemListener() {
-            @Override
-            public void itemStateChanged(ItemEvent e) {
-                if (ItemEvent.SELECTED == e.getStateChange()) {
-                    selectedType = (RedisValueTypeEnum) e.getItem();
-                    cardLayout.show(valuePanel, selectedType.name());
-                }
-            }
-        });
-        redisValueTypeEnumJComboBox.setSelectedIndex(0);
-        selectedType = RedisValueTypeEnum.String;
-
-        JPanel typePanel = new JPanel(new BorderLayout());
-        typePanel.add(typeLabel, BorderLayout.WEST);
-        typePanel.add(redisValueTypeEnumJComboBox, BorderLayout.CENTER);
-        return typePanel;
-    }
-
-    @NotNull
-    private JPanel createKeyPanel() {
-        JPanel keyPanel = new JPanel(new BorderLayout());
-        keyPanel.setMinimumSize(new Dimension(300, 10));
-        JBLabel keyLabel = new JBLabel("Key:");
-        keyLabel.setPreferredSize(new Dimension(50, 25));
-        keyPanel.add(keyLabel, BorderLayout.WEST);
-        keyTextField = new JTextField();
-        keyPanel.add(keyTextField, BorderLayout.CENTER);
-        return keyPanel;
+            default:
+                return new JPanel();
+        }
     }
 
     @NotNull
@@ -186,9 +85,11 @@ public class NewKeyDialog extends DialogWrapper {
         JBLabel scoreLabel = new JBLabel("Score:");
         scoreLabel.setPreferredSize(new Dimension(50, 25));
         scorePanel.add(scoreLabel, BorderLayout.WEST);
-        scoreTextField = new JTextField();
-        scoreTextField.setDocument(new DoubleDocument());
-        scorePanel.add(scoreTextField, BorderLayout.CENTER);
+        scoreOrFieldTextField = new JTextField();
+        scoreOrFieldTextField.setDocument(new DoubleDocument());
+        scorePanel.add(scoreOrFieldTextField, BorderLayout.CENTER);
+
+        JPanel zsetValuePanel = createSimpleValuePanel(RedisValueTypeEnum.Zset);
 
         JPanel zsetTypePanel = new JPanel(new BorderLayout());
         zsetTypePanel.add(scorePanel, BorderLayout.NORTH);
@@ -202,8 +103,10 @@ public class NewKeyDialog extends DialogWrapper {
         JBLabel scoreLabel = new JBLabel("Field:");
         scoreLabel.setPreferredSize(new Dimension(50, 25));
         scorePanel.add(scoreLabel, BorderLayout.WEST);
-        fieldTextField = new JTextField();
-        scorePanel.add(fieldTextField, BorderLayout.CENTER);
+        scoreOrFieldTextField = new JTextField();
+        scorePanel.add(scoreOrFieldTextField, BorderLayout.CENTER);
+
+        JPanel hashValuePanel = createSimpleValuePanel(RedisValueTypeEnum.Hash);
 
         JPanel zsetTypePanel = new JPanel(new BorderLayout());
         zsetTypePanel.add(scorePanel, BorderLayout.NORTH);
@@ -218,10 +121,9 @@ public class NewKeyDialog extends DialogWrapper {
     @NotNull
     private JPanel createSimpleValuePanel(RedisValueTypeEnum valueTypeEnum) {
         JBScrollPane valueArea;
-        JBTextArea valueTextArea;
         switch (valueTypeEnum) {
             case List:
-                listValueTextArea = new JBTextArea();
+                JBTextArea listValueTextArea = new JBTextArea();
                 listValueTextArea.setRows(5);
                 listValueTextArea.setLineWrap(true);
                 listValueTextArea.setAutoscrolls(true);
@@ -229,7 +131,7 @@ public class NewKeyDialog extends DialogWrapper {
                 valueTextArea = listValueTextArea;
                 break;
             case Set:
-                setValueTextArea = new JBTextArea();
+                JBTextArea setValueTextArea = new JBTextArea();
                 setValueTextArea.setRows(5);
                 setValueTextArea.setLineWrap(true);
                 setValueTextArea.setAutoscrolls(true);
@@ -237,7 +139,7 @@ public class NewKeyDialog extends DialogWrapper {
                 valueTextArea = setValueTextArea;
                 break;
             case Zset:
-                zsetValueTextArea = new JBTextArea();
+                JBTextArea zsetValueTextArea = new JBTextArea();
                 zsetValueTextArea.setRows(5);
                 zsetValueTextArea.setLineWrap(true);
                 zsetValueTextArea.setAutoscrolls(true);
@@ -245,7 +147,7 @@ public class NewKeyDialog extends DialogWrapper {
                 valueTextArea = zsetValueTextArea;
                 break;
             case Hash:
-                hashValueTextArea = new JBTextArea();
+                JBTextArea hashValueTextArea = new JBTextArea();
                 hashValueTextArea.setRows(5);
                 hashValueTextArea.setLineWrap(true);
                 hashValueTextArea.setAutoscrolls(true);
@@ -253,7 +155,7 @@ public class NewKeyDialog extends DialogWrapper {
                 valueTextArea = hashValueTextArea;
                 break;
             default:
-                stringValueTextArea = new JBTextArea();
+                JBTextArea stringValueTextArea = new JBTextArea();
                 stringValueTextArea.setRows(5);
                 stringValueTextArea.setLineWrap(true);
                 stringValueTextArea.setAutoscrolls(true);
@@ -282,8 +184,6 @@ public class NewKeyDialog extends DialogWrapper {
         // todo 先不实现value格式化
 //        valueLabelPanel.add(viewAsPanel, BorderLayout.EAST);
 
-
-
         JPanel stringTypePanel = new JPanel(new BorderLayout());
         stringTypePanel.add(valueLabelPanel, BorderLayout.NORTH);
         stringTypePanel.add(valueArea, BorderLayout.CENTER);
@@ -295,7 +195,7 @@ public class NewKeyDialog extends DialogWrapper {
     @Override
     protected Action[] createActions() {
         DialogWrapperExitAction exitAction = new DialogWrapperExitAction("Cancel", CANCEL_EXIT_CODE);
-        NewKeyDialog.CustomOKAction okAction = new NewKeyDialog.CustomOKAction();
+        AddRowDialog.CustomOKAction okAction = new AddRowDialog.CustomOKAction();
         // 设置默认的焦点按钮
         okAction.putValue(DialogWrapper.DEFAULT_ACTION, true);
         return new Action[]{exitAction, okAction};
@@ -318,7 +218,16 @@ public class NewKeyDialog extends DialogWrapper {
         }
     }
 
+    public String getValue() {
+       return valueTextArea.getText();
+    }
+
+    public String getScoreOrField() {
+        return scoreOrFieldTextField.getText();
+    }
+
     public void setCustomOkAction(Consumer<ActionEvent> customOkAction) {
         this.customOkAction = customOkAction;
     }
+
 }

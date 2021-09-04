@@ -7,15 +7,16 @@ import com.mzyupc.aredis.vo.ConnectionInfo;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.reflect.MethodUtils;
 import redis.clients.jedis.*;
+import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.util.Pool;
 
 import java.io.*;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.charset.Charset;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * @author mzyupc@163.com
@@ -119,6 +120,40 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
         private boolean success;
 
         private String msg;
+    }
+
+    /**
+     * 执行redis命令
+     * @param db
+     * @param command
+     * @param args
+     * @return
+     * @throws InvocationTargetException
+     * @throws IllegalAccessException
+     */
+    public List<String> execRedisCommand(int db, String command, String... args) throws InvocationTargetException, IllegalAccessException {
+        Protocol.Command cmd = Protocol.Command.valueOf(command.toUpperCase());
+        try (Jedis jedis = getJedis(db)) {
+            Client client = jedis.getClient();
+            Method method = MethodUtils.getMatchingMethod(Client.class, "sendCommand", Protocol.Command.class, String[].class);
+            method.setAccessible(true);
+            method.invoke(client, cmd, args);
+            try {
+                List<String> respList = new ArrayList<>();
+                Object response = client.getOne();
+                if (response instanceof List) {
+                    for (Object itemResp : ((List) response)) {
+                        respList.add(new String((byte[]) itemResp));
+                    }
+                    return respList;
+                } else {
+                    return Collections.singletonList(new String((byte[]) response));
+                }
+
+            } catch (JedisException e) {
+                return Collections.singletonList(e.getMessage());
+            }
+        }
     }
 
     private synchronized void instancePool() {

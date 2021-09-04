@@ -1,4 +1,4 @@
-package com.mzyupc.aredis.view.dialog.enums;
+package com.mzyupc.aredis.view.enums;
 
 /**
  * @author mzyupc@163.com
