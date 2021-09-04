@@ -22,7 +22,7 @@ import com.mzyupc.aredis.utils.RedisPoolManager;
 import com.mzyupc.aredis.view.dialog.ConfirmDialog;
 import com.mzyupc.aredis.view.dialog.ErrorDialog;
 import com.mzyupc.aredis.view.dialog.NewKeyDialog;
-import com.mzyupc.aredis.view.tree.KeyTreeCellRenderer;
+import com.mzyupc.aredis.view.render.KeyTreeCellRenderer;
 import com.mzyupc.aredis.vo.DbInfo;
 import com.mzyupc.aredis.vo.FragmentedKey;
 import com.mzyupc.aredis.vo.KeyInfo;

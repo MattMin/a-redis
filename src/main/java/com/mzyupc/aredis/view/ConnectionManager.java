@@ -18,7 +18,7 @@ import com.mzyupc.aredis.view.dialog.ConfirmDialog;
 import com.mzyupc.aredis.view.dialog.ConnectionSettingsDialog;
 import com.mzyupc.aredis.view.editor.ARedisFileSystem;
 import com.mzyupc.aredis.view.editor.ARedisVirtualFile;
-import com.mzyupc.aredis.view.tree.ConnectionTreeCellRenderer;
+import com.mzyupc.aredis.view.render.ConnectionTreeCellRenderer;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import com.mzyupc.aredis.vo.DbInfo;
 import org.apache.commons.collections.CollectionUtils;
