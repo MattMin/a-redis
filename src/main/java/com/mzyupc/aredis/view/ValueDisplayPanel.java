@@ -1,5 +1,6 @@
 package com.mzyupc.aredis.view;
 
+import com.alibaba.fastjson.JSON;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
@@ -38,10 +39,7 @@ import javax.swing.table.TableColumn;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
+import java.awt.event.*;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -419,11 +417,38 @@ public class ValueDisplayPanel extends JPanel {
         fieldTextArea.setLineWrap(true);
         JBTextArea valueTextArea = new JBTextArea();
         valueTextArea.setLineWrap(true);
+        valueTextArea.setWrapStyleWord(true);
+        valueTextArea.setMinimumSize(new Dimension(100, 100));
         JButton saveValueButton = createSaveValueButton(fieldTextArea, valueTextArea);
 
         JPanel viewAsAndSavePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         viewAsAndSavePanel.add(new JLabel("View as:"));
-        viewAsAndSavePanel.add(new JComboBox<>(ValueFormatEnum.values()));
+        JComboBox<ValueFormatEnum> valueFormatComboBox = new JComboBox<>(ValueFormatEnum.values());
+        // todo View as 功能
+        valueFormatComboBox.addItemListener(new ItemListener() {
+            @Override
+            public void itemStateChanged(ItemEvent e) {
+                if (ItemEvent.SELECTED == e.getStateChange()) {
+                    ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();
+                    switch (formatEnum) {
+                        case JSON:
+                            Object jsonObject;
+                            try {
+                                jsonObject = JSON.parse(valueTextArea.getText());
+                            } catch (Exception exception) {
+                                ErrorDialog.show("Failed to format value to JSON: " + exception.getMessage());
+                                return;
+                            }
+                            valueTextArea.setText(JSON.toJSONString(jsonObject, true));
+                            break;
+                        case PLAIN:
+                            break;
+                        default:
+                    }
+                }
+            }
+        });
+        viewAsAndSavePanel.add(valueFormatComboBox);
         viewAsAndSavePanel.add(saveValueButton);
 
         JBLabel valueSizeLabel = new JBLabel();
@@ -439,6 +464,7 @@ public class ValueDisplayPanel extends JPanel {
          * value视图区
          */
         JBScrollPane valueViewPanel = new JBScrollPane(valueTextArea);
+        valueViewPanel.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 
         // value size/view as and value preview
         JPanel valuePreviewAndFunctionPanel = new JPanel(new BorderLayout());

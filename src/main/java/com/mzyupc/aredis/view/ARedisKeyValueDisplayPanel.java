@@ -197,6 +197,7 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
         valueDisplayPanel = ValueDisplayPanel.getInstance();
         valueDisplayPanel.setMinimumSize(new Dimension(100, 100));
         JBScrollPane valueDisplayScrollPanel = new JBScrollPane(valueDisplayPanel);
+        valueDisplayScrollPanel.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 
         LoadingDecorator loadingDecorator = new LoadingDecorator(valueDisplayScrollPanel, this, 0);
         splitterContainer.setSecondComponent(loadingDecorator.getComponent());
