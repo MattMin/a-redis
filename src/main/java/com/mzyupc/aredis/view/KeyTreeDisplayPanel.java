@@ -1,6 +1,7 @@
 package com.mzyupc.aredis.view;
 
 import com.alibaba.fastjson.JSON;
+import com.intellij.icons.AllIcons;
 import com.intellij.ide.CommonActionsManager;
 import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.ActionPlaces;
@@ -11,6 +12,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.LoadingDecorator;
 import com.intellij.ui.JBSplitter;
 import com.intellij.ui.TreeSpeedSearch;
+import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.treeStructure.Tree;
 import com.intellij.util.containers.Convertor;
@@ -30,54 +32,63 @@ import lombok.Getter;
 import lombok.SneakyThrows;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
+import org.jetbrains.annotations.NotNull;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.ScanParams;
+import redis.clients.jedis.ScanResult;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import javax.swing.tree.*;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Enumeration;
 import java.util.List;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static com.intellij.openapi.ui.DialogWrapper.OK_EXIT_CODE;
 import static com.mzyupc.aredis.utils.JTreeUtil.getTreeExpander;
-import static com.mzyupc.aredis.view.ARedisKeyValueDisplayPanel.DEFAULT_PAGE_SIZE;
 import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
 
 /**
  * @author mzyupc@163.com
- *
+ * <p>
  * key tree 展示面板
  */
 @Getter
 public class KeyTreeDisplayPanel extends JPanel {
+    private static final int DEFAULT_PAGE_SIZE = 10000;
+
     private final Tree keyTree;
-    private DefaultTreeModel treeModel;
     private final LoadingDecorator keyDisplayLoadingDecorator;
     private final DbInfo dbInfo;
     private final RedisPoolManager redisPoolManager;
     private final Project project;
     private final ARedisKeyValueDisplayPanel parent;
     /**
+     * 每次查询KEY的数量
+     */
+    private final int pageSize = DEFAULT_PAGE_SIZE;
+    private DefaultTreeModel treeModel;
+    /**
      * 没有分组过的根节点
      */
     private DefaultMutableTreeNode flatRootNode;
+    private JBLabel pageLabel;
+    private int pageIndex = 1;
 
-    /**
-     * 每次查询KEY的数量
-     */
-    private final Integer pageSize = DEFAULT_PAGE_SIZE;
+    private Map<Integer, String> pageIndexScanPointerMap = new HashMap<>();
 
     public KeyTreeDisplayPanel(Project project, ARedisKeyValueDisplayPanel parent, JBSplitter splitterContainer, DbInfo dbInfo, RedisPoolManager redisPoolManager, Consumer<KeyInfo> doubleClickKeyAction) {
         this.project = project;
         this.dbInfo = dbInfo;
         this.redisPoolManager = redisPoolManager;
         this.parent = parent;
+        pageIndexScanPointerMap.put(pageIndex, SCAN_POINTER_START);
 
         keyTree = new Tree();
         // 搜索功能
@@ -121,6 +132,7 @@ public class KeyTreeDisplayPanel extends JPanel {
             }
         });
         JBScrollPane keyTreeScrollPane = new JBScrollPane(keyTree);
+        keyDisplayLoadingDecorator = new LoadingDecorator(keyTreeScrollPane, parent, 0);
 
         // toolbar
         final CommonActionsManager actionManager = CommonActionsManager.getInstance();
@@ -141,85 +153,18 @@ public class KeyTreeDisplayPanel extends JPanel {
         ActionToolbar actionToolbar = ActionManager.getInstance()
                 .createActionToolbar(ActionPlaces.TOOLBAR, actions, true);
 
-        /**
-         * key展示区域 包括key工具栏区域, key树状图区域
-         */
+        // key分页panel
+        JPanel keyPagingPanel = createPagingPanel(parent);
+
+        // key展示区域 包括key工具栏区域, key树状图区域, key分页区
         JPanel keyDisplayPanel = new JPanel(new BorderLayout());
+        keyDisplayPanel.setMinimumSize(new Dimension(250, 100));
         actionToolbar.setTargetComponent(keyDisplayPanel);
         keyDisplayPanel.add(actionToolbar.getComponent(), BorderLayout.NORTH);
-        keyDisplayPanel.setMinimumSize(new Dimension(100, 100));
-        keyDisplayPanel.add(keyTreeScrollPane, BorderLayout.CENTER);
+        keyDisplayPanel.add(keyDisplayLoadingDecorator.getComponent(), BorderLayout.CENTER);
+        keyDisplayPanel.add(keyPagingPanel, BorderLayout.SOUTH);
 
-        keyDisplayLoadingDecorator = new LoadingDecorator(keyDisplayPanel, parent, 0);
-        splitterContainer.setFirstComponent(keyDisplayLoadingDecorator.getComponent());
-    }
-
-    /**
-     * 渲染keyTree
-     */
-    @SneakyThrows
-    public void renderKeyTree(String keyFilter, String groupSymbol) {
-        if (dbInfo.getKeyCount() > 10000) {
-            keyDisplayLoadingDecorator.startLoading(true);
-        } else {
-            keyDisplayLoadingDecorator.startLoading(false);
-        }
-
-        ApplicationManager.getApplication().invokeLater(() -> {
-            Long dbSize = redisPoolManager.dbSize(dbInfo.getIndex());
-            dbInfo.setKeyCount(dbSize);
-
-            // redis 查询前pageSize个key
-            List<String> allKeys = redisPoolManager.scan(SCAN_POINTER_START, keyFilter, pageSize, dbInfo.getIndex());
-            allKeys = allKeys.stream().sorted().collect(Collectors.toList());
-            flatRootNode = new DefaultMutableTreeNode(dbInfo);
-            if (!CollectionUtils.isEmpty(allKeys)) {
-                for (String key : allKeys) {
-                    DefaultMutableTreeNode keyNode = new DefaultMutableTreeNode(KeyInfo.builder()
-                            .key(key)
-                            .del(false)
-                            .build());
-                    flatRootNode.add(keyNode);
-                }
-            }
-
-            updateKeyTree(groupSymbol);
-        });
-
-        keyDisplayLoadingDecorator.stopLoading();
-    }
-
-    /**
-     * 根据groupSymbol更新树节点
-     * @param groupSymbol
-     */
-    public void updateKeyTree(String groupSymbol) {
-        if (StringUtils.isEmpty(groupSymbol)) {
-            treeModel = new DefaultTreeModel(flatRootNode);
-
-        } else {
-            // newRoot没有children
-            DefaultMutableTreeNode rootNode = (DefaultMutableTreeNode) flatRootNode.clone();
-            for (int i = 0; i < flatRootNode.getChildCount(); i++) {
-                DefaultMutableTreeNode originalChildNode = (DefaultMutableTreeNode) flatRootNode.getChildAt(i);
-                DefaultMutableTreeNode clonedChildNode = (DefaultMutableTreeNode) originalChildNode.clone();
-                KeyInfo key = (KeyInfo) clonedChildNode.getUserObject();
-                String[] explodedKey = StringUtils.split(key.getKey(), groupSymbol);
-                if (explodedKey.length == 1) {
-                    addChildren(clonedChildNode, originalChildNode);
-                    rootNode.add(clonedChildNode);
-                } else {
-                    updateTree(rootNode, originalChildNode, explodedKey, key);
-                }
-            }
-            treeModel = new DefaultTreeModel(rootNode);
-        }
-
-        keyTree.setModel(treeModel);
-        treeModel.reload();
-
-
-//        keyDisplayPanel.updateUI();
+        splitterContainer.setFirstComponent(keyDisplayPanel);
     }
 
     private static void updateTree(DefaultMutableTreeNode parentTargetNode, DefaultMutableTreeNode originalChildNode, String[] explodedKey, KeyInfo key) {
@@ -267,6 +212,148 @@ public class KeyTreeDisplayPanel extends JPanel {
         }
     }
 
+    /**
+     * key分页panel
+     *
+     * @param parent
+     * @return
+     */
+    @NotNull
+    private JPanel createPagingPanel(ARedisKeyValueDisplayPanel parent) {
+        JPanel keyPagingPanel = new JPanel(new BorderLayout());
+
+        JBLabel pageSizeLabel = new JBLabel("Page Size: " + pageSize);
+        pageSizeLabel.setBorder(new EmptyBorder(0, 5, 0, 0));
+        keyPagingPanel.add(pageSizeLabel, BorderLayout.NORTH);
+        JPanel pagePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        pageLabel = new JBLabel(String.format("Page %s of %s", pageIndex, getPageCount()));
+        pagePanel.add(pageLabel);
+
+        JButton prevPageButton = new JButton(AllIcons.Actions.Play_back);
+        JButton nextPageButton = new JButton(AllIcons.Actions.Play_forward);
+        pagePanel.add(prevPageButton);
+        pagePanel.add(nextPageButton);
+        keyPagingPanel.add(pagePanel, BorderLayout.SOUTH);
+
+        if (pageIndex <= 1) {
+            prevPageButton.setEnabled(false);
+        }
+        prevPageButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (pageIndex <= 1) {
+                    return;
+                }
+
+                updatePageDataOnPrevButtonClicked();
+                renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
+                nextPageButton.setEnabled(true);
+
+                if (pageIndex <= 1) {
+                    prevPageButton.setEnabled(false);
+                }
+            }
+        });
+
+        if (pageIndex >= getPageCount()) {
+            nextPageButton.setEnabled(false);
+        }
+        nextPageButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (pageIndex >= getPageCount()) {
+                    return;
+                }
+
+                updatePageDataOnNextButtonClicked();
+                renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
+                prevPageButton.setEnabled(true);
+                if (pageIndex >= getPageCount()) {
+                    nextPageButton.setEnabled(false);
+                }
+            }
+        });
+        return keyPagingPanel;
+    }
+
+    /**
+     * 渲染keyTree
+     */
+    @SneakyThrows
+    public void renderKeyTree(String keyFilter, String groupSymbol) {
+        if (dbInfo.getKeyCount() > 10000) {
+            keyDisplayLoadingDecorator.startLoading(true);
+        } else {
+            keyDisplayLoadingDecorator.startLoading(false);
+        }
+
+        ApplicationManager.getApplication().invokeLater(() -> {
+            Long dbSize = redisPoolManager.dbSize(dbInfo.getIndex());
+            dbInfo.setKeyCount(dbSize);
+
+            // redis 查询前pageSize个key
+            List<String> allKeys;
+            try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                ScanParams scanParams = new ScanParams();
+                scanParams.count(pageSize);
+                scanParams.match(keyFilter);
+                ScanResult<String> scanResult = jedis.scan(pageIndexScanPointerMap.get(pageIndex), scanParams);
+                allKeys = scanResult.getResult();
+                pageIndexScanPointerMap.put(pageIndex + 1, scanResult.getStringCursor());
+            }
+
+            allKeys = allKeys.stream().sorted().collect(Collectors.toList());
+            flatRootNode = new DefaultMutableTreeNode(dbInfo);
+            if (!CollectionUtils.isEmpty(allKeys)) {
+                for (String key : allKeys) {
+                    DefaultMutableTreeNode keyNode = new DefaultMutableTreeNode(KeyInfo.builder()
+                            .key(key)
+                            .del(false)
+                            .build());
+                    flatRootNode.add(keyNode);
+                }
+            }
+
+            updateKeyTree(groupSymbol);
+        });
+
+        keyDisplayLoadingDecorator.stopLoading();
+        updatePageLabel();
+    }
+
+    /**
+     * 根据groupSymbol更新树节点
+     *
+     * @param groupSymbol
+     */
+    public void updateKeyTree(String groupSymbol) {
+        if (StringUtils.isEmpty(groupSymbol)) {
+            treeModel = new DefaultTreeModel(flatRootNode);
+
+        } else {
+            // newRoot没有children
+            DefaultMutableTreeNode rootNode = (DefaultMutableTreeNode) flatRootNode.clone();
+            for (int i = 0; i < flatRootNode.getChildCount(); i++) {
+                DefaultMutableTreeNode originalChildNode = (DefaultMutableTreeNode) flatRootNode.getChildAt(i);
+                DefaultMutableTreeNode clonedChildNode = (DefaultMutableTreeNode) originalChildNode.clone();
+                KeyInfo key = (KeyInfo) clonedChildNode.getUserObject();
+                String[] explodedKey = StringUtils.split(key.getKey(), groupSymbol);
+                if (explodedKey.length == 1) {
+                    addChildren(clonedChildNode, originalChildNode);
+                    rootNode.add(clonedChildNode);
+                } else {
+                    updateTree(rootNode, originalChildNode, explodedKey, key);
+                }
+            }
+            treeModel = new DefaultTreeModel(rootNode);
+        }
+
+        keyTree.setModel(treeModel);
+        treeModel.reload();
+
+
+//        keyDisplayPanel.updateUI();
+    }
 
     /**
      * 清空Key
@@ -284,6 +371,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                         try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
                             jedis.flushDB();
                         }
+                        resetPageIndex();
                         renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
                     });
             confirmDialog.show();
@@ -321,6 +409,7 @@ public class KeyTreeDisplayPanel extends JPanel {
 
                                 if (newKeyDialog.isReloadSelected()) {
                                     // 重新渲染keyTree
+                                    resetPageIndex();
                                     renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
                                 }
                             }
@@ -341,6 +430,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                                 newKeyDialog.close(OK_EXIT_CODE);
                                 if (newKeyDialog.isReloadSelected()) {
                                     // 重新渲染keyTree
+                                    resetPageIndex();
                                     renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
                                 }
                             }
@@ -361,6 +451,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                                 newKeyDialog.close(OK_EXIT_CODE);
                                 if (newKeyDialog.isReloadSelected()) {
                                     // 重新渲染keyTree
+                                    resetPageIndex();
                                     renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
                                 }
                             }
@@ -381,6 +472,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                                 newKeyDialog.close(OK_EXIT_CODE);
                                 if (newKeyDialog.isReloadSelected()) {
                                     // 重新渲染keyTree
+                                    resetPageIndex();
                                     renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
                                 }
                             }
@@ -400,6 +492,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                                 newKeyDialog.close(OK_EXIT_CODE);
                                 if (newKeyDialog.isReloadSelected()) {
                                     // 重新渲染keyTree
+                                    resetPageIndex();
                                     renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
                                 }
                             }
@@ -498,6 +591,29 @@ public class KeyTreeDisplayPanel extends JPanel {
             renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
         });
         return refreshAction;
+    }
+
+    private long getPageCount() {
+        Long total = dbInfo.getKeyCount();
+        long result = total / pageSize;
+        long mod = total % pageSize;
+        return mod > 0 ? result + 1 : result;
+    }
+
+    private synchronized void updatePageDataOnPrevButtonClicked() {
+        pageIndex--;
+    }
+
+    private synchronized void updatePageDataOnNextButtonClicked() {
+        pageIndex++;
+    }
+
+    public void resetPageIndex() {
+        pageIndex = 1;
+    }
+
+    private void updatePageLabel() {
+        pageLabel.setText(String.format("Page %s of %s", pageIndex, getPageCount()));
     }
 
 }

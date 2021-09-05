@@ -28,8 +28,6 @@ import java.awt.event.KeyListener;
  */
 public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
     public static final String DEFAULT_FILTER = "*";
-
-    public static final Integer DEFAULT_PAGE_SIZE = 10000;
     private final DbInfo dbInfo;
     private final RedisPoolManager redisPoolManager;
     /**
@@ -133,6 +131,7 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
                     } else {
                         searchTextField.addCurrentTextToHistory();
                     }
+                    keyTreeDisplayPanel.resetPageIndex();
                     keyTreeDisplayPanel.renderKeyTree(getKeyFilter(), getGroupSymbol());
                 }
             }
