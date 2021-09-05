@@ -1,10 +1,11 @@
 <idea-plugin>
     <id>com.mzyupc.a-redis</id>
     <name>A-Redis</name>
-    <vendor email="mzyupc@163.com" url="http://www.github.com/MattMin">MattMin</vendor>
+    <vendor email="mzyupc@163.com" url="https://github.com/MattMin">MattMin</vendor>
 
     <description><![CDATA[
-    an idea redis desktop manage plugin..................
+    A simple and open source IDEA Redis plugin</br></br>
+    <a href="https://github.com/MattMin/a-redis">Github</a>
     ]]></description>
 
     <!-- please see https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html
@@ -14,16 +15,10 @@
     <extensions defaultExtensionNs="com.intellij">
         <toolWindow factoryClass="com.mzyupc.aredis.factory.ARedisToolWindowFactory" id="A-Redis" secondary="true"
                     icon="AllIcons.Debugger.Db_db_object" anchor="right"/>
-
-        <!-- 注册 -->
+        <!-- 注册ARedisEditorProvider -->
         <fileEditorProvider implementation="com.mzyupc.aredis.view.editor.ARedisEditorProvider"/>
-
         <projectService serviceImplementation="com.mzyupc.aredis.view.editor.ARedisFileSystem"/>
-
-
     </extensions>
-
-
 
     <actions>
         <!-- Add your actions here -->
