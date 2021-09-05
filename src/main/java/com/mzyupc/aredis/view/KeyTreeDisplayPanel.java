@@ -34,8 +34,6 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import redis.clients.jedis.Jedis;
-import redis.clients.jedis.ScanParams;
-import redis.clients.jedis.ScanResult;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -80,6 +78,7 @@ public class KeyTreeDisplayPanel extends JPanel {
     private DefaultMutableTreeNode flatRootNode;
     private JBLabel pageLabel;
     private int pageIndex = 1;
+    private List<String> allKeys = new ArrayList<>();
 
     private Map<Integer, String> pageIndexScanPointerMap = new HashMap<>();
 
@@ -89,6 +88,8 @@ public class KeyTreeDisplayPanel extends JPanel {
         this.redisPoolManager = redisPoolManager;
         this.parent = parent;
         pageIndexScanPointerMap.put(pageIndex, SCAN_POINTER_START);
+
+        allKeys = redisPoolManager.scan(SCAN_POINTER_START, parent.getKeyFilter(), pageSize, dbInfo.getIndex());
 
         keyTree = new Tree();
         // 搜索功能
@@ -292,33 +293,31 @@ public class KeyTreeDisplayPanel extends JPanel {
             dbInfo.setKeyCount(dbSize);
 
             // redis 查询前pageSize个key
-            List<String> allKeys;
-            try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
-                ScanParams scanParams = new ScanParams();
-                scanParams.count(pageSize);
-                scanParams.match(keyFilter);
-                ScanResult<String> scanResult = jedis.scan(pageIndexScanPointerMap.get(pageIndex), scanParams);
-                allKeys = scanResult.getResult();
-                pageIndexScanPointerMap.put(pageIndex + 1, scanResult.getStringCursor());
-            }
+            allKeys = redisPoolManager.scan(SCAN_POINTER_START, keyFilter, pageSize, dbInfo.getIndex());
+            if (CollectionUtils.isNotEmpty(allKeys)) {
+                allKeys = allKeys.stream().sorted().collect(Collectors.toList());
 
-            allKeys = allKeys.stream().sorted().collect(Collectors.toList());
-            flatRootNode = new DefaultMutableTreeNode(dbInfo);
-            if (!CollectionUtils.isEmpty(allKeys)) {
-                for (String key : allKeys) {
-                    DefaultMutableTreeNode keyNode = new DefaultMutableTreeNode(KeyInfo.builder()
-                            .key(key)
-                            .del(false)
-                            .build());
-                    flatRootNode.add(keyNode);
+                int size = allKeys.size();
+                int start = (pageIndex - 1) * pageSize;
+                int end = Math.min(start + pageSize, size);
+                List<String> currentPageKeys = allKeys.subList(start, end);
+                flatRootNode = new DefaultMutableTreeNode(dbInfo);
+                if (!CollectionUtils.isEmpty(currentPageKeys)) {
+                    for (String key : currentPageKeys) {
+                        DefaultMutableTreeNode keyNode = new DefaultMutableTreeNode(KeyInfo.builder()
+                                .key(key)
+                                .del(false)
+                                .build());
+                        flatRootNode.add(keyNode);
+                    }
                 }
             }
 
             updateKeyTree(groupSymbol);
+            updatePageLabel();
         });
 
         keyDisplayLoadingDecorator.stopLoading();
-        updatePageLabel();
     }
 
     /**
@@ -594,7 +593,7 @@ public class KeyTreeDisplayPanel extends JPanel {
     }
 
     private long getPageCount() {
-        Long total = dbInfo.getKeyCount();
+        int total = allKeys.size();
         long result = total / pageSize;
         long mod = total % pageSize;
         return mod > 0 ? result + 1 : result;

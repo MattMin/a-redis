@@ -632,7 +632,7 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
     }
 
     public List<String> scan(String cursor, String pattern, int count, int db) {
-        List<String> list = new LinkedList<>();
+        List<String> list = new ArrayList<>();
         Jedis jedis = null;
         try {
             jedis = getJedis(db);
