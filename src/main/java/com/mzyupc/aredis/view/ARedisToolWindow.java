@@ -19,10 +19,6 @@ import java.awt.*;
  */
 @Getter
 public class ARedisToolWindow implements Disposable {
-    /**
-     * 激活的连接的个数
-     */
-    public static boolean isConnected = false;
 
     private Project project;
     private JPanel aRedisWindowContent;
@@ -68,7 +64,7 @@ public class ARedisToolWindow implements Disposable {
         connectionPanel.setLayout(new BorderLayout());
 
         // 连接树
-        connectionManager = ConnectionManager.getInstance(project);
+        connectionManager = new ConnectionManager(project);
         connectionTree = connectionManager.createConnectionTree(this, connectionPanel);
 
         // 工具栏

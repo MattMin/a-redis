@@ -2,9 +2,7 @@ package com.mzyupc.aredis.action;
 
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.util.NlsActions;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.util.function.Consumer;
@@ -15,7 +13,7 @@ import java.util.function.Consumer;
 public abstract class CustomAction extends AnAction {
     protected Consumer<AnActionEvent> action;
 
-    public CustomAction(@Nullable @NlsActions.ActionText String text, @Nullable @NlsActions.ActionDescription String description, @Nullable Icon icon) {
+    public CustomAction(String text, String description, Icon icon) {
         super(text, description, icon);
     }
 

@@ -2,8 +2,6 @@ package com.mzyupc.aredis.view.editor;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.fileTypes.FileType;
-import com.intellij.openapi.util.NlsContexts;
-import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
@@ -23,14 +21,14 @@ public class ARedisFileType implements FileType {
     }
 
     @Override
-    public @NlsContexts.Label
+    public
     @NotNull
     String getDescription() {
         return "A redis tool tab";
     }
 
     @Override
-    public @NlsSafe
+    public
     @NotNull
     String getDefaultExtension() {
         return "";
@@ -56,6 +54,6 @@ public class ARedisFileType implements FileType {
     public @NonNls
     @Nullable
     String getCharset(@NotNull VirtualFile file, @NotNull byte[] content) {
-        return FileType.super.getCharset(file, content);
+        return null;
     }
 }

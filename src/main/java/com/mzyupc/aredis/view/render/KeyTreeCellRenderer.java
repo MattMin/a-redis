@@ -27,7 +27,7 @@ public class KeyTreeCellRenderer extends DefaultTreeCellRenderer {
                 this.setIcon(AllIcons.Debugger.Value);
             }
         } else {
-            this.setIcon(AllIcons.Actions.MenuOpen);
+            this.setIcon(AllIcons.Nodes.Folder);
         }
 
         return this;

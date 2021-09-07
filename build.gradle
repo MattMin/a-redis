@@ -4,7 +4,7 @@ plugins {
 }
 
 group 'com.mzyupc'
-version 'beta-0.1'
+version 'beta-0.2'
 
 repositories {
     mavenCentral()
@@ -32,9 +32,18 @@ dependencies {
 // See https://github.com/JetBrains/gradle-intellij-plugin/
 intellij {
     version = '2021.2'
+    updateSinceUntilBuild = true
 }
+
 patchPluginXml {
+    sinceBuild = '201.8743.12'
     changeNotes = """
+      beta-0.2</br>
+      <ul>
+      <li>fix: 不同项目会出现相同的connection</li>
+      <li>update: 支持最早版本到201.8743.12</li>
+      <li>update: Key分页Page Size的计算</li>
+      </ul>
       beta-0.1</br>
       <ul>
       <li>first version</li>

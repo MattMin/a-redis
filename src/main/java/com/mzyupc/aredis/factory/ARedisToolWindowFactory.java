@@ -14,30 +14,10 @@ import org.jetbrains.annotations.NotNull;
  */
 public class ARedisToolWindowFactory implements ToolWindowFactory {
     @Override
-    public boolean isApplicable(@NotNull Project project) {
-        return ToolWindowFactory.super.isApplicable(project);
-    }
-
-    @Override
     public void createToolWindowContent(@NotNull Project project, @NotNull ToolWindow toolWindow) {
         ARedisToolWindow aRedisToolWindow = new ARedisToolWindow(project, toolWindow);
         ContentFactory contentFactory = ContentFactory.SERVICE.getInstance();
         Content content = contentFactory.createContent(aRedisToolWindow.getContent(), "", false);
         toolWindow.getContentManager().addContent(content);
-    }
-
-    @Override
-    public void init(@NotNull ToolWindow toolWindow) {
-        ToolWindowFactory.super.init(toolWindow);
-    }
-
-    @Override
-    public boolean shouldBeAvailable(@NotNull Project project) {
-        return ToolWindowFactory.super.shouldBeAvailable(project);
-    }
-
-    @Override
-    public boolean isDoNotActivateOnStart() {
-        return ToolWindowFactory.super.isDoNotActivateOnStart();
     }
 }

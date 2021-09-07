@@ -6,10 +6,8 @@ import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.FileEditorLocation;
 import com.intellij.openapi.fileEditor.FileEditorState;
 import com.intellij.openapi.fileEditor.FileEditorStateLevel;
-import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.UserDataHolderBase;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.mzyupc.aredis.view.ConnectionManager;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -115,8 +113,6 @@ public class ARedisEditor extends UserDataHolderBase implements FileEditor {
     public void dispose() {
         // editor关闭的时候 移除connectionId-editor的映射]
         String id = aRedisVirtualFile.getConnectionInfo().getId();
-        Project project = aRedisVirtualFile.getProject();
-        ConnectionManager connectionManager = ConnectionManager.getInstance(project);
-        connectionManager.removeEditor(id, aRedisVirtualFile);
+        aRedisVirtualFile.getConnectionManager().removeEditor(id, aRedisVirtualFile);
     }
 }

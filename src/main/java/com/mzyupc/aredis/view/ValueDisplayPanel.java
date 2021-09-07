@@ -998,7 +998,7 @@ public class ValueDisplayPanel extends JPanel {
         return mod > 0 ? result + 1 : result;
     }
 
-    private static class Value {
+    private class Value {
         private final Object valueData;
 
         public Value(Object valueData) {

@@ -72,13 +72,16 @@ public class KeyTreeDisplayPanel extends JPanel {
      */
     private final int pageSize = DEFAULT_PAGE_SIZE;
     private DefaultTreeModel treeModel;
+    private JPanel keyDisplayPanel;
     /**
      * 没有分组过的根节点
      */
     private DefaultMutableTreeNode flatRootNode;
+    private JBLabel pageSizeLabel;
     private JBLabel pageLabel;
     private int pageIndex = 1;
-    private List<String> allKeys = new ArrayList<>();
+    private List<String> allKeys;
+    private List<String> currentPageKeys = new ArrayList<>();
 
     private Map<Integer, String> pageIndexScanPointerMap = new HashMap<>();
 
@@ -158,8 +161,8 @@ public class KeyTreeDisplayPanel extends JPanel {
         JPanel keyPagingPanel = createPagingPanel(parent);
 
         // key展示区域 包括key工具栏区域, key树状图区域, key分页区
-        JPanel keyDisplayPanel = new JPanel(new BorderLayout());
-        keyDisplayPanel.setMinimumSize(new Dimension(250, 100));
+        keyDisplayPanel = new JPanel(new BorderLayout());
+        keyDisplayPanel.setMinimumSize(new Dimension(255, 100));
         actionToolbar.setTargetComponent(keyDisplayPanel);
         keyDisplayPanel.add(actionToolbar.getComponent(), BorderLayout.NORTH);
         keyDisplayPanel.add(keyDisplayLoadingDecorator.getComponent(), BorderLayout.CENTER);
@@ -223,7 +226,7 @@ public class KeyTreeDisplayPanel extends JPanel {
     private JPanel createPagingPanel(ARedisKeyValueDisplayPanel parent) {
         JPanel keyPagingPanel = new JPanel(new BorderLayout());
 
-        JBLabel pageSizeLabel = new JBLabel("Page Size: " + pageSize);
+        pageSizeLabel = new JBLabel("Page Size: " + currentPageKeys.size());
         pageSizeLabel.setBorder(new EmptyBorder(0, 5, 0, 0));
         keyPagingPanel.add(pageSizeLabel, BorderLayout.NORTH);
         JPanel pagePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -282,11 +285,7 @@ public class KeyTreeDisplayPanel extends JPanel {
      */
     @SneakyThrows
     public void renderKeyTree(String keyFilter, String groupSymbol) {
-        if (dbInfo.getKeyCount() > 10000) {
-            keyDisplayLoadingDecorator.startLoading(true);
-        } else {
-            keyDisplayLoadingDecorator.startLoading(false);
-        }
+        keyDisplayLoadingDecorator.startLoading(false);
 
         ApplicationManager.getApplication().invokeLater(() -> {
             Long dbSize = redisPoolManager.dbSize(dbInfo.getIndex());
@@ -300,7 +299,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                 int size = allKeys.size();
                 int start = (pageIndex - 1) * pageSize;
                 int end = Math.min(start + pageSize, size);
-                List<String> currentPageKeys = allKeys.subList(start, end);
+                currentPageKeys = allKeys.subList(start, end);
                 flatRootNode = new DefaultMutableTreeNode(dbInfo);
                 if (!CollectionUtils.isEmpty(currentPageKeys)) {
                     for (String key : currentPageKeys) {
@@ -318,6 +317,7 @@ public class KeyTreeDisplayPanel extends JPanel {
         });
 
         keyDisplayLoadingDecorator.stopLoading();
+        keyDisplayPanel.updateUI();
     }
 
     /**
@@ -349,9 +349,6 @@ public class KeyTreeDisplayPanel extends JPanel {
 
         keyTree.setModel(treeModel);
         treeModel.reload();
-
-
-//        keyDisplayPanel.updateUI();
     }
 
     /**
@@ -613,6 +610,7 @@ public class KeyTreeDisplayPanel extends JPanel {
 
     private void updatePageLabel() {
         pageLabel.setText(String.format("Page %s of %s", pageIndex, getPageCount()));
+        pageSizeLabel.setText("Page Size: " + currentPageKeys.size());
     }
 
 }
