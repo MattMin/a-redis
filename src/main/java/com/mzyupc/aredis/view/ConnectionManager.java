@@ -22,6 +22,7 @@ import com.mzyupc.aredis.view.render.ConnectionTreeCellRenderer;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import com.mzyupc.aredis.vo.DbInfo;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang.StringUtils;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
@@ -42,11 +43,6 @@ import static com.mzyupc.aredis.utils.JTreeUtil.expandTree;
  */
 public class ConnectionManager {
     /**
-     * 是否有连接
-     */
-    public boolean isConnected = false;
-
-    /**
      * connectionId-redisPoolManager
      */
     private Map<String, RedisPoolManager> connectionRedisMap = new HashMap<>();
@@ -66,18 +62,9 @@ public class ConnectionManager {
 
     private LoadingDecorator connectionTreeLoadingDecorator;
 
-    private static ConnectionManager instance;
-
-    private ConnectionManager(Project project) {
+    public ConnectionManager(Project project) {
         this.project = project;
         this.propertyUtil = PropertyUtil.getInstance(project);
-    }
-
-    public static synchronized ConnectionManager getInstance(Project project) {
-        if (instance == null) {
-            instance = new ConnectionManager(project);
-        }
-        return instance;
     }
 
     /**
@@ -86,7 +73,9 @@ public class ConnectionManager {
     public void initConnections(Tree connectionTree) {
         List<ConnectionInfo> connections = propertyUtil.getConnections();
         for (ConnectionInfo connection : connections) {
-            addConnectionToList(connectionTreeModel, connection);
+            if (connection != null && StringUtils.isNotEmpty(connection.getId())) {
+                addConnectionToList(connectionTreeModel, connection);
+            }
         }
 
         connectionTree.setModel(connectionTreeModel);
@@ -105,6 +94,7 @@ public class ConnectionManager {
 
         connectionTree.setCellRenderer(new ConnectionTreeCellRenderer());
         connectionTree.setAlignmentX(Component.LEFT_ALIGNMENT);
+        ConnectionManager connectionManager = this;
         connectionTree.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -148,19 +138,19 @@ public class ConnectionManager {
                         ConnectionInfo connectionInfo = (ConnectionInfo) connectionNode.getUserObject();
                         DbInfo dbInfo = (DbInfo) dbNode.getUserObject();
                         connectionTreeLoadingDecorator.startLoading(false);
+
                         ApplicationManager.getApplication().invokeLater(() -> {
                             String connectionId = connectionInfo.getId();
                             ARedisVirtualFile aRedisVirtualFile = new ARedisVirtualFile(connectionInfo.getName() + "-DB" + dbInfo.getIndex(),
                                     project,
                                     connectionInfo,
                                     dbInfo,
-                                    connectionRedisMap.get(connectionId));
+                                    connectionRedisMap.get(connectionId),
+                                    connectionManager);
                             ARedisFileSystem.getInstance(project).openEditor(aRedisVirtualFile);
                             addEditorToMap(connectionId, aRedisVirtualFile);
                         });
-
                     }
-
                     connectionTreeLoadingDecorator.stopLoading();
                 }
 
@@ -196,7 +186,7 @@ public class ConnectionManager {
         actions.add(actionManager.createExpandAllAction(getTreeExpander(connectionTree), connectionTree));
         // 折叠所有
         actions.add(actionManager.createCollapseAllAction(getTreeExpander(connectionTree), connectionTree));
-        ActionToolbar actionToolbar = ActionManager.getInstance().createActionToolbar(ActionPlaces.TOOLWINDOW_TOOLBAR_BAR, actions, true);
+        ActionToolbar actionToolbar = ActionManager.getInstance().createActionToolbar("ToolwindowToolbar", actions, true);
         actionToolbar.setTargetComponent(connectionPanel);
         actionToolbar.adjustTheSameSize(true);
         return actionToolbar;
@@ -238,6 +228,10 @@ public class ConnectionManager {
      */
     private void addDbs2Connection(DefaultMutableTreeNode connectionNode) {
         ConnectionInfo connection = (ConnectionInfo) connectionNode.getUserObject();
+        if (connection == null) {
+            return;
+        }
+
         RedisPoolManager redisPoolManager = connectionRedisMap.get(connection.getId());
         int dbCount = redisPoolManager.getDbCount();
         propertyUtil.setDbCount(connection.getId(), dbCount);

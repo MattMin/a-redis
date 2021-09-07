@@ -1,7 +1,6 @@
 package com.mzyupc.aredis.utils;
 
 import com.intellij.openapi.Disposable;
-import com.mzyupc.aredis.view.ARedisToolWindow;
 import com.mzyupc.aredis.view.dialog.ErrorDialog;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import lombok.Builder;
@@ -236,7 +235,6 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
             if (db != Protocol.DEFAULT_DATABASE) {
                 resource.select(db);
             }
-            ARedisToolWindow.isConnected = true;
             return resource;
         } catch (Exception e) {
             log.warn("Failed to get resource from the pool", e);

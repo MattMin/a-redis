@@ -3,21 +3,22 @@ package com.mzyupc.aredis.utils;
 import com.alibaba.fastjson.JSON;
 import com.google.common.collect.Lists;
 import com.intellij.ide.util.PropertiesComponent;
+import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.project.Project;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import com.mzyupc.aredis.vo.DbInfo;
 import org.apache.commons.lang.StringUtils;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * @author mzyupc@163.com
  */
-public class PropertyUtil {
+public class PropertyUtil implements PersistentStateComponent {
     /**
      * connection id集合的key
      */
@@ -36,9 +37,7 @@ public class PropertyUtil {
     private PropertyUtil () {}
 
     public static PropertyUtil getInstance(Project project) {
-        if (properties == null) {
-            properties = PropertiesComponent.getInstance(project);
-        }
+        properties = PropertiesComponent.getInstance(project);
         return instance;
     }
 
@@ -53,10 +52,16 @@ public class PropertyUtil {
             return Lists.newArrayList();
         }
 
-        return Arrays.stream(ids).map(id -> {
+        List<ConnectionInfo> result = new ArrayList<>();
+        for (String id : ids) {
             String connection = properties.getValue(id);
-            return JSON.parseObject(connection, ConnectionInfo.class);
-        }).collect(Collectors.toList());
+            if (StringUtils.isEmpty(connection)) {
+                removeConnection(id, null);
+                continue;
+            }
+            result.add(JSON.parseObject(connection, ConnectionInfo.class));
+        }
+        return result;
     }
 
     /**
@@ -171,5 +176,16 @@ public class PropertyUtil {
 
     private String getGroupSymbolKey(DbInfo dbInfo) {
         return dbInfo.getConnectionId() + ":" + dbInfo.getIndex();
+    }
+
+    @Nullable
+    @Override
+    public Object getState() {
+        return null;
+    }
+
+    @Override
+    public void loadState(@NotNull Object o) {
+
     }
 }

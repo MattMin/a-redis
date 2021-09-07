@@ -3,11 +3,11 @@ package com.mzyupc.aredis.view.editor;
 import com.google.common.base.Objects;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileSystem;
 import com.mzyupc.aredis.utils.RedisPoolManager;
 import com.mzyupc.aredis.view.ARedisKeyValueDisplayPanel;
+import com.mzyupc.aredis.view.ConnectionManager;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import com.mzyupc.aredis.vo.DbInfo;
 import lombok.Getter;
@@ -29,23 +29,25 @@ public class ARedisVirtualFile extends VirtualFile {
     private ConnectionInfo connectionInfo;
     private DbInfo dbInfo;
     private ARedisKeyValueDisplayPanel aRedisKeyValueDisplayPanel;
+    private ConnectionManager connectionManager;
 
     @Override
     public @NotNull FileType getFileType() {
         return new ARedisFileType();
     }
 
-    public ARedisVirtualFile(String name, Project project, ConnectionInfo connectionInfo, DbInfo dbInfo, RedisPoolManager redisPoolManager) {
+    public ARedisVirtualFile(String name, Project project, ConnectionInfo connectionInfo, DbInfo dbInfo, RedisPoolManager redisPoolManager, ConnectionManager connectionManager) {
         this.project = project;
         this.name = name;
         this.connectionInfo = connectionInfo;
         this.dbInfo = dbInfo;
         this.aRedisKeyValueDisplayPanel = new ARedisKeyValueDisplayPanel(project, connectionInfo, dbInfo, redisPoolManager);
+        this.connectionManager = connectionManager;
     }
 
     @Override
     public @NotNull
-    @NlsSafe String getName() {
+    String getName() {
         return name;
     }
 
