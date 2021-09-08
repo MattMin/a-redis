@@ -2,9 +2,13 @@ package com.mzyupc.aredis.view;
 
 import com.alibaba.fastjson.JSON;
 import com.intellij.icons.AllIcons;
+import com.intellij.json.JsonFileType;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.LoadingDecorator;
+import com.intellij.ui.EditorSettingsProvider;
+import com.intellij.ui.EditorTextField;
 import com.intellij.ui.JBSplitter;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
@@ -415,10 +419,15 @@ public class ValueDisplayPanel extends JPanel {
 
         JBTextArea fieldTextArea = new JBTextArea();
         fieldTextArea.setLineWrap(true);
-        JBTextArea valueTextArea = new JBTextArea();
-        valueTextArea.setLineWrap(true);
-        valueTextArea.setWrapStyleWord(true);
+        EditorTextField valueTextArea = new EditorTextField("", project, JsonFileType.INSTANCE);
+        valueTextArea.setOneLineMode(false);
         valueTextArea.setMinimumSize(new Dimension(100, 100));
+        valueTextArea.addSettingsProvider(new EditorSettingsProvider() {
+            @Override
+            public void customizeSettings(EditorEx editorEx) {
+                editorEx.getSettings().setUseSoftWraps(true);
+            }
+        });
         JButton saveValueButton = createSaveValueButton(fieldTextArea, valueTextArea);
 
         JPanel viewAsAndSavePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
@@ -612,7 +621,7 @@ public class ValueDisplayPanel extends JPanel {
     }
 
     @NotNull
-    private JBTable createValueTable(DefaultTableModel tableModel, int valueColumnIndex, int fieldOrScoreColumnIndex, JBTextArea fieldTextArea, JBTextArea valueTextArea, JBLabel valueSizeLabel) {
+    private JBTable createValueTable(DefaultTableModel tableModel, int valueColumnIndex, int fieldOrScoreColumnIndex, JBTextArea fieldTextArea, EditorTextField valueTextArea, JBLabel valueSizeLabel) {
         JBTable valueTable = new JBTable(tableModel) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -755,7 +764,7 @@ public class ValueDisplayPanel extends JPanel {
     }
 
     @NotNull
-    private JButton createSaveValueButton(JBTextArea fieldTextArea, JBTextArea valueTextArea) {
+    private JButton createSaveValueButton(JBTextArea fieldTextArea, EditorTextField valueTextArea) {
         JButton saveValueButton = new JButton("Save");
         saveValueButton.setEnabled(true);
         saveValueButton.addActionListener(new ActionListener() {
