@@ -1,25 +1,12 @@
 package com.mzyupc.aredis.view;
 
 import com.intellij.icons.AllIcons;
-import com.intellij.ide.DataManager;
-import com.intellij.json.JsonLanguage;
-import com.intellij.lang.Language;
-import com.intellij.lang.html.HTMLLanguage;
-import com.intellij.lang.xml.XMLLanguage;
-import com.intellij.openapi.actionSystem.ActionManager;
-import com.intellij.openapi.actionSystem.ActionPlaces;
-import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.actionSystem.Presentation;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.editor.EditorSettings;
-import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.fileTypes.PlainTextLanguage;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.LoadingDecorator;
-import com.intellij.ui.EditorSettingsProvider;
 import com.intellij.ui.EditorTextField;
 import com.intellij.ui.JBSplitter;
-import com.intellij.ui.LanguageTextField;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
@@ -61,6 +48,8 @@ import java.util.List;
 import java.util.Map;
 
 import static com.intellij.openapi.ui.DialogWrapper.OK_EXIT_CODE;
+import static com.mzyupc.aredis.view.ValueTextAreaManager.createValueTextArea;
+import static com.mzyupc.aredis.view.ValueTextAreaManager.formatValue;
 import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
 
 /**
@@ -113,7 +102,7 @@ public class ValueDisplayPanel extends JPanel {
 
     private int pageIndex = 1;
 
-    private int pageSize = 100;
+    private final int pageSize = 100;
 
     /**
      * 一共有多少条数据
@@ -437,21 +426,19 @@ public class ValueDisplayPanel extends JPanel {
 //        Document document = editorFactory.createDocument("{\"abc\":123}");
 //        Editor editor = editorFactory.createEditor(document);
 
-        createValueTextArea(PlainTextLanguage.INSTANCE, "");
+        valueTextArea = createValueTextArea(project, PlainTextLanguage.INSTANCE, "");
         JBScrollPane valueViewPanel = new JBScrollPane(valueTextArea);
 
         JPanel viewAsAndSavePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         viewAsAndSavePanel.add(new JLabel("View as:"));
         JComboBox<ValueFormatEnum> valueFormatComboBox = new JComboBox<>(ValueFormatEnum.values());
-        // todo View as 功能
+        // View as 功能
         valueFormatComboBox.addItemListener(new ItemListener() {
             @Override
             public void itemStateChanged(ItemEvent e) {
                 if (ItemEvent.SELECTED == e.getStateChange()) {
                     ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();
-                    formatValue(valueViewPanel, formatEnum);
-                    // todo 触发 ReformatCodeAction
-//                    ActionManager.getInstance().getAction("ReformatCode").actionPerformed(e);
+                    valueTextArea = formatValue(project, valueViewPanel, formatEnum, valueTextArea.getText());
                 }
             }
         });
@@ -556,61 +543,6 @@ public class ValueDisplayPanel extends JPanel {
             valuePreviewPanel.add(valuePreviewAndFunctionPanel, BorderLayout.CENTER);
             this.add(valuePreviewPanel, BorderLayout.CENTER);
         }
-    }
-
-    private void createValueTextArea(Language language, String text) {
-        valueTextArea = new LanguageTextField(language, project, text, false);
-        valueTextArea.setOneLineMode(false);
-        valueTextArea.setMinimumSize(new Dimension(100, 100));
-        valueTextArea.addSettingsProvider(new EditorSettingsProvider() {
-            @Override
-            public void customizeSettings(EditorEx editorEx) {
-                EditorSettings settings = editorEx.getSettings();
-                settings.setUseSoftWraps(true);
-                // 行号
-                settings.setLineNumbersShown(true);
-                // 折叠
-                settings.setFoldingOutlineShown(true);
-                settings.setWhitespacesShown(true);
-                settings.setLeadingWhitespaceShown(true);
-            }
-        });
-    }
-
-    /**
-     * 更新value展示的数据格式
-     *
-     * @param valueViewPanel
-     * @param formatEnum
-     */
-    private void formatValue(JBScrollPane valueViewPanel, ValueFormatEnum formatEnum) {
-        switch (formatEnum) {
-            case HTML:
-                createValueTextArea(HTMLLanguage.INSTANCE, valueTextArea.getText());
-                break;
-            case XML:
-                createValueTextArea(XMLLanguage.INSTANCE, valueTextArea.getText());
-                break;
-            case JSON:
-                createValueTextArea(JsonLanguage.INSTANCE, valueTextArea.getText());
-                break;
-            case PLAIN:
-                createValueTextArea(PlainTextLanguage.INSTANCE, valueTextArea.getText());
-                break;
-            default:
-        }
-        valueViewPanel.setViewportView(valueTextArea);
-        ActionManager am = ActionManager.getInstance();
-        am.getAction("ReformatCode").actionPerformed(
-                new AnActionEvent(
-                        null,
-                        DataManager.getInstance().getDataContext(valueTextArea),
-                        ActionPlaces.UNKNOWN,
-                        new Presentation(),
-                        ActionManager.getInstance(),
-                        0
-                )
-        );
     }
 
     @NotNull
