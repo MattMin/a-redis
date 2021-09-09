@@ -1,15 +1,25 @@
 package com.mzyupc.aredis.view;
 
-import com.alibaba.fastjson.JSON;
 import com.intellij.icons.AllIcons;
-import com.intellij.json.JsonFileType;
+import com.intellij.ide.DataManager;
+import com.intellij.json.JsonLanguage;
+import com.intellij.lang.Language;
+import com.intellij.lang.html.HTMLLanguage;
+import com.intellij.lang.xml.XMLLanguage;
+import com.intellij.openapi.actionSystem.ActionManager;
+import com.intellij.openapi.actionSystem.ActionPlaces;
+import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.Presentation;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.editor.EditorSettings;
 import com.intellij.openapi.editor.ex.EditorEx;
+import com.intellij.openapi.fileTypes.PlainTextLanguage;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.LoadingDecorator;
 import com.intellij.ui.EditorSettingsProvider;
 import com.intellij.ui.EditorTextField;
 import com.intellij.ui.JBSplitter;
+import com.intellij.ui.LanguageTextField;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
@@ -84,6 +94,8 @@ public class ValueDisplayPanel extends JPanel {
 
     private LoadingDecorator loadingDecorator;
 
+    private EditorTextField valueTextArea;
+
     /**
      * value内部预览区 选中的value
      */
@@ -125,6 +137,7 @@ public class ValueDisplayPanel extends JPanel {
 
     /**
      * 初始化
+     *
      * @param project
      * @param parent
      * @param keyTreeDisplayPanel
@@ -145,7 +158,7 @@ public class ValueDisplayPanel extends JPanel {
         this.project = project;
         this.parent = parent;
         this.keyTreeDisplayPanel = keyTreeDisplayPanel;
-        this.loadingDecorator  = loadingDecorator;
+        this.loadingDecorator = loadingDecorator;
 
         loadingDecorator.startLoading(false);
 
@@ -419,16 +432,13 @@ public class ValueDisplayPanel extends JPanel {
 
         JBTextArea fieldTextArea = new JBTextArea();
         fieldTextArea.setLineWrap(true);
-        EditorTextField valueTextArea = new EditorTextField("", project, JsonFileType.INSTANCE);
-        valueTextArea.setOneLineMode(false);
-        valueTextArea.setMinimumSize(new Dimension(100, 100));
-        valueTextArea.addSettingsProvider(new EditorSettingsProvider() {
-            @Override
-            public void customizeSettings(EditorEx editorEx) {
-                editorEx.getSettings().setUseSoftWraps(true);
-            }
-        });
-        JButton saveValueButton = createSaveValueButton(fieldTextArea, valueTextArea);
+
+//        final EditorFactory editorFactory = EditorFactory.getInstance();
+//        Document document = editorFactory.createDocument("{\"abc\":123}");
+//        Editor editor = editorFactory.createEditor(document);
+
+        createValueTextArea(PlainTextLanguage.INSTANCE, "");
+        JBScrollPane valueViewPanel = new JBScrollPane(valueTextArea);
 
         JPanel viewAsAndSavePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         viewAsAndSavePanel.add(new JLabel("View as:"));
@@ -439,24 +449,14 @@ public class ValueDisplayPanel extends JPanel {
             public void itemStateChanged(ItemEvent e) {
                 if (ItemEvent.SELECTED == e.getStateChange()) {
                     ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();
-                    switch (formatEnum) {
-                        case JSON:
-                            Object jsonObject;
-                            try {
-                                jsonObject = JSON.parse(valueTextArea.getText());
-                            } catch (Exception exception) {
-                                ErrorDialog.show("Failed to format value to JSON: " + exception.getMessage());
-                                return;
-                            }
-                            valueTextArea.setText(JSON.toJSONString(jsonObject, true));
-                            break;
-                        case PLAIN:
-                            break;
-                        default:
-                    }
+                    formatValue(valueViewPanel, formatEnum);
+                    // todo 触发 ReformatCodeAction
+//                    ActionManager.getInstance().getAction("ReformatCode").actionPerformed(e);
                 }
             }
         });
+
+        JButton saveValueButton = createSaveValueButton(fieldTextArea);
         viewAsAndSavePanel.add(valueFormatComboBox);
         viewAsAndSavePanel.add(saveValueButton);
 
@@ -472,7 +472,7 @@ public class ValueDisplayPanel extends JPanel {
         /**
          * value视图区
          */
-        JBScrollPane valueViewPanel = new JBScrollPane(valueTextArea);
+
         valueViewPanel.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 
         // value size/view as and value preview
@@ -484,7 +484,7 @@ public class ValueDisplayPanel extends JPanel {
 
         // 需要表格预览
         if (tableModel != null) {
-            JBTable valueTable = createValueTable(tableModel, valueColumnIndex, fieldOrScoreColumnIndex, fieldTextArea, valueTextArea, valueSizeLabel);
+            JBTable valueTable = createValueTable(tableModel, valueColumnIndex, fieldOrScoreColumnIndex, fieldTextArea, valueSizeLabel);
 
             // 分页panel
             JPanel pagePanel = createPagePanel();
@@ -558,17 +558,72 @@ public class ValueDisplayPanel extends JPanel {
         }
     }
 
+    private void createValueTextArea(Language language, String text) {
+        valueTextArea = new LanguageTextField(language, project, text, false);
+        valueTextArea.setOneLineMode(false);
+        valueTextArea.setMinimumSize(new Dimension(100, 100));
+        valueTextArea.addSettingsProvider(new EditorSettingsProvider() {
+            @Override
+            public void customizeSettings(EditorEx editorEx) {
+                EditorSettings settings = editorEx.getSettings();
+                settings.setUseSoftWraps(true);
+                // 行号
+                settings.setLineNumbersShown(true);
+                // 折叠
+                settings.setFoldingOutlineShown(true);
+                settings.setWhitespacesShown(true);
+                settings.setLeadingWhitespaceShown(true);
+            }
+        });
+    }
+
+    /**
+     * 更新value展示的数据格式
+     *
+     * @param valueViewPanel
+     * @param formatEnum
+     */
+    private void formatValue(JBScrollPane valueViewPanel, ValueFormatEnum formatEnum) {
+        switch (formatEnum) {
+            case HTML:
+                createValueTextArea(HTMLLanguage.INSTANCE, valueTextArea.getText());
+                break;
+            case XML:
+                createValueTextArea(XMLLanguage.INSTANCE, valueTextArea.getText());
+                break;
+            case JSON:
+                createValueTextArea(JsonLanguage.INSTANCE, valueTextArea.getText());
+                break;
+            case PLAIN:
+                createValueTextArea(PlainTextLanguage.INSTANCE, valueTextArea.getText());
+                break;
+            default:
+        }
+        valueViewPanel.setViewportView(valueTextArea);
+        ActionManager am = ActionManager.getInstance();
+        am.getAction("ReformatCode").actionPerformed(
+                new AnActionEvent(
+                        null,
+                        DataManager.getInstance().getDataContext(valueTextArea),
+                        ActionPlaces.UNKNOWN,
+                        new Presentation(),
+                        ActionManager.getInstance(),
+                        0
+                )
+        );
+    }
+
     @NotNull
     private JPanel createPagePanel() {
         JPanel pagePanel = new JPanel();
         pagePanel.setLayout(new VFlowLayout());
         JBLabel pageSizeLabel = new JBLabel(String.format("Page %s of %s", pageIndex, getPageCount()));
         pageSizeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        pageSizeLabel.setBorder(new EmptyBorder(0,10,0,0));
+        pageSizeLabel.setBorder(new EmptyBorder(0, 10, 0, 0));
         pagePanel.add(pageSizeLabel);
         JBLabel sizeLabel = new JBLabel(String.format("Size: %s", total));
         sizeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        sizeLabel.setBorder(new EmptyBorder(0,10,0,0));
+        sizeLabel.setBorder(new EmptyBorder(0, 10, 0, 0));
         pagePanel.add(sizeLabel);
 
         JPanel pageButtonPanel = new JPanel();
@@ -621,7 +676,7 @@ public class ValueDisplayPanel extends JPanel {
     }
 
     @NotNull
-    private JBTable createValueTable(DefaultTableModel tableModel, int valueColumnIndex, int fieldOrScoreColumnIndex, JBTextArea fieldTextArea, EditorTextField valueTextArea, JBLabel valueSizeLabel) {
+    private JBTable createValueTable(DefaultTableModel tableModel, int valueColumnIndex, int fieldOrScoreColumnIndex, JBTextArea fieldTextArea, JBLabel valueSizeLabel) {
         JBTable valueTable = new JBTable(tableModel) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -655,6 +710,7 @@ public class ValueDisplayPanel extends JPanel {
                             tableModel.getValueAt(selectedRow, fieldOrScoreColumnIndex).toString());
                     fieldTextArea.setText(getSelectedFieldOrScore());
                     valueTextArea.setText(getSelectedValue());
+                    valueTextArea.updateUI();
                     updateValueSize(valueSizeLabel);
                 }
             }
@@ -764,13 +820,13 @@ public class ValueDisplayPanel extends JPanel {
     }
 
     @NotNull
-    private JButton createSaveValueButton(JBTextArea fieldTextArea, EditorTextField valueTextArea) {
+    private JButton createSaveValueButton(JBTextArea fieldTextArea) {
         JButton saveValueButton = new JButton("Save");
         saveValueButton.setEnabled(true);
         saveValueButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (selectedRow == -1) {
+                if (selectedRow == -1 && typeEnum != RedisValueTypeEnum.String) {
                     return;
                 }
 
@@ -999,6 +1055,7 @@ public class ValueDisplayPanel extends JPanel {
 
     /**
      * 计算页数
+     *
      * @return
      */
     private long getPageCount() {

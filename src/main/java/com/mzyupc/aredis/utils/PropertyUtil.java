@@ -15,6 +15,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import static com.mzyupc.aredis.view.ARedisKeyValueDisplayPanel.DEFAULT_GROUP_SYMBOL;
+
 /**
  * @author mzyupc@163.com
  */
@@ -27,8 +29,6 @@ public class PropertyUtil implements PersistentStateComponent {
     private static final String RELOAD_AFTER_ADDING_THE_KEY = "reloadAfterAddingTheKey";
 
     private static final String DB_COUNT_KEY = "dbCount:";
-
-    private static final String DEFAULT_GROUP_SYMBOL = "";
 
     private static PropertiesComponent properties;
 

@@ -28,6 +28,7 @@ import java.awt.event.KeyListener;
  */
 public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
     public static final String DEFAULT_FILTER = "*";
+    public static final String DEFAULT_GROUP_SYMBOL = ":";
     private final DbInfo dbInfo;
     private final RedisPoolManager redisPoolManager;
     /**

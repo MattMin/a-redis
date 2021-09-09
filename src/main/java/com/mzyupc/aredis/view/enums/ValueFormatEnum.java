@@ -9,7 +9,9 @@ public enum ValueFormatEnum {
      *
      */
     PLAIN("Plain text"),
-    JSON("JSON");
+    JSON("JSON"),
+    XML("XML"),
+    HTML("HTML");
 
     private String description;
 
