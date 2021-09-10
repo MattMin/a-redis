@@ -1,5 +1,7 @@
 # A-Redis
 > A Simple IDEA Redis Plugin
+> 
+> IDEA Redis 插件
 
 ## Function
 ### 1. Redis connection management
