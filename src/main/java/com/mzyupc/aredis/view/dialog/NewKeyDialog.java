@@ -1,12 +1,12 @@
 package com.mzyupc.aredis.view.dialog;
 
+import com.intellij.openapi.fileTypes.PlainTextLanguage;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
+import com.intellij.ui.EditorTextField;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
-import com.intellij.ui.components.JBTextArea;
-import com.mzyupc.aredis.utils.FormatUtil;
 import com.mzyupc.aredis.utils.PropertyUtil;
 import com.mzyupc.aredis.view.enums.RedisValueTypeEnum;
 import com.mzyupc.aredis.view.enums.ValueFormatEnum;
@@ -24,6 +24,9 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.util.function.Consumer;
+
+import static com.mzyupc.aredis.view.ValueTextAreaManager.createValueTextArea;
+import static com.mzyupc.aredis.view.ValueTextAreaManager.formatValue;
 
 /**
  * @author mzyupc@163.com
@@ -64,23 +67,22 @@ public class NewKeyDialog extends DialogWrapper {
      */
     private JTextField fieldTextField;
 
-    private JBTextArea stringValueTextArea;
-    private JBTextArea listValueTextArea;
-    private JBTextArea setValueTextArea;
-    private JBTextArea zsetValueTextArea;
-    private JBTextArea hashValueTextArea;
-
     /**
      * Reload after adding the key
      */
     private boolean reloadSelected;
 
-    private PropertyUtil propertyUtil;
+    private final PropertyUtil propertyUtil;
+
+    private final Project project;
+
+    private EditorTextField valueTextArea;
 
     public NewKeyDialog(@Nullable Project project) {
         super(project);
         propertyUtil = PropertyUtil.getInstance(project);
         reloadSelected = propertyUtil.getReloadAfterAddingTheKey();
+        this.project = project;
         this.init();
     }
 
@@ -124,11 +126,11 @@ public class NewKeyDialog extends DialogWrapper {
 
     @NotNull
     private JPanel createValuePanel() {
-        JPanel stringValuePanel = createSimpleValuePanel(RedisValueTypeEnum.String);
-        JPanel listValuePanel = createSimpleValuePanel(RedisValueTypeEnum.List);
-        JPanel setValuePanel = createSimpleValuePanel(RedisValueTypeEnum.Set);
-        zsetValuePanel = createSimpleValuePanel(RedisValueTypeEnum.Zset);
-        hashValuePanel = createSimpleValuePanel(RedisValueTypeEnum.Hash);
+        JPanel stringValuePanel = createSimpleValuePanel();
+        JPanel listValuePanel = createSimpleValuePanel();
+        JPanel setValuePanel = createSimpleValuePanel();
+        zsetValuePanel = createSimpleValuePanel();
+        hashValuePanel = createSimpleValuePanel();
 
         JPanel zsetTypePanel = createZSetValuePanel();
         JPanel hashTypePanel = createHashValuePanel();
@@ -216,50 +218,9 @@ public class NewKeyDialog extends DialogWrapper {
      * @return
      */
     @NotNull
-    private JPanel createSimpleValuePanel(RedisValueTypeEnum valueTypeEnum) {
-        JBScrollPane valueArea;
-        JBTextArea valueTextArea;
-        switch (valueTypeEnum) {
-            case List:
-                listValueTextArea = new JBTextArea();
-                listValueTextArea.setRows(5);
-                listValueTextArea.setLineWrap(true);
-                listValueTextArea.setAutoscrolls(true);
-                valueArea = new JBScrollPane(listValueTextArea);
-                valueTextArea = listValueTextArea;
-                break;
-            case Set:
-                setValueTextArea = new JBTextArea();
-                setValueTextArea.setRows(5);
-                setValueTextArea.setLineWrap(true);
-                setValueTextArea.setAutoscrolls(true);
-                valueArea = new JBScrollPane(setValueTextArea);
-                valueTextArea = setValueTextArea;
-                break;
-            case Zset:
-                zsetValueTextArea = new JBTextArea();
-                zsetValueTextArea.setRows(5);
-                zsetValueTextArea.setLineWrap(true);
-                zsetValueTextArea.setAutoscrolls(true);
-                valueArea = new JBScrollPane(zsetValueTextArea);
-                valueTextArea = zsetValueTextArea;
-                break;
-            case Hash:
-                hashValueTextArea = new JBTextArea();
-                hashValueTextArea.setRows(5);
-                hashValueTextArea.setLineWrap(true);
-                hashValueTextArea.setAutoscrolls(true);
-                valueArea = new JBScrollPane(hashValueTextArea);
-                valueTextArea = hashValueTextArea;
-                break;
-            default:
-                stringValueTextArea = new JBTextArea();
-                stringValueTextArea.setRows(5);
-                stringValueTextArea.setLineWrap(true);
-                stringValueTextArea.setAutoscrolls(true);
-                valueArea = new JBScrollPane(stringValueTextArea);
-                valueTextArea = stringValueTextArea;
-        }
+    private JPanel createSimpleValuePanel() {
+        valueTextArea = createValueTextArea(project, PlainTextLanguage.INSTANCE, "");
+        JBScrollPane valueArea = new JBScrollPane(valueTextArea);
 
         JComboBox<ValueFormatEnum> newKeyValueFormatEnumJComboBox = new JComboBox<>(ValueFormatEnum.values());
         newKeyValueFormatEnumJComboBox.addItemListener(new ItemListener() {
@@ -267,8 +228,7 @@ public class NewKeyDialog extends DialogWrapper {
             public void itemStateChanged(ItemEvent e) {
                 if (ItemEvent.SELECTED == e.getStateChange()) {
                     ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();
-                    String format = FormatUtil.format(valueTextArea.getText(), formatEnum);
-                    valueTextArea.setText(format);
+                    valueTextArea = formatValue(project, valueArea, formatEnum, valueTextArea.getText());
                 }
             }
         });
@@ -279,17 +239,13 @@ public class NewKeyDialog extends DialogWrapper {
 
         JPanel valueLabelPanel = new JPanel(new BorderLayout());
         valueLabelPanel.add(new JBLabel("Value:"), BorderLayout.WEST);
-        // todo 先不实现value格式化
-//        valueLabelPanel.add(viewAsPanel, BorderLayout.EAST);
-
-
+        valueLabelPanel.add(viewAsPanel, BorderLayout.EAST);
 
         JPanel stringTypePanel = new JPanel(new BorderLayout());
         stringTypePanel.add(valueLabelPanel, BorderLayout.NORTH);
         stringTypePanel.add(valueArea, BorderLayout.CENTER);
         return stringTypePanel;
     }
-
 
     @NotNull
     @Override
