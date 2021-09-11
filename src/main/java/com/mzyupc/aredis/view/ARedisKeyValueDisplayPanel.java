@@ -4,6 +4,7 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.LoadingDecorator;
+import com.intellij.openapi.ui.Splitter;
 import com.intellij.ui.JBSplitter;
 import com.intellij.ui.SearchTextField;
 import com.intellij.ui.components.JBScrollPane;
@@ -198,6 +199,7 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
         valueDisplayPanel.setMinimumSize(new Dimension(100, 100));
         JBScrollPane valueDisplayScrollPanel = new JBScrollPane(valueDisplayPanel);
         valueDisplayScrollPanel.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        valueDisplayScrollPanel.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
 
         LoadingDecorator loadingDecorator = new LoadingDecorator(valueDisplayScrollPanel, this, 0);
         splitterContainer.setSecondComponent(loadingDecorator.getComponent());
@@ -210,6 +212,7 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
         splitterContainer = new JBSplitter(false, 0.35f);
         removeValueDisplayPanel();
         splitterContainer.setDividerWidth(2);
+        splitterContainer.setDividerPositionStrategy(Splitter.DividerPositionStrategy.KEEP_FIRST_SIZE);
         splitterContainer.setShowDividerControls(true);
         splitterContainer.setSplitterProportionKey("aRedis.keyValue.splitter");
 

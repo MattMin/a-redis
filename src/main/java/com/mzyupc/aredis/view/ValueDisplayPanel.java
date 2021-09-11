@@ -5,6 +5,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileTypes.PlainTextLanguage;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.LoadingDecorator;
+import com.intellij.openapi.ui.Splitter;
 import com.intellij.ui.EditorTextField;
 import com.intellij.ui.JBSplitter;
 import com.intellij.ui.components.JBLabel;
@@ -422,10 +423,6 @@ public class ValueDisplayPanel extends JPanel {
         JBTextArea fieldTextArea = new JBTextArea();
         fieldTextArea.setLineWrap(true);
 
-//        final EditorFactory editorFactory = EditorFactory.getInstance();
-//        Document document = editorFactory.createDocument("{\"abc\":123}");
-//        Editor editor = editorFactory.createEditor(document);
-
         valueTextArea = createValueTextArea(project, PlainTextLanguage.INSTANCE, "");
         JBScrollPane valueViewPanel = new JBScrollPane(valueTextArea);
 
@@ -498,6 +495,7 @@ public class ValueDisplayPanel extends JPanel {
             innerPreviewPanel.add(valueInnerPreviewPanel, BorderLayout.CENTER);
 
             JBSplitter valuePreviewSplitter = new JBSplitter(true, 0.35f);
+            valuePreviewSplitter.setDividerPositionStrategy(Splitter.DividerPositionStrategy.KEEP_FIRST_SIZE);
             valuePreviewSplitter.setFirstComponent(innerPreviewPanel);
 
             if (typeEnum == RedisValueTypeEnum.Hash) {
@@ -508,6 +506,7 @@ public class ValueDisplayPanel extends JPanel {
                 fieldPanel.add(fieldScrollPane, BorderLayout.CENTER);
 
                 JBSplitter keyValueSplitter = new JBSplitter(true, 0.1f);
+                keyValueSplitter.setDividerPositionStrategy(Splitter.DividerPositionStrategy.KEEP_FIRST_SIZE);
                 keyValueSplitter.setFirstComponent(fieldPanel);
                 keyValueSplitter.setSecondComponent(valuePreviewAndFunctionPanel);
 
@@ -521,6 +520,7 @@ public class ValueDisplayPanel extends JPanel {
                 fieldTextArea.setDocument(new DoubleDocument());
 
                 JBSplitter keyValueSplitter = new JBSplitter(true, 0.1f);
+                keyValueSplitter.setDividerPositionStrategy(Splitter.DividerPositionStrategy.KEEP_FIRST_SIZE);
                 keyValueSplitter.setFirstComponent(fieldPanel);
                 keyValueSplitter.setSecondComponent(valuePreviewAndFunctionPanel);
 

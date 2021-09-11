@@ -29,6 +29,7 @@ public class ValueTextAreaManager {
 
     public static EditorTextField createValueTextArea(Project project, Language language, String text) {
         EditorTextField valueTextArea = new LanguageTextField(language, project, text, false);
+        valueTextArea.setAutoscrolls(true);
         valueTextArea.setOneLineMode(false);
         valueTextArea.setAutoscrolls(true);
         valueTextArea.setMinimumSize(new Dimension(100, 100));
