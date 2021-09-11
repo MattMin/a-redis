@@ -49,3 +49,5 @@ Value display
 ![value-display](./img/value-display.png)
 Add a row
 ![add-row](./img/add-row.png)
+
+![star](./img/star.jpg)
