@@ -13,13 +13,13 @@ import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.ui.table.JBTable;
+import com.mzyupc.aredis.enums.RedisValueTypeEnum;
+import com.mzyupc.aredis.enums.ValueFormatEnum;
 import com.mzyupc.aredis.layout.VFlowLayout;
 import com.mzyupc.aredis.utils.RedisPoolManager;
 import com.mzyupc.aredis.view.dialog.AddRowDialog;
 import com.mzyupc.aredis.view.dialog.ConfirmDialog;
 import com.mzyupc.aredis.view.dialog.ErrorDialog;
-import com.mzyupc.aredis.view.enums.RedisValueTypeEnum;
-import com.mzyupc.aredis.view.enums.ValueFormatEnum;
 import com.mzyupc.aredis.vo.DbInfo;
 import com.mzyupc.aredis.vo.KeyInfo;
 import lombok.extern.slf4j.Slf4j;
@@ -63,25 +63,16 @@ import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
 public class ValueDisplayPanel extends JPanel {
 
     private static final String REMOVED_VALUE = "_VALUE_REMOVED_BY_AREDIS_";
-
+    private final int pageSize = 100;
     private Project project;
-
     private String key;
-
     private Value value;
-
     private Long ttl;
-
     private RedisValueTypeEnum typeEnum;
-
     private RedisPoolManager redisPoolManager;
-
     private DbInfo dbInfo;
-
     private ARedisKeyValueDisplayPanel parent;
-
     private KeyTreeDisplayPanel keyTreeDisplayPanel;
-
     private LoadingDecorator loadingDecorator;
 
     private EditorTextField valueTextArea;
@@ -90,21 +81,15 @@ public class ValueDisplayPanel extends JPanel {
      * value内部预览区 选中的value
      */
     private String selectedValue = "";
-
     /**
      * value内部预览区 选中的field或者score, 依赖于typeEnum
      */
     private String selectedFieldOrScore = "";
-
     /**
      * value内部预览区 选中的行
      */
     private int selectedRow = -1;
-
     private int pageIndex = 1;
-
-    private final int pageSize = 100;
-
     /**
      * 一共有多少条数据
      */
@@ -422,12 +407,13 @@ public class ValueDisplayPanel extends JPanel {
 
         JBTextArea fieldTextArea = new JBTextArea();
         fieldTextArea.setLineWrap(true);
+        fieldTextArea.setAutoscrolls(true);
 
         valueTextArea = createValueTextArea(project, PlainTextLanguage.INSTANCE, "");
-        JBScrollPane valueViewPanel = new JBScrollPane(valueTextArea);
 
         JPanel viewAsAndSavePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         viewAsAndSavePanel.add(new JLabel("View as:"));
+        JPanel valuePreviewAndFunctionPanel = new JPanel(new BorderLayout());
         JComboBox<ValueFormatEnum> valueFormatComboBox = new JComboBox<>(ValueFormatEnum.values());
         // View as 功能
         valueFormatComboBox.addItemListener(new ItemListener() {
@@ -435,7 +421,7 @@ public class ValueDisplayPanel extends JPanel {
             public void itemStateChanged(ItemEvent e) {
                 if (ItemEvent.SELECTED == e.getStateChange()) {
                     ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();
-                    valueTextArea = formatValue(project, valueViewPanel, formatEnum, valueTextArea.getText());
+                    valueTextArea = formatValue(project, valuePreviewAndFunctionPanel, formatEnum, valueTextArea);
                 }
             }
         });
@@ -457,12 +443,9 @@ public class ValueDisplayPanel extends JPanel {
          * value视图区
          */
 
-        valueViewPanel.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-
         // value size/view as and value preview
-        JPanel valuePreviewAndFunctionPanel = new JPanel(new BorderLayout());
         valuePreviewAndFunctionPanel.add(valueFunctionPanel, BorderLayout.NORTH);
-        valuePreviewAndFunctionPanel.add(valueViewPanel, BorderLayout.CENTER);
+        valuePreviewAndFunctionPanel.add(valueTextArea, BorderLayout.CENTER);
 
         JPanel innerPreviewPanel = new JPanel(new BorderLayout());
 

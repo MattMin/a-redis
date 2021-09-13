@@ -290,7 +290,7 @@ public class KeyTreeDisplayPanel extends JPanel {
         ApplicationManager.getApplication().invokeLater(() -> {
             Long dbSize = redisPoolManager.dbSize(dbInfo.getIndex());
             dbInfo.setKeyCount(dbSize);
-
+            flatRootNode = new DefaultMutableTreeNode(dbInfo);
             // redis 查询前pageSize个key
             allKeys = redisPoolManager.scan(SCAN_POINTER_START, keyFilter, pageSize, dbInfo.getIndex());
             if (CollectionUtils.isNotEmpty(allKeys)) {
@@ -300,7 +300,6 @@ public class KeyTreeDisplayPanel extends JPanel {
                 int start = (pageIndex - 1) * pageSize;
                 int end = Math.min(start + pageSize, size);
                 currentPageKeys = allKeys.subList(start, end);
-                flatRootNode = new DefaultMutableTreeNode(dbInfo);
                 if (!CollectionUtils.isEmpty(currentPageKeys)) {
                     for (String key : currentPageKeys) {
                         DefaultMutableTreeNode keyNode = new DefaultMutableTreeNode(KeyInfo.builder()
@@ -326,6 +325,10 @@ public class KeyTreeDisplayPanel extends JPanel {
      * @param groupSymbol
      */
     public void updateKeyTree(String groupSymbol) {
+        if (flatRootNode == null) {
+            return;
+        }
+
         if (StringUtils.isEmpty(groupSymbol)) {
             treeModel = new DefaultTreeModel(flatRootNode);
 

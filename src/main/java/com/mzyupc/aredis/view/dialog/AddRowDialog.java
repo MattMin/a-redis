@@ -5,9 +5,8 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.ui.EditorTextField;
 import com.intellij.ui.components.JBLabel;
-import com.intellij.ui.components.JBScrollPane;
-import com.mzyupc.aredis.view.enums.RedisValueTypeEnum;
-import com.mzyupc.aredis.view.enums.ValueFormatEnum;
+import com.mzyupc.aredis.enums.RedisValueTypeEnum;
+import com.mzyupc.aredis.enums.ValueFormatEnum;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.batik.ext.swing.DoubleDocument;
 import org.jetbrains.annotations.NotNull;
@@ -122,18 +121,15 @@ public class AddRowDialog extends DialogWrapper {
      */
     @NotNull
     private JPanel createSimpleValuePanel() {
-        // todo 回车换行后如果不调整窗口大小, 则滚动条不会出现
         valueTextArea = createValueTextArea(project, PlainTextLanguage.INSTANCE, "");
-        JBScrollPane valueArea = new JBScrollPane(valueTextArea);
-        valueArea.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
-
+        JPanel stringTypePanel = new JPanel(new BorderLayout());
         JComboBox<ValueFormatEnum> newKeyValueFormatEnumJComboBox = new JComboBox<>(ValueFormatEnum.values());
         newKeyValueFormatEnumJComboBox.addItemListener(new ItemListener() {
             @Override
             public void itemStateChanged(ItemEvent e) {
                 if (ItemEvent.SELECTED == e.getStateChange()) {
                     ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();
-                    valueTextArea = formatValue(project, valueArea, formatEnum, valueTextArea.getText());
+                    valueTextArea = formatValue(project, stringTypePanel, formatEnum, valueTextArea);
                 }
             }
         });
@@ -146,9 +142,8 @@ public class AddRowDialog extends DialogWrapper {
         valueLabelPanel.add(new JBLabel("Value:"), BorderLayout.WEST);
         valueLabelPanel.add(viewAsPanel, BorderLayout.EAST);
 
-        JPanel stringTypePanel = new JPanel(new BorderLayout());
         stringTypePanel.add(valueLabelPanel, BorderLayout.NORTH);
-        stringTypePanel.add(valueArea, BorderLayout.CENTER);
+        stringTypePanel.add(valueTextArea, BorderLayout.CENTER);
         return stringTypePanel;
     }
 

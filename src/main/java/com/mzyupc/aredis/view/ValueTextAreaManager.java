@@ -15,10 +15,10 @@ import com.intellij.openapi.fileTypes.PlainTextLanguage;
 import com.intellij.openapi.project.Project;
 import com.intellij.ui.EditorSettingsProvider;
 import com.intellij.ui.EditorTextField;
-import com.intellij.ui.LanguageTextField;
-import com.intellij.ui.components.JBScrollPane;
-import com.mzyupc.aredis.view.enums.ValueFormatEnum;
+import com.mzyupc.aredis.enums.ValueFormatEnum;
+import com.mzyupc.aredis.view.textfield.ValueTextField;
 
+import javax.swing.*;
 import java.awt.*;
 
 /**
@@ -28,7 +28,7 @@ import java.awt.*;
 public class ValueTextAreaManager {
 
     public static EditorTextField createValueTextArea(Project project, Language language, String text) {
-        EditorTextField valueTextArea = new LanguageTextField(language, project, text, false);
+        EditorTextField valueTextArea = new ValueTextField(language, project, text, false);
         valueTextArea.setAutoscrolls(true);
         valueTextArea.setOneLineMode(false);
         valueTextArea.setAutoscrolls(true);
@@ -53,30 +53,31 @@ public class ValueTextAreaManager {
 
     /**
      * 更新value展示的数据格式
-     *
-     * @param valueViewPanel
+     *  @param parent
      * @param formatEnum
      */
-    public static EditorTextField formatValue(Project project, JBScrollPane valueViewPanel, ValueFormatEnum formatEnum, String text) {
+    public static EditorTextField formatValue(Project project, JComponent parent, ValueFormatEnum formatEnum, EditorTextField oldTextFiled) {
         EditorTextField valueTextArea;
         switch (formatEnum) {
             case HTML:
-                valueTextArea = createValueTextArea(project, HTMLLanguage.INSTANCE, text);
+                valueTextArea = createValueTextArea(project, HTMLLanguage.INSTANCE, oldTextFiled.getText());
                 break;
             case XML:
-                valueTextArea = createValueTextArea(project, XMLLanguage.INSTANCE, text);
+                valueTextArea = createValueTextArea(project, XMLLanguage.INSTANCE, oldTextFiled.getText());
                 break;
             case JSON:
-                valueTextArea = createValueTextArea(project, JsonLanguage.INSTANCE, text);
+                valueTextArea = createValueTextArea(project, JsonLanguage.INSTANCE, oldTextFiled.getText());
                 break;
             case PLAIN:
-                valueTextArea = createValueTextArea(project, PlainTextLanguage.INSTANCE, text);
+                valueTextArea = createValueTextArea(project, PlainTextLanguage.INSTANCE, oldTextFiled.getText());
                 break;
             default:
                 return null;
         }
 
-        valueViewPanel.setViewportView(valueTextArea);
+        parent.remove(oldTextFiled);
+        parent.add(valueTextArea);
+
         // 触发 ReformatCode
         ActionManager am = ActionManager.getInstance();
         am.getAction("ReformatCode").actionPerformed(
