@@ -1,4 +1,4 @@
-package com.mzyupc.aredis.view.enums;
+package com.mzyupc.aredis.enums;
 
 /**
  * @author mzyupc@163.com
@@ -9,7 +9,9 @@ public enum ValueFormatEnum {
      *
      */
     PLAIN("Plain text"),
-    JSON("JSON");
+    JSON("JSON"),
+    XML("XML"),
+    HTML("HTML");
 
     private String description;
 

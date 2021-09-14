@@ -1,7 +1,7 @@
 package com.mzyupc.aredis.utils;
 
 import com.alibaba.fastjson.JSON;
-import com.mzyupc.aredis.view.enums.ValueFormatEnum;
+import com.mzyupc.aredis.enums.ValueFormatEnum;
 import org.apache.commons.lang.StringUtils;
 
 /**

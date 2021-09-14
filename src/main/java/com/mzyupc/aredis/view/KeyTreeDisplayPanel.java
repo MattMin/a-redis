@@ -3,10 +3,7 @@ package com.mzyupc.aredis.view;
 import com.alibaba.fastjson.JSON;
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.CommonActionsManager;
-import com.intellij.openapi.actionSystem.ActionManager;
-import com.intellij.openapi.actionSystem.ActionPlaces;
-import com.intellij.openapi.actionSystem.ActionToolbar;
-import com.intellij.openapi.actionSystem.DefaultActionGroup;
+import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.LoadingDecorator;
@@ -131,6 +128,14 @@ public class KeyTreeDisplayPanel extends JPanel {
                         if (lastNode.isLeaf()) {
                             doubleClickKeyAction.accept((KeyInfo) lastNode.getUserObject());
                         }
+                    }
+                }
+
+                if (e.getButton() == MouseEvent.BUTTON3) {
+                    // 获取右键点击所在connectionNodede路径
+                    TreePath pathForLocation = keyTree.getSelectionPath();
+                    if (pathForLocation != null && pathForLocation.getPathCount() > 1) {
+                        createKeyTreePopupMenu().getComponent().show(keyTree, x, y);
                     }
                 }
             }
@@ -290,7 +295,7 @@ public class KeyTreeDisplayPanel extends JPanel {
         ApplicationManager.getApplication().invokeLater(() -> {
             Long dbSize = redisPoolManager.dbSize(dbInfo.getIndex());
             dbInfo.setKeyCount(dbSize);
-
+            flatRootNode = new DefaultMutableTreeNode(dbInfo);
             // redis 查询前pageSize个key
             allKeys = redisPoolManager.scan(SCAN_POINTER_START, keyFilter, pageSize, dbInfo.getIndex());
             if (CollectionUtils.isNotEmpty(allKeys)) {
@@ -300,7 +305,6 @@ public class KeyTreeDisplayPanel extends JPanel {
                 int start = (pageIndex - 1) * pageSize;
                 int end = Math.min(start + pageSize, size);
                 currentPageKeys = allKeys.subList(start, end);
-                flatRootNode = new DefaultMutableTreeNode(dbInfo);
                 if (!CollectionUtils.isEmpty(currentPageKeys)) {
                     for (String key : currentPageKeys) {
                         DefaultMutableTreeNode keyNode = new DefaultMutableTreeNode(KeyInfo.builder()
@@ -326,6 +330,10 @@ public class KeyTreeDisplayPanel extends JPanel {
      * @param groupSymbol
      */
     public void updateKeyTree(String groupSymbol) {
+        if (flatRootNode == null) {
+            return;
+        }
+
         if (StringUtils.isEmpty(groupSymbol)) {
             treeModel = new DefaultTreeModel(flatRootNode);
 
@@ -391,6 +399,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                         ErrorDialog.show("Key can not be empty");
                         return;
                     }
+
                     String valueString;
                     // 判断数据类型, 并存入
                     switch (newKeyDialog.getSelectedType()) {
@@ -402,7 +411,6 @@ public class KeyTreeDisplayPanel extends JPanel {
                                 redisPoolManager.set(key, valueString, 0, dbInfo.getIndex());
                                 // 关闭对话框
                                 newKeyDialog.close(OK_EXIT_CODE);
-
                                 if (newKeyDialog.isReloadSelected()) {
                                     // 重新渲染keyTree
                                     resetPageIndex();
@@ -475,7 +483,6 @@ public class KeyTreeDisplayPanel extends JPanel {
                             break;
 
                         default:
-                            // Hash
                             valueString = newKeyDialog.getHashValueTextArea().getText();
                             String field = newKeyDialog.getFieldTextField().getText();
                             if (StringUtils.isEmpty(valueString)) {
@@ -493,7 +500,6 @@ public class KeyTreeDisplayPanel extends JPanel {
                                 }
                             }
                     }
-
                 } catch (Exception exp) {
                     ErrorDialog.show(exp.getMessage() + "");
                 }
@@ -611,6 +617,19 @@ public class KeyTreeDisplayPanel extends JPanel {
     private void updatePageLabel() {
         pageLabel.setText(String.format("Page %s of %s", pageIndex, getPageCount()));
         pageSizeLabel.setText("Page Size: " + currentPageKeys.size());
+    }
+
+    /**
+     * 创建一个连接右键菜单
+     *
+     * @return
+     */
+    private ActionPopupMenu createKeyTreePopupMenu() {
+        DefaultActionGroup actionGroup = new DefaultActionGroup();
+        actionGroup.add(createDeleteAction());
+        ActionPopupMenu menu = ActionManager.getInstance().createActionPopupMenu(ActionPlaces.POPUP, actionGroup);
+        menu.setTargetComponent(keyTree);
+        return menu;
     }
 
 }

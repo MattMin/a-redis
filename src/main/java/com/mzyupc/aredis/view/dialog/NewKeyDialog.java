@@ -1,15 +1,14 @@
 package com.mzyupc.aredis.view.dialog;
 
+import com.intellij.openapi.fileTypes.PlainTextLanguage;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
+import com.intellij.ui.EditorTextField;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
-import com.intellij.ui.components.JBScrollPane;
-import com.intellij.ui.components.JBTextArea;
-import com.mzyupc.aredis.utils.FormatUtil;
+import com.mzyupc.aredis.enums.RedisValueTypeEnum;
+import com.mzyupc.aredis.enums.ValueFormatEnum;
 import com.mzyupc.aredis.utils.PropertyUtil;
-import com.mzyupc.aredis.view.enums.RedisValueTypeEnum;
-import com.mzyupc.aredis.view.enums.ValueFormatEnum;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.batik.ext.swing.DoubleDocument;
@@ -24,6 +23,9 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.util.function.Consumer;
+
+import static com.mzyupc.aredis.view.ValueTextAreaManager.createValueTextArea;
+import static com.mzyupc.aredis.view.ValueTextAreaManager.formatValue;
 
 /**
  * @author mzyupc@163.com
@@ -47,40 +49,38 @@ public class NewKeyDialog extends DialogWrapper {
     private JTextField keyTextField;
 
     /**
-     * zset value
-     */
-    private JPanel zsetValuePanel;
-    /**
      * zset score
      */
     private JTextField scoreTextField;
 
     /**
-     * hash value
-     */
-    private JPanel hashValuePanel;
-    /**
      * hash field
      */
     private JTextField fieldTextField;
-
-    private JBTextArea stringValueTextArea;
-    private JBTextArea listValueTextArea;
-    private JBTextArea setValueTextArea;
-    private JBTextArea zsetValueTextArea;
-    private JBTextArea hashValueTextArea;
 
     /**
      * Reload after adding the key
      */
     private boolean reloadSelected;
 
-    private PropertyUtil propertyUtil;
+    private final PropertyUtil propertyUtil;
+
+    private final Project project;
+
+    private JPanel zsetValuePanel;
+    private JPanel hashValuePanel;
+
+    private EditorTextField stringValueTextArea;
+    private EditorTextField listValueTextArea;
+    private EditorTextField setValueTextArea;
+    private EditorTextField zsetValueTextArea;
+    private EditorTextField hashValueTextArea;
 
     public NewKeyDialog(@Nullable Project project) {
         super(project);
         propertyUtil = PropertyUtil.getInstance(project);
         reloadSelected = propertyUtil.getReloadAfterAddingTheKey();
+        this.project = project;
         this.init();
     }
 
@@ -120,6 +120,12 @@ public class NewKeyDialog extends DialogWrapper {
         container.add(reloadPanel, BorderLayout.AFTER_LAST_LINE);
 
         return container;
+    }
+
+
+    @Override
+    public @Nullable JComponent getPreferredFocusedComponent() {
+        return keyTextField;
     }
 
     @NotNull
@@ -216,62 +222,76 @@ public class NewKeyDialog extends DialogWrapper {
      * @return
      */
     @NotNull
-    private JPanel createSimpleValuePanel(RedisValueTypeEnum valueTypeEnum) {
-        JBScrollPane valueArea;
-        JBTextArea valueTextArea;
-        switch (valueTypeEnum) {
+    private JPanel createSimpleValuePanel(RedisValueTypeEnum typeEnum) {
+        JPanel stringTypePanel = new JPanel(new BorderLayout());
+        JComboBox<ValueFormatEnum> newKeyValueFormatEnumJComboBox = new JComboBox<>(ValueFormatEnum.values());
+        switch (typeEnum) {
+            case String:
+                stringValueTextArea = createValueTextArea(project, PlainTextLanguage.INSTANCE, "");
+                newKeyValueFormatEnumJComboBox.addItemListener(new ItemListener() {
+                    @Override
+                    public void itemStateChanged(ItemEvent e) {
+                        if (ItemEvent.SELECTED == e.getStateChange()) {
+                            ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();
+                            stringValueTextArea = formatValue(project, stringTypePanel, formatEnum, stringValueTextArea);
+                        }
+                    }
+                });
+                stringTypePanel.add(stringValueTextArea, BorderLayout.CENTER);
+                break;
             case List:
-                listValueTextArea = new JBTextArea();
-                listValueTextArea.setRows(5);
-                listValueTextArea.setLineWrap(true);
-                listValueTextArea.setAutoscrolls(true);
-                valueArea = new JBScrollPane(listValueTextArea);
-                valueTextArea = listValueTextArea;
+                listValueTextArea = createValueTextArea(project, PlainTextLanguage.INSTANCE, "");
+                newKeyValueFormatEnumJComboBox.addItemListener(new ItemListener() {
+                    @Override
+                    public void itemStateChanged(ItemEvent e) {
+                        if (ItemEvent.SELECTED == e.getStateChange()) {
+                            ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();
+                            listValueTextArea = formatValue(project, stringTypePanel, formatEnum, listValueTextArea);
+                        }
+                    }
+                });
+                stringTypePanel.add(listValueTextArea, BorderLayout.CENTER);
                 break;
             case Set:
-                setValueTextArea = new JBTextArea();
-                setValueTextArea.setRows(5);
-                setValueTextArea.setLineWrap(true);
-                setValueTextArea.setAutoscrolls(true);
-                valueArea = new JBScrollPane(setValueTextArea);
-                valueTextArea = setValueTextArea;
+                setValueTextArea = createValueTextArea(project, PlainTextLanguage.INSTANCE, "");
+                newKeyValueFormatEnumJComboBox.addItemListener(new ItemListener() {
+                    @Override
+                    public void itemStateChanged(ItemEvent e) {
+                        if (ItemEvent.SELECTED == e.getStateChange()) {
+                            ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();
+                            setValueTextArea = formatValue(project, stringTypePanel, formatEnum, setValueTextArea);
+                        }
+                    }
+                });
+                stringTypePanel.add(setValueTextArea, BorderLayout.CENTER);
                 break;
             case Zset:
-                zsetValueTextArea = new JBTextArea();
-                zsetValueTextArea.setRows(5);
-                zsetValueTextArea.setLineWrap(true);
-                zsetValueTextArea.setAutoscrolls(true);
-                valueArea = new JBScrollPane(zsetValueTextArea);
-                valueTextArea = zsetValueTextArea;
-                break;
-            case Hash:
-                hashValueTextArea = new JBTextArea();
-                hashValueTextArea.setRows(5);
-                hashValueTextArea.setLineWrap(true);
-                hashValueTextArea.setAutoscrolls(true);
-                valueArea = new JBScrollPane(hashValueTextArea);
-                valueTextArea = hashValueTextArea;
+                zsetValueTextArea = createValueTextArea(project, PlainTextLanguage.INSTANCE, "");
+                newKeyValueFormatEnumJComboBox.addItemListener(new ItemListener() {
+                    @Override
+                    public void itemStateChanged(ItemEvent e) {
+                        if (ItemEvent.SELECTED == e.getStateChange()) {
+                            ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();
+                            zsetValueTextArea = formatValue(project, stringTypePanel, formatEnum, zsetValueTextArea);
+                        }
+                    }
+                });
+                stringTypePanel.add(zsetValueTextArea, BorderLayout.CENTER);
                 break;
             default:
-                stringValueTextArea = new JBTextArea();
-                stringValueTextArea.setRows(5);
-                stringValueTextArea.setLineWrap(true);
-                stringValueTextArea.setAutoscrolls(true);
-                valueArea = new JBScrollPane(stringValueTextArea);
-                valueTextArea = stringValueTextArea;
+                hashValueTextArea = createValueTextArea(project, PlainTextLanguage.INSTANCE, "");
+                newKeyValueFormatEnumJComboBox.addItemListener(new ItemListener() {
+                    @Override
+                    public void itemStateChanged(ItemEvent e) {
+                        if (ItemEvent.SELECTED == e.getStateChange()) {
+                            ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();
+                            hashValueTextArea = formatValue(project, stringTypePanel, formatEnum, hashValueTextArea);
+                        }
+                    }
+                });
+                stringTypePanel.add(hashValueTextArea, BorderLayout.CENTER);
+                break;
         }
-
-        JComboBox<ValueFormatEnum> newKeyValueFormatEnumJComboBox = new JComboBox<>(ValueFormatEnum.values());
-        newKeyValueFormatEnumJComboBox.addItemListener(new ItemListener() {
-            @Override
-            public void itemStateChanged(ItemEvent e) {
-                if (ItemEvent.SELECTED == e.getStateChange()) {
-                    ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();
-                    String format = FormatUtil.format(valueTextArea.getText(), formatEnum);
-                    valueTextArea.setText(format);
-                }
-            }
-        });
 
         JPanel viewAsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         viewAsPanel.add(new JBLabel("View as:"));
@@ -279,17 +299,12 @@ public class NewKeyDialog extends DialogWrapper {
 
         JPanel valueLabelPanel = new JPanel(new BorderLayout());
         valueLabelPanel.add(new JBLabel("Value:"), BorderLayout.WEST);
-        // todo 先不实现value格式化
-//        valueLabelPanel.add(viewAsPanel, BorderLayout.EAST);
+        valueLabelPanel.add(viewAsPanel, BorderLayout.EAST);
 
-
-
-        JPanel stringTypePanel = new JPanel(new BorderLayout());
         stringTypePanel.add(valueLabelPanel, BorderLayout.NORTH);
-        stringTypePanel.add(valueArea, BorderLayout.CENTER);
+
         return stringTypePanel;
     }
-
 
     @NotNull
     @Override

@@ -1,23 +1,25 @@
 package com.mzyupc.aredis.view;
 
-import com.alibaba.fastjson.JSON;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.fileTypes.PlainTextLanguage;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.LoadingDecorator;
+import com.intellij.openapi.ui.Splitter;
+import com.intellij.ui.EditorTextField;
 import com.intellij.ui.JBSplitter;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.ui.table.JBTable;
+import com.mzyupc.aredis.enums.RedisValueTypeEnum;
+import com.mzyupc.aredis.enums.ValueFormatEnum;
 import com.mzyupc.aredis.layout.VFlowLayout;
 import com.mzyupc.aredis.utils.RedisPoolManager;
 import com.mzyupc.aredis.view.dialog.AddRowDialog;
 import com.mzyupc.aredis.view.dialog.ConfirmDialog;
 import com.mzyupc.aredis.view.dialog.ErrorDialog;
-import com.mzyupc.aredis.view.enums.RedisValueTypeEnum;
-import com.mzyupc.aredis.view.enums.ValueFormatEnum;
 import com.mzyupc.aredis.vo.DbInfo;
 import com.mzyupc.aredis.vo.KeyInfo;
 import lombok.extern.slf4j.Slf4j;
@@ -47,6 +49,8 @@ import java.util.List;
 import java.util.Map;
 
 import static com.intellij.openapi.ui.DialogWrapper.OK_EXIT_CODE;
+import static com.mzyupc.aredis.view.ValueTextAreaManager.createValueTextArea;
+import static com.mzyupc.aredis.view.ValueTextAreaManager.formatValue;
 import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
 
 /**
@@ -59,46 +63,33 @@ import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
 public class ValueDisplayPanel extends JPanel {
 
     private static final String REMOVED_VALUE = "_VALUE_REMOVED_BY_AREDIS_";
-
+    private final int pageSize = 100;
     private Project project;
-
     private String key;
-
     private Value value;
-
     private Long ttl;
-
     private RedisValueTypeEnum typeEnum;
-
     private RedisPoolManager redisPoolManager;
-
     private DbInfo dbInfo;
-
     private ARedisKeyValueDisplayPanel parent;
-
     private KeyTreeDisplayPanel keyTreeDisplayPanel;
-
     private LoadingDecorator loadingDecorator;
+
+    private EditorTextField valueTextArea;
 
     /**
      * value内部预览区 选中的value
      */
     private String selectedValue = "";
-
     /**
      * value内部预览区 选中的field或者score, 依赖于typeEnum
      */
     private String selectedFieldOrScore = "";
-
     /**
      * value内部预览区 选中的行
      */
     private int selectedRow = -1;
-
     private int pageIndex = 1;
-
-    private int pageSize = 100;
-
     /**
      * 一共有多少条数据
      */
@@ -121,6 +112,7 @@ public class ValueDisplayPanel extends JPanel {
 
     /**
      * 初始化
+     *
      * @param project
      * @param parent
      * @param keyTreeDisplayPanel
@@ -141,7 +133,7 @@ public class ValueDisplayPanel extends JPanel {
         this.project = project;
         this.parent = parent;
         this.keyTreeDisplayPanel = keyTreeDisplayPanel;
-        this.loadingDecorator  = loadingDecorator;
+        this.loadingDecorator = loadingDecorator;
 
         loadingDecorator.startLoading(false);
 
@@ -415,39 +407,26 @@ public class ValueDisplayPanel extends JPanel {
 
         JBTextArea fieldTextArea = new JBTextArea();
         fieldTextArea.setLineWrap(true);
-        JBTextArea valueTextArea = new JBTextArea();
-        valueTextArea.setLineWrap(true);
-        valueTextArea.setWrapStyleWord(true);
-        valueTextArea.setMinimumSize(new Dimension(100, 100));
-        JButton saveValueButton = createSaveValueButton(fieldTextArea, valueTextArea);
+        fieldTextArea.setAutoscrolls(true);
+
+        valueTextArea = createValueTextArea(project, PlainTextLanguage.INSTANCE, "");
 
         JPanel viewAsAndSavePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         viewAsAndSavePanel.add(new JLabel("View as:"));
+        JPanel valuePreviewAndFunctionPanel = new JPanel(new BorderLayout());
         JComboBox<ValueFormatEnum> valueFormatComboBox = new JComboBox<>(ValueFormatEnum.values());
-        // todo View as 功能
+        // View as 功能
         valueFormatComboBox.addItemListener(new ItemListener() {
             @Override
             public void itemStateChanged(ItemEvent e) {
                 if (ItemEvent.SELECTED == e.getStateChange()) {
                     ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();
-                    switch (formatEnum) {
-                        case JSON:
-                            Object jsonObject;
-                            try {
-                                jsonObject = JSON.parse(valueTextArea.getText());
-                            } catch (Exception exception) {
-                                ErrorDialog.show("Failed to format value to JSON: " + exception.getMessage());
-                                return;
-                            }
-                            valueTextArea.setText(JSON.toJSONString(jsonObject, true));
-                            break;
-                        case PLAIN:
-                            break;
-                        default:
-                    }
+                    valueTextArea = formatValue(project, valuePreviewAndFunctionPanel, formatEnum, valueTextArea);
                 }
             }
         });
+
+        JButton saveValueButton = createSaveValueButton(fieldTextArea);
         viewAsAndSavePanel.add(valueFormatComboBox);
         viewAsAndSavePanel.add(saveValueButton);
 
@@ -463,19 +442,16 @@ public class ValueDisplayPanel extends JPanel {
         /**
          * value视图区
          */
-        JBScrollPane valueViewPanel = new JBScrollPane(valueTextArea);
-        valueViewPanel.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 
         // value size/view as and value preview
-        JPanel valuePreviewAndFunctionPanel = new JPanel(new BorderLayout());
         valuePreviewAndFunctionPanel.add(valueFunctionPanel, BorderLayout.NORTH);
-        valuePreviewAndFunctionPanel.add(valueViewPanel, BorderLayout.CENTER);
+        valuePreviewAndFunctionPanel.add(valueTextArea, BorderLayout.CENTER);
 
         JPanel innerPreviewPanel = new JPanel(new BorderLayout());
 
         // 需要表格预览
         if (tableModel != null) {
-            JBTable valueTable = createValueTable(tableModel, valueColumnIndex, fieldOrScoreColumnIndex, fieldTextArea, valueTextArea, valueSizeLabel);
+            JBTable valueTable = createValueTable(tableModel, valueColumnIndex, fieldOrScoreColumnIndex, fieldTextArea, valueSizeLabel);
 
             // 分页panel
             JPanel pagePanel = createPagePanel();
@@ -502,6 +478,7 @@ public class ValueDisplayPanel extends JPanel {
             innerPreviewPanel.add(valueInnerPreviewPanel, BorderLayout.CENTER);
 
             JBSplitter valuePreviewSplitter = new JBSplitter(true, 0.35f);
+            valuePreviewSplitter.setDividerPositionStrategy(Splitter.DividerPositionStrategy.KEEP_FIRST_SIZE);
             valuePreviewSplitter.setFirstComponent(innerPreviewPanel);
 
             if (typeEnum == RedisValueTypeEnum.Hash) {
@@ -512,6 +489,7 @@ public class ValueDisplayPanel extends JPanel {
                 fieldPanel.add(fieldScrollPane, BorderLayout.CENTER);
 
                 JBSplitter keyValueSplitter = new JBSplitter(true, 0.1f);
+                keyValueSplitter.setDividerPositionStrategy(Splitter.DividerPositionStrategy.KEEP_FIRST_SIZE);
                 keyValueSplitter.setFirstComponent(fieldPanel);
                 keyValueSplitter.setSecondComponent(valuePreviewAndFunctionPanel);
 
@@ -525,6 +503,7 @@ public class ValueDisplayPanel extends JPanel {
                 fieldTextArea.setDocument(new DoubleDocument());
 
                 JBSplitter keyValueSplitter = new JBSplitter(true, 0.1f);
+                keyValueSplitter.setDividerPositionStrategy(Splitter.DividerPositionStrategy.KEEP_FIRST_SIZE);
                 keyValueSplitter.setFirstComponent(fieldPanel);
                 keyValueSplitter.setSecondComponent(valuePreviewAndFunctionPanel);
 
@@ -555,11 +534,11 @@ public class ValueDisplayPanel extends JPanel {
         pagePanel.setLayout(new VFlowLayout());
         JBLabel pageSizeLabel = new JBLabel(String.format("Page %s of %s", pageIndex, getPageCount()));
         pageSizeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        pageSizeLabel.setBorder(new EmptyBorder(0,10,0,0));
+        pageSizeLabel.setBorder(new EmptyBorder(0, 10, 0, 0));
         pagePanel.add(pageSizeLabel);
         JBLabel sizeLabel = new JBLabel(String.format("Size: %s", total));
         sizeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        sizeLabel.setBorder(new EmptyBorder(0,10,0,0));
+        sizeLabel.setBorder(new EmptyBorder(0, 10, 0, 0));
         pagePanel.add(sizeLabel);
 
         JPanel pageButtonPanel = new JPanel();
@@ -612,7 +591,7 @@ public class ValueDisplayPanel extends JPanel {
     }
 
     @NotNull
-    private JBTable createValueTable(DefaultTableModel tableModel, int valueColumnIndex, int fieldOrScoreColumnIndex, JBTextArea fieldTextArea, JBTextArea valueTextArea, JBLabel valueSizeLabel) {
+    private JBTable createValueTable(DefaultTableModel tableModel, int valueColumnIndex, int fieldOrScoreColumnIndex, JBTextArea fieldTextArea, JBLabel valueSizeLabel) {
         JBTable valueTable = new JBTable(tableModel) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -646,6 +625,7 @@ public class ValueDisplayPanel extends JPanel {
                             tableModel.getValueAt(selectedRow, fieldOrScoreColumnIndex).toString());
                     fieldTextArea.setText(getSelectedFieldOrScore());
                     valueTextArea.setText(getSelectedValue());
+                    valueTextArea.updateUI();
                     updateValueSize(valueSizeLabel);
                 }
             }
@@ -755,13 +735,13 @@ public class ValueDisplayPanel extends JPanel {
     }
 
     @NotNull
-    private JButton createSaveValueButton(JBTextArea fieldTextArea, JBTextArea valueTextArea) {
+    private JButton createSaveValueButton(JBTextArea fieldTextArea) {
         JButton saveValueButton = new JButton("Save");
         saveValueButton.setEnabled(true);
         saveValueButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (selectedRow == -1) {
+                if (selectedRow == -1 && typeEnum != RedisValueTypeEnum.String) {
                     return;
                 }
 
@@ -990,6 +970,7 @@ public class ValueDisplayPanel extends JPanel {
 
     /**
      * 计算页数
+     *
      * @return
      */
     private long getPageCount() {
