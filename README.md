@@ -39,11 +39,11 @@ DBs
 ![dbs](./img/dbs.png)
 Keys
 ![keys](./img/keys.png)
-Keys with group by symbol
-![keys-with-group](./img/keys-with-group.png)
 Add a key
-![new-a-key](./img/new-a-key.png)
+![add-a-key](./img/add-a-key.png)
 Value display
 ![value-display](./img/value-display.png)
 Add a row
 ![add-row](./img/add-row.png)
+
+![star](./img/star.jpg)
