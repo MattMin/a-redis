@@ -122,6 +122,12 @@ public class NewKeyDialog extends DialogWrapper {
         return container;
     }
 
+
+    @Override
+    public @Nullable JComponent getPreferredFocusedComponent() {
+        return keyTextField;
+    }
+
     @NotNull
     private JPanel createValuePanel() {
         JPanel stringValuePanel = createSimpleValuePanel(RedisValueTypeEnum.String);

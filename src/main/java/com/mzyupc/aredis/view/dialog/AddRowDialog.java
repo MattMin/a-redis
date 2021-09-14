@@ -61,7 +61,21 @@ public class AddRowDialog extends DialogWrapper {
         return container;
     }
 
+    @Override
+    public @Nullable JComponent getPreferredFocusedComponent() {
+        return scoreOrFieldTextField == null ? valueTextArea : scoreOrFieldTextField;
+    }
+
     @NotNull
+    @Override
+    protected Action[] createActions() {
+        DialogWrapperExitAction exitAction = new DialogWrapperExitAction("Cancel", CANCEL_EXIT_CODE);
+        AddRowDialog.CustomOKAction okAction = new AddRowDialog.CustomOKAction();
+        // 设置默认的焦点按钮
+        okAction.putValue(DialogWrapper.DEFAULT_ACTION, true);
+        return new Action[]{exitAction, okAction};
+    }
+
     private JPanel createValuePanel() {
         switch (valueTypeEnum) {
             case String:
@@ -146,18 +160,6 @@ public class AddRowDialog extends DialogWrapper {
         stringTypePanel.add(valueTextArea, BorderLayout.CENTER);
         return stringTypePanel;
     }
-
-
-    @NotNull
-    @Override
-    protected Action[] createActions() {
-        DialogWrapperExitAction exitAction = new DialogWrapperExitAction("Cancel", CANCEL_EXIT_CODE);
-        AddRowDialog.CustomOKAction okAction = new AddRowDialog.CustomOKAction();
-        // 设置默认的焦点按钮
-        okAction.putValue(DialogWrapper.DEFAULT_ACTION, true);
-        return new Action[]{exitAction, okAction};
-    }
-
 
     /**
      * 自定义 ok Action

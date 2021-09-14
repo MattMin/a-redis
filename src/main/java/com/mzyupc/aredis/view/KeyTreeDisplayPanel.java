@@ -3,10 +3,7 @@ package com.mzyupc.aredis.view;
 import com.alibaba.fastjson.JSON;
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.CommonActionsManager;
-import com.intellij.openapi.actionSystem.ActionManager;
-import com.intellij.openapi.actionSystem.ActionPlaces;
-import com.intellij.openapi.actionSystem.ActionToolbar;
-import com.intellij.openapi.actionSystem.DefaultActionGroup;
+import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.LoadingDecorator;
@@ -131,6 +128,14 @@ public class KeyTreeDisplayPanel extends JPanel {
                         if (lastNode.isLeaf()) {
                             doubleClickKeyAction.accept((KeyInfo) lastNode.getUserObject());
                         }
+                    }
+                }
+
+                if (e.getButton() == MouseEvent.BUTTON3) {
+                    // 获取右键点击所在connectionNodede路径
+                    TreePath pathForLocation = keyTree.getSelectionPath();
+                    if (pathForLocation != null && pathForLocation.getPathCount() > 1) {
+                        createKeyTreePopupMenu().getComponent().show(keyTree, x, y);
                     }
                 }
             }
@@ -612,6 +617,19 @@ public class KeyTreeDisplayPanel extends JPanel {
     private void updatePageLabel() {
         pageLabel.setText(String.format("Page %s of %s", pageIndex, getPageCount()));
         pageSizeLabel.setText("Page Size: " + currentPageKeys.size());
+    }
+
+    /**
+     * 创建一个连接右键菜单
+     *
+     * @return
+     */
+    private ActionPopupMenu createKeyTreePopupMenu() {
+        DefaultActionGroup actionGroup = new DefaultActionGroup();
+        actionGroup.add(createDeleteAction());
+        ActionPopupMenu menu = ActionManager.getInstance().createActionPopupMenu(ActionPlaces.POPUP, actionGroup);
+        menu.setTargetComponent(keyTree);
+        return menu;
     }
 
 }

@@ -249,7 +249,11 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         return centerPanel;
     }
 
-    DialogWrapperExitAction exitAction;
+    @Override
+    public @Nullable JComponent getPreferredFocusedComponent() {
+        return nameTextField;
+    }
+
     /**
      * 覆盖默认的ok/cancel按钮
      *
@@ -258,7 +262,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
     @NotNull
     @Override
     protected Action[] createActions() {
-        exitAction = new DialogWrapperExitAction("Cancel", CANCEL_EXIT_CODE);
+        DialogWrapperExitAction exitAction = new DialogWrapperExitAction("Cancel", CANCEL_EXIT_CODE);
         okAction = new CustomOKAction();
 
         // 设置默认的焦点按钮
