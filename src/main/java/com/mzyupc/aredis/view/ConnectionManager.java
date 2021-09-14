@@ -553,8 +553,9 @@ public class ConnectionManager {
         actionGroup.add(createEditAction(connectionTree));
         actionGroup.add(createDuplicateAction(connectionTree));
         actionGroup.add(createDeleteAction(connectionTree));
-        actionGroup.addSeparator();
-        actionGroup.add(createConsoleAction());
+        // todo console 待实现
+//        actionGroup.addSeparator();
+//        actionGroup.add(createConsoleAction());
         actionGroup.addSeparator();
         actionGroup.add(createCloseAction(connectionTree, connectionTreeModel));
         ActionPopupMenu menu = ActionManager.getInstance().createActionPopupMenu(ActionPlaces.POPUP, actionGroup);
