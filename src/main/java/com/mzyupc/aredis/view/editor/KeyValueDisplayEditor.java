@@ -20,16 +20,16 @@ import java.beans.PropertyChangeListener;
  *
  * key-value展示
  */
-public class ARedisEditor extends UserDataHolderBase implements FileEditor {
-    private ARedisVirtualFile aRedisVirtualFile;
+public class KeyValueDisplayEditor extends UserDataHolderBase implements FileEditor {
+    private KeyValueDisplayVirtualFile keyValueDisplayVirtualFile;
 
-    public ARedisEditor(VirtualFile aRedisVirtualFile) {
-        this.aRedisVirtualFile = (ARedisVirtualFile) aRedisVirtualFile;
+    public KeyValueDisplayEditor(VirtualFile aRedisVirtualFile) {
+        this.keyValueDisplayVirtualFile = (KeyValueDisplayVirtualFile) aRedisVirtualFile;
     }
 
     @Override
     public @NotNull JComponent getComponent() {
-        return aRedisVirtualFile.getARedisKeyValueDisplayPanel();
+        return keyValueDisplayVirtualFile.getARedisKeyValueDisplayPanel();
     }
 
     @Override
@@ -106,13 +106,13 @@ public class ARedisEditor extends UserDataHolderBase implements FileEditor {
 
     @Override
     public @Nullable VirtualFile getFile() {
-        return this.aRedisVirtualFile;
+        return this.keyValueDisplayVirtualFile;
     }
 
     @Override
     public void dispose() {
         // editor关闭的时候 移除connectionId-editor的映射]
-        String id = aRedisVirtualFile.getConnectionInfo().getId();
-        aRedisVirtualFile.getConnectionManager().removeEditor(id, aRedisVirtualFile);
+        String id = keyValueDisplayVirtualFile.getConnectionInfo().getId();
+        keyValueDisplayVirtualFile.getConnectionManager().removeEditor(id, keyValueDisplayVirtualFile);
     }
 }

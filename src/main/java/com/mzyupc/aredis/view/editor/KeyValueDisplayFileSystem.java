@@ -14,15 +14,15 @@ import java.io.IOException;
 /**
  * @author mzyupc@163.com
  */
-public class ARedisFileSystem extends VirtualFileSystem {
+public class KeyValueDisplayFileSystem extends VirtualFileSystem {
 
-    public static ARedisFileSystem getInstance(Project project) {
-        return project.getService(ARedisFileSystem.class);
+    public static KeyValueDisplayFileSystem getInstance(Project project) {
+        return project.getService(KeyValueDisplayFileSystem.class);
     }
 
-    public void openEditor(ARedisVirtualFile aRedisVirtualFile) {
-        FileEditorManager fileEditorManager = FileEditorManager.getInstance(aRedisVirtualFile.getProject());
-        fileEditorManager.openFile(aRedisVirtualFile, true);
+    public void openEditor(KeyValueDisplayVirtualFile keyValueDisplayVirtualFile) {
+        FileEditorManager fileEditorManager = FileEditorManager.getInstance(keyValueDisplayVirtualFile.getProject());
+        fileEditorManager.openFile(keyValueDisplayVirtualFile, true);
     }
 
     @Override

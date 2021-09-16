@@ -23,7 +23,7 @@ import java.io.OutputStream;
  * @author mzyupc@163.com
  */
 @Getter
-public class ARedisVirtualFile extends VirtualFile {
+public class KeyValueDisplayVirtualFile extends VirtualFile {
     private final String name;
     private final Project project;
     private ConnectionInfo connectionInfo;
@@ -33,10 +33,10 @@ public class ARedisVirtualFile extends VirtualFile {
 
     @Override
     public @NotNull FileType getFileType() {
-        return new ARedisFileType();
+        return new KeyValueDisplayFileType();
     }
 
-    public ARedisVirtualFile(String name, Project project, ConnectionInfo connectionInfo, DbInfo dbInfo, RedisPoolManager redisPoolManager, ConnectionManager connectionManager) {
+    public KeyValueDisplayVirtualFile(String name, Project project, ConnectionInfo connectionInfo, DbInfo dbInfo, RedisPoolManager redisPoolManager, ConnectionManager connectionManager) {
         this.project = project;
         this.name = name;
         this.connectionInfo = connectionInfo;
@@ -53,7 +53,7 @@ public class ARedisVirtualFile extends VirtualFile {
 
     @Override
     public @NotNull VirtualFileSystem getFileSystem() {
-        return ARedisFileSystem.getInstance(project);
+        return KeyValueDisplayFileSystem.getInstance(project);
     }
 
     @Override
@@ -130,7 +130,7 @@ public class ARedisVirtualFile extends VirtualFile {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        ARedisVirtualFile that = (ARedisVirtualFile) o;
+        KeyValueDisplayVirtualFile that = (KeyValueDisplayVirtualFile) o;
         return Objects.equal(connectionInfo, that.connectionInfo) && Objects.equal(dbInfo, that.dbInfo);
     }
 

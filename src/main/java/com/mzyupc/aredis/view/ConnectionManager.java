@@ -16,8 +16,8 @@ import com.mzyupc.aredis.utils.PropertyUtil;
 import com.mzyupc.aredis.utils.RedisPoolManager;
 import com.mzyupc.aredis.view.dialog.ConfirmDialog;
 import com.mzyupc.aredis.view.dialog.ConnectionSettingsDialog;
-import com.mzyupc.aredis.view.editor.ARedisFileSystem;
-import com.mzyupc.aredis.view.editor.ARedisVirtualFile;
+import com.mzyupc.aredis.view.editor.KeyValueDisplayFileSystem;
+import com.mzyupc.aredis.view.editor.KeyValueDisplayVirtualFile;
 import com.mzyupc.aredis.view.render.ConnectionTreeCellRenderer;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import com.mzyupc.aredis.vo.DbInfo;
@@ -54,7 +54,7 @@ public class ConnectionManager {
     /**
      * connectionId-editor
      */
-    private Map<String, CopyOnWriteArraySet<ARedisVirtualFile>> connectionDbEditorMap = new HashMap<>();
+    private Map<String, CopyOnWriteArraySet<KeyValueDisplayVirtualFile>> connectionDbEditorMap = new HashMap<>();
 
     private DefaultMutableTreeNode connectionTreeRoot = new DefaultMutableTreeNode();
 
@@ -141,14 +141,14 @@ public class ConnectionManager {
 
                         ApplicationManager.getApplication().invokeLater(() -> {
                             String connectionId = connectionInfo.getId();
-                            ARedisVirtualFile aRedisVirtualFile = new ARedisVirtualFile(connectionInfo.getName() + "-DB" + dbInfo.getIndex(),
+                            KeyValueDisplayVirtualFile keyValueDisplayVirtualFile = new KeyValueDisplayVirtualFile(connectionInfo.getName() + "-DB" + dbInfo.getIndex(),
                                     project,
                                     connectionInfo,
                                     dbInfo,
                                     connectionRedisMap.get(connectionId),
                                     connectionManager);
-                            ARedisFileSystem.getInstance(project).openEditor(aRedisVirtualFile);
-                            addEditorToMap(connectionId, aRedisVirtualFile);
+                            KeyValueDisplayFileSystem.getInstance(project).openEditor(keyValueDisplayVirtualFile);
+                            addEditorToMap(connectionId, keyValueDisplayVirtualFile);
                         });
                     }
                     connectionTreeLoadingDecorator.stopLoading();
@@ -363,12 +363,12 @@ public class ConnectionManager {
     /**
      * 关闭tab时移除connection-editor
      */
-    public void removeEditor(String connectionId, ARedisVirtualFile virtualFile) {
-        CopyOnWriteArraySet<ARedisVirtualFile> aRedisVirtualFiles = connectionDbEditorMap.get(connectionId);
-        if (CollectionUtils.isEmpty(aRedisVirtualFiles)) {
+    public void removeEditor(String connectionId, KeyValueDisplayVirtualFile virtualFile) {
+        CopyOnWriteArraySet<KeyValueDisplayVirtualFile> keyValueDisplayVirtualFiles = connectionDbEditorMap.get(connectionId);
+        if (CollectionUtils.isEmpty(keyValueDisplayVirtualFiles)) {
             return;
         }
-        aRedisVirtualFiles.remove(virtualFile);
+        keyValueDisplayVirtualFiles.remove(virtualFile);
     }
 
     /**
@@ -377,17 +377,17 @@ public class ConnectionManager {
      * @param connectionId
      */
     private void closeAllEditor(String connectionId) {
-        CopyOnWriteArraySet<ARedisVirtualFile> aRedisVirtualFiles = connectionDbEditorMap.get(connectionId);
-        if (CollectionUtils.isEmpty(aRedisVirtualFiles)) {
+        CopyOnWriteArraySet<KeyValueDisplayVirtualFile> keyValueDisplayVirtualFiles = connectionDbEditorMap.get(connectionId);
+        if (CollectionUtils.isEmpty(keyValueDisplayVirtualFiles)) {
             return;
         }
 
-        Iterator<ARedisVirtualFile> iterator = aRedisVirtualFiles.iterator();
+        Iterator<KeyValueDisplayVirtualFile> iterator = keyValueDisplayVirtualFiles.iterator();
         while (iterator.hasNext()) {
-            ARedisVirtualFile aRedisVirtualFile = iterator.next();
+            KeyValueDisplayVirtualFile keyValueDisplayVirtualFile = iterator.next();
             // close editor
             FileEditorManager fileEditorManager = FileEditorManager.getInstance(project);
-            fileEditorManager.closeFile(aRedisVirtualFile);
+            fileEditorManager.closeFile(keyValueDisplayVirtualFile);
         }
 
         connectionDbEditorMap.remove(connectionId);
@@ -399,14 +399,14 @@ public class ConnectionManager {
      * @param connectionId
      * @param virtualFile
      */
-    private void addEditorToMap(String connectionId, ARedisVirtualFile virtualFile) {
-        CopyOnWriteArraySet<ARedisVirtualFile> aRedisVirtualFiles = connectionDbEditorMap.get(connectionId);
-        if (aRedisVirtualFiles == null) {
-            aRedisVirtualFiles = Sets.newCopyOnWriteArraySet();
-            aRedisVirtualFiles.add(virtualFile);
-            connectionDbEditorMap.put(connectionId, aRedisVirtualFiles);
+    private void addEditorToMap(String connectionId, KeyValueDisplayVirtualFile virtualFile) {
+        CopyOnWriteArraySet<KeyValueDisplayVirtualFile> keyValueDisplayVirtualFiles = connectionDbEditorMap.get(connectionId);
+        if (keyValueDisplayVirtualFiles == null) {
+            keyValueDisplayVirtualFiles = Sets.newCopyOnWriteArraySet();
+            keyValueDisplayVirtualFiles.add(virtualFile);
+            connectionDbEditorMap.put(connectionId, keyValueDisplayVirtualFiles);
         } else {
-            aRedisVirtualFiles.add(virtualFile);
+            keyValueDisplayVirtualFiles.add(virtualFile);
         }
     }
 
