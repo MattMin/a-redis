@@ -17,5 +17,15 @@
                     icon="AllIcons.Debugger.Db_db_object" anchor="right"/>
         <fileEditorProvider implementation="com.mzyupc.aredis.view.editor.KeyValueDisplayEditorProvider"/>
         <projectService serviceImplementation="com.mzyupc.aredis.view.editor.KeyValueDisplayFileSystem"/>
+
+        <fileEditorProvider implementation="com.mzyupc.aredis.view.editor.ConsoleEditorProvider"/>
+        <projectService serviceImplementation="com.mzyupc.aredis.view.editor.ConsoleFileSystem"/>
+
+        <fileType name="Redis Cmd" extensions="rcmd"
+                  implementationClass="com.mzyupc.aredis.view.language.RedisCmdLanguageFileType" language="REDIS_CMD"/>
     </extensions>
+
+    <extensionPoints>
+
+    </extensionPoints>
 </idea-plugin>

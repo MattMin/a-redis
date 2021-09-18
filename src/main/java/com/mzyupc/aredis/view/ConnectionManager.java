@@ -16,6 +16,8 @@ import com.mzyupc.aredis.utils.PropertyUtil;
 import com.mzyupc.aredis.utils.RedisPoolManager;
 import com.mzyupc.aredis.view.dialog.ConfirmDialog;
 import com.mzyupc.aredis.view.dialog.ConnectionSettingsDialog;
+import com.mzyupc.aredis.view.editor.ConsoleFileSystem;
+import com.mzyupc.aredis.view.editor.ConsoleVirtualFile;
 import com.mzyupc.aredis.view.editor.KeyValueDisplayFileSystem;
 import com.mzyupc.aredis.view.editor.KeyValueDisplayVirtualFile;
 import com.mzyupc.aredis.view.render.ConnectionTreeCellRenderer;
@@ -505,10 +507,25 @@ public class ConnectionManager {
         return duplicateAction;
     }
 
-    private ConsoleAction createConsoleAction() {
+    private ConsoleAction createConsoleAction(Tree connectionTree) {
         ConsoleAction consoleAction = new ConsoleAction();
         consoleAction.setAction(e -> {
+            TreePath selectionPath = connectionTree.getSelectionPath();
+            if (selectionPath == null || selectionPath.getPathCount() != 2) {
+                return;
+            }
+
+            DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) selectionPath.getPath()[1];
+            ConnectionInfo connectionInfo = (ConnectionInfo) connectionNode.getUserObject();
+
             // todo console
+            ConsoleVirtualFile consoleVirtualFile = new ConsoleVirtualFile(
+                    connectionInfo.getName(),
+                    project,
+                    connectionInfo,
+                    connectionRedisMap.get(connectionInfo.getId())
+            );
+            ConsoleFileSystem.getInstance(project).openEditor(consoleVirtualFile);
         });
         return consoleAction;
     }
@@ -553,9 +570,8 @@ public class ConnectionManager {
         actionGroup.add(createEditAction(connectionTree));
         actionGroup.add(createDuplicateAction(connectionTree));
         actionGroup.add(createDeleteAction(connectionTree));
-        // todo console 待实现
-//        actionGroup.addSeparator();
-//        actionGroup.add(createConsoleAction());
+        actionGroup.addSeparator();
+        actionGroup.add(createConsoleAction(connectionTree));
         actionGroup.addSeparator();
         actionGroup.add(createCloseAction(connectionTree, connectionTreeModel));
         ActionPopupMenu menu = ActionManager.getInstance().createActionPopupMenu(ActionPlaces.POPUP, actionGroup);
