@@ -4,8 +4,24 @@
     <vendor email="mzyupc@163.com" url="https://github.com/MattMin">MattMin</vendor>
 
     <description><![CDATA[
-    A simple and open source IDEA Redis plugin </br>
-    <a href="https://github.com/MattMin/a-redis">Github</a>
+    <div>
+        A simple and open source IDEA Redis plugin
+    </div>
+    <div style="white-space:normal; word-break:break-all; width:100%">
+        <ul>
+            <li>Convenient management of Redis connections</li>
+            <li>Display DB and number of keys</li>
+            <li>Filtering and grouping of keys</li>
+            <li>Support paging to display keys and value</li>
+            <li>Support adding, modifying and deleting keys and value</li>
+            <li>Support displaying String, List, Set, ZSet, Hash data formats</li>
+            <li>The value can be formatted as JSON, XML, HTML for display</li>
+        </ul>
+    </div>
+    <br>
+    If you have any suggestions, questions or bugs about this plugin,
+    please issue them on <a href="https://github.com/MattMin/a-redis">Github</a>,
+    and if you like this plugin, just click the star on <a href="https://github.com/MattMin/a-redis">Github</a> to show your support.
     ]]></description>
 
     <!-- please see https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html
