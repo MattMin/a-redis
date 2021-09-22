@@ -1,6 +1,6 @@
 <idea-plugin>
     <id>com.mzyupc.a-redis</id>
-    <name>A-Redis</name>
+    <name>Redis</name>
     <vendor email="mzyupc@163.com" url="https://github.com/MattMin">MattMin</vendor>
 
     <description><![CDATA[
