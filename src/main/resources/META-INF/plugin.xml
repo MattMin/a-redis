@@ -29,7 +29,7 @@
     <depends>com.intellij.modules.platform</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow factoryClass="com.mzyupc.aredis.factory.ARedisToolWindowFactory" id="A-Redis" secondary="false"
+        <toolWindow factoryClass="com.mzyupc.aredis.factory.ARedisToolWindowFactory" id="Redis" secondary="false"
                     icon="AllIcons.Debugger.Db_db_object" anchor="right"/>
         <fileEditorProvider implementation="com.mzyupc.aredis.view.editor.ARedisEditorProvider"/>
         <projectService serviceImplementation="com.mzyupc.aredis.view.editor.ARedisFileSystem"/>
