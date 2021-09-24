@@ -26,6 +26,7 @@ import com.mzyupc.aredis.vo.DbInfo;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.jetbrains.annotations.Nullable;
+import redis.clients.jedis.Jedis;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
@@ -517,6 +518,12 @@ public class ConnectionManager {
 
             DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) selectionPath.getPath()[1];
             ConnectionInfo connectionInfo = (ConnectionInfo) connectionNode.getUserObject();
+
+            RedisPoolManager redis = getConnectionRedisMap().get(connectionInfo.getId());
+            Jedis jedis = redis.getJedis(0);
+            if (jedis == null) {
+                return;
+            }
 
             // todo console
             ConsoleVirtualFile consoleVirtualFile = new ConsoleVirtualFile(

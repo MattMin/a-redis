@@ -34,7 +34,7 @@ public class ConsoleEditor extends UserDataHolderBase implements FileEditor {
 
     @Override
     public @Nullable JComponent getPreferredFocusedComponent() {
-        return null;
+        return consoleVirtualFile.getConsolePanel().getCmdTextArea();
     }
 
     @Override

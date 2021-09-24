@@ -21,8 +21,8 @@
         <fileEditorProvider implementation="com.mzyupc.aredis.view.editor.ConsoleEditorProvider"/>
         <projectService serviceImplementation="com.mzyupc.aredis.view.editor.ConsoleFileSystem"/>
 
-        <fileType name="Redis Cmd" extensions="rcmd"
-                  implementationClass="com.mzyupc.aredis.view.language.RedisCmdLanguageFileType" language="REDIS_CMD"/>
+<!--        <fileType name="Redis Cmd" extensions="rcmd"-->
+<!--                  implementationClass="com.mzyupc.aredis.view.language.RedisCmdLanguageFileType" language="REDIS_CMD"/>-->
     </extensions>
 
     <extensionPoints>

@@ -19,17 +19,12 @@ import java.util.*;
 
 /**
  * @author mzyupc@163.com
- *
+ * <p>
  * todo redis线程池回收
  */
 @Slf4j
 public class RedisPoolManager extends CloseTranscoder implements Disposable {
 
-    private String host;
-    private Integer port;
-    private String password;
-    private Integer db;
-    private JedisPool pool = null;
     private static JedisPoolConfig jedisPoolConfig;
 
     static {
@@ -52,11 +47,40 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
         jedisPoolConfig.setTestOnBorrow(true);
     }
 
+    private String host;
+    private Integer port;
+    private String password;
+    private Integer db;
+    private JedisPool pool = null;
+
     public RedisPoolManager(ConnectionInfo connectionInfo) {
         this.host = connectionInfo.getUrl();
         this.port = Integer.parseInt(connectionInfo.getPort());
         this.password = connectionInfo.getPassword();
         this.db = Protocol.DEFAULT_DATABASE;
+    }
+
+    public static TestConnectionResult getTestConnectionResult(String host, Integer port, String password) {
+        try (Pool<Jedis> pool = new JedisPool(jedisPoolConfig, host, port, Protocol.DEFAULT_TIMEOUT, password);
+             Jedis jedis = pool.getResource()) {
+            String pong = jedis.ping();
+            if ("PONG".equalsIgnoreCase(pong)) {
+                return TestConnectionResult.builder()
+                        .success(true)
+                        // todo
+                        .msg("Succeeded")
+                        .build();
+            }
+            return TestConnectionResult.builder()
+                    .success(false)
+                    .msg(pong)
+                    .build();
+        } catch (Exception e) {
+            return TestConnectionResult.builder()
+                    .success(false)
+                    .msg(e.getCause().getMessage())
+                    .build();
+        }
     }
 
     /**
@@ -85,44 +109,14 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
         return pool;
     }
 
-    public static TestConnectionResult getTestConnectionResult(String host, Integer port, String password) {
-        try (Pool<Jedis> pool = new JedisPool(jedisPoolConfig, host, port, Protocol.DEFAULT_TIMEOUT, password);
-             Jedis jedis = pool.getResource()) {
-            String pong = jedis.ping();
-            if ("PONG".equalsIgnoreCase(pong)) {
-                return TestConnectionResult.builder()
-                        .success(true)
-                        // todo
-                        .msg("Succeeded")
-                        .build();
-            }
-            return TestConnectionResult.builder()
-                    .success(false)
-                    .msg(pong)
-                    .build();
-        } catch (Exception e) {
-            return TestConnectionResult.builder()
-                    .success(false)
-                    .msg(e.getCause().getMessage())
-                    .build();
-        }
-    }
-
     @Override
     public void dispose() {
         this.invalidate();
     }
 
-    @Builder
-    @Getter
-    public static class TestConnectionResult {
-        private boolean success;
-
-        private String msg;
-    }
-
     /**
      * 执行redis命令
+     *
      * @param db
      * @param command
      * @param args
@@ -130,9 +124,9 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
      * @throws InvocationTargetException
      * @throws IllegalAccessException
      */
-    public List<String> execRedisCommand(int db, String command, String... args) throws InvocationTargetException, IllegalAccessException {
-        Protocol.Command cmd = Protocol.Command.valueOf(command.toUpperCase());
+    public List<String> execRedisCommand(int db, String command, String... args) {
         try (Jedis jedis = getJedis(db)) {
+            Protocol.Command cmd = Protocol.Command.valueOf(command.toUpperCase());
             Client client = jedis.getClient();
             Method method = MethodUtils.getMatchingMethod(Client.class, "sendCommand", Protocol.Command.class, String[].class);
             method.setAccessible(true);
@@ -140,18 +134,30 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
             try {
                 List<String> respList = new ArrayList<>();
                 Object response = client.getOne();
+                if (response == null) {
+                    return Collections.singletonList("null");
+                }
                 if (response instanceof List) {
                     for (Object itemResp : ((List) response)) {
-                        respList.add(new String((byte[]) itemResp));
+                        if (itemResp == null) {
+                            respList.add("null");
+                        } else {
+                            respList.add(new String((byte[]) itemResp));
+                        }
                     }
                     return respList;
-                } else {
-                    return Collections.singletonList(new String((byte[]) response));
                 }
 
+                if (response instanceof Long) {
+                    return Collections.singletonList(response + "");
+                }
+
+                return Collections.singletonList(new String((byte[]) response));
             } catch (JedisException e) {
                 return Collections.singletonList(e.getMessage());
             }
+        } catch (InvocationTargetException | IllegalAccessException | IllegalArgumentException e) {
+            return Collections.singletonList(e.getMessage());
         }
     }
 
@@ -165,7 +171,6 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
             ErrorDialog.show("Failed to initialize the Redis pool." + "\n" + e.getMessage());
         }
     }
-
 
     public int getDb() {
         return this.db == null ? Protocol.DEFAULT_DATABASE : this.db;
@@ -223,7 +228,6 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
         return null;
     }
 
-
     /**
      * 获取redis连接
      *
@@ -265,11 +269,9 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
         }
     }
 
-
     public String get(String key) {
         return get(key, getDb());
     }
-
 
     public String get(String key, int db) {
         Jedis jedis = null;
@@ -283,6 +285,7 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
 
     /**
      * 查询有多少个db
+     *
      * @return
      */
     public int getDbCount() {
@@ -313,7 +316,6 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
             close(jedis);
         }
     }
-
 
     /**
      * 获取对象
@@ -383,7 +385,6 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
         }
     }
 
-
     /**
      * 设置值
      *
@@ -422,7 +423,6 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
         }
     }
 
-
     /**
      * 改变缓存的时间
      *
@@ -449,7 +449,6 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
         }
 
     }
-
 
     public void del(String key) {
         del(key, getDb());
@@ -481,7 +480,6 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
 
     }
 
-
     /**
      * 加上指定值，如果 key 不存在，那么 key 的值会先被初始化为 0,在加 integer
      *
@@ -504,7 +502,6 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
             close(jedis);
         }
     }
-
 
     /**
      * 操作map结构 加上指定值，如果 key 不存在，那么 key 的值会先被初始化为 0,在加 integer
@@ -530,7 +527,6 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
         }
     }
 
-
     /**
      * 减去指定值，如果 key 不存在，那么 key 的值会先被初始化为 0,在减去 integer
      *
@@ -553,7 +549,6 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
             close(jedis);
         }
     }
-
 
     /**
      * 将值value关联到key，并设置缓存时间为seconds
@@ -579,7 +574,6 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
             close(jedis);
         }
     }
-
 
     /**
      * 当且仅当 key 不存在时才会set，如果key已存在不会覆盖
@@ -614,7 +608,6 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
             close(jedis);
         }
     }
-
 
     /**
      * 模糊匹配满足条件的key
@@ -651,7 +644,6 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
         return list;
     }
 
-
     /**
      * 设置hash值
      * value=键值对形式
@@ -676,7 +668,6 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
             close(jedis);
         }
     }
-
 
     /**
      * 一次性存储多个hash
@@ -769,7 +760,6 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
         }
     }
 
-
     /**
      * 获取hash元素中所有的field
      *
@@ -813,7 +803,6 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
             close(jedis);
         }
     }
-
 
     /**
      * 返回整个hash表元素,key和value
@@ -860,7 +849,6 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
             close(jedis);
         }
     }
-
 
     /**
      * 插入list，从队列<span style="color:red;font-size:18px;">前</span>插入
@@ -934,7 +922,6 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
         }
     }
 
-
     /**
      * 获取list中所有元素
      *
@@ -972,7 +959,6 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
             close(jedis);
         }
     }
-
 
     /**
      * 获取指定下标的值
@@ -1075,7 +1061,6 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
         }
     }
 
-
     /**
      * 移除头部第一个元素并返回
      *
@@ -1165,7 +1150,6 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
         }
     }
 
-
     /**
      * 获取指定key中的 集合的差集
      *
@@ -1233,7 +1217,6 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
         }
     }
 
-
     /**
      * 删除指定值
      *
@@ -1277,5 +1260,13 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
         } finally {
             close(jedis);
         }
+    }
+
+    @Builder
+    @Getter
+    public static class TestConnectionResult {
+        private boolean success;
+
+        private String msg;
     }
 }
