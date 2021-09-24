@@ -4,7 +4,7 @@ plugins {
 }
 
 group 'com.mzyupc'
-version 'beta-0.3.3'
+version 'beta-0.3.4'
 
 repositories {
     mavenCentral()
@@ -38,7 +38,7 @@ intellij {
 patchPluginXml {
     sinceBuild = '201.8743.12'
     changeNotes = """
-      beta-0.3.3</br>
+      beta-0.3.4</br>
       <ul>
       <li>update: add plugin description</li>
       </ul>
