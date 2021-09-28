@@ -2,6 +2,9 @@
 > A Simple IntelliJ-based Redis Plugin
 > 
 > 基于IntelliJ的Redis插件 / IDEA Redis插件
+> 
+> [IntelliJ IDEs Plugin Marketplace](https://plugins.jetbrains.com/plugin/17595-redis-helper)
+
 
 ## Function
 ### 1. Redis connection management
