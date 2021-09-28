@@ -45,13 +45,14 @@ public class ConsolePanel extends JPanel {
         executeResultPanel.add(executeResultScrollPane, BorderLayout.CENTER);
 
         cmdTextArea = new ConsoleCommandTextArea(resultArea, redisPoolManager);
-        JBScrollPane cmdScrollPane = new JBScrollPane(cmdTextArea);
-        JPanel cmdPanel = new JPanel(new BorderLayout());
-        cmdPanel.add(cmdScrollPane, BorderLayout.CENTER);
 
-        container = new JBSplitter(true,  0.8F);
+        JPanel cmdPanel = new JPanel(new BorderLayout());
+        cmdPanel.add(cmdTextArea);
+        JBScrollPane cmdScrollPane = new JBScrollPane(cmdPanel);
+
+        container = new JBSplitter(true,  0.6F);
         container.setDividerPositionStrategy(Splitter.DividerPositionStrategy.KEEP_FIRST_SIZE);
-        container.setFirstComponent(cmdPanel);
+        container.setFirstComponent(cmdScrollPane);
         container.setSecondComponent(executeResultPanel);
 
         this.add(container, BorderLayout.CENTER);

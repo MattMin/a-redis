@@ -1,5 +1,6 @@
 package com.mzyupc.aredis.utils;
 
+import com.alibaba.fastjson.JSON;
 import com.intellij.openapi.Disposable;
 import com.mzyupc.aredis.view.dialog.ErrorDialog;
 import com.mzyupc.aredis.vo.ConnectionInfo;
@@ -16,6 +17,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.charset.Charset;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * @author mzyupc@163.com
@@ -142,7 +144,15 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
                         if (itemResp == null) {
                             respList.add("null");
                         } else {
-                            respList.add(new String((byte[]) itemResp));
+                            if (itemResp instanceof List) {
+                                List<byte[]> itemList = (List<byte[]>) itemResp;
+                                List<String> strings = itemList.stream().map(String::new).collect(Collectors.toList());
+                                respList.add(String.join("\n", strings));
+                            } else if (itemResp instanceof byte[]) {
+                                respList.add(new String((byte[]) itemResp));
+                            } else {
+                                respList.add(JSON.toJSONString(itemResp));
+                            }
                         }
                     }
                     return respList;

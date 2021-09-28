@@ -19,6 +19,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.StringTokenizer;
+import java.util.stream.Collectors;
 
 /**
  * @author mzyupc@163.com
@@ -30,19 +31,22 @@ public class ConsoleCommandTextArea extends JTextPane {
     /**
      * 所有关键字
      */
-    private final static String[] KEYS = Arrays.stream(Protocol.Command.values()).map(item -> item.name().toLowerCase()).toArray(String[]::new);
+    private final static String[] KEYS;
+
+    static {
+        List<String> cmdList = Arrays.stream(Protocol.Command.values()).map(item -> item.name().toLowerCase()).collect(Collectors.toList());
+        List<String> keywordList = Arrays.stream(Protocol.Keyword.values()).map(item -> item.name().toLowerCase()).collect(Collectors.toList());
+        cmdList.addAll(keywordList);
+        KEYS = cmdList.toArray(new String[0]);
+    }
 
     private final MutableAttributeSet keyAttr;
     private final MutableAttributeSet normalAttr;
     private final MutableAttributeSet inputAttributes = new RTFEditorKit().getInputAttributes();
+    private final int fontSize = 14;
     protected StyleContext mContext;
     protected DefaultStyledDocument mDoc;
-
-    /**
-     * 是否实现行号，默认不显示
-     */
-    private boolean showLineNumber = false;
-    private int fontSize = 16;//默认为16号字体
+    private int db = 0;
 
     /**
      * 初始化，包括关键字颜色，和非关键字颜色
@@ -53,9 +57,7 @@ public class ConsoleCommandTextArea extends JTextPane {
         mDoc = new DefaultStyledDocument(mContext);
         this.setDocument(mDoc);
         this.setAutoscrolls(true);
-        this.setMargin(JBUI.insetsLeft(5));
-        this.setShowLineNumber(true);
-        this.setFontSize(14);
+        this.setMargin(JBUI.insetsLeft(20));
 
         ConsoleCommandTextArea ths = this;
         this.addKeyListener(new KeyAdapter() {
@@ -69,102 +71,51 @@ public class ConsoleCommandTextArea extends JTextPane {
                 dealSingleRow();
             }
         });
-        // 义关键字显示属性
+
+        // 关键字显示属性
         keyAttr = new SimpleAttributeSet();
-        StyleConstants.setForeground(keyAttr, JBColor.GREEN);
-        StyleConstants.setFontSize(keyAttr, 14);
+        StyleConstants.setForeground(keyAttr, new Color(19, 233, 208));
+        StyleConstants.setFontSize(keyAttr, this.fontSize);
         StyleConstants.setBold(keyAttr, false);
-        // 义一般文本显示属性
+
+        // 一般文本显示属性
         normalAttr = new SimpleAttributeSet();
         StyleConstants.setBold(normalAttr, false);
         StyleConstants.setForeground(normalAttr, JBColor.BLACK);
-        StyleConstants.setFontSize(normalAttr, 14);
+        StyleConstants.setFontSize(normalAttr, this.fontSize);
     }
 
     @Override
     public void paint(Graphics g) {
         super.paint(g);
-        StyleConstants.setFontSize(getInputAttributes(), getFontSize());
-        if (getShowLineNumber()) {
-            drawLineNumber(g);
-        }
+        StyleConstants.setFontSize(getInputAttributes(), this.fontSize);
+        drawLineStarter(g);
     }
 
-    public void setShowLineNumber(boolean isShow) {
-        this.showLineNumber = isShow;
-    }
-    public boolean getShowLineNumber() {
-        return this.showLineNumber;
-    }
-
-    protected void drawLineNumber(Graphics g) {
-        setMargin(new Insets(0, 35, 0, 0));
-        // 绘制行号的背景色
-        g.setColor(new Color(180, 180, 180));
-        g.fillRect(0, 0, 30, getHeight());
-        // 获得有多少行
-        StyledDocument docu = getStyledDocument();
-        Element element = docu.getDefaultRootElement();
+    /**
+     * 在每行前绘制'▶'
+     *
+     * @param g
+     */
+    protected void drawLineStarter(Graphics g) {
+        Element element = mDoc.getDefaultRootElement();
         int rows = element.getElementCount();
         // 绘制行号的颜色
-        //System.out.println("y:" + getY());
-        g.setColor(new Color(90, 90, 90));
-        g.setFont(new Font(getFont().getName(), getFont().getStyle(), 16));
+        g.setColor(JBColor.BLACK);
+        g.setFont(new Font(getFont().getName(), getFont().getStyle(), this.fontSize));
         for (int row = 0; row < rows; row++) {
-            g.drawString((row + 1)+"",2, getPositionY(row + 1));
+            g.drawString("▶", 2, getPositionY(row + 1));
         }
     }
-    public void setFontSize(int fontSize) {
-        if(fontSize!=12 &&
-                fontSize!=14 &&
-                fontSize!=16 &&
-                fontSize!=18 &&
-                fontSize!=20 &&
-                fontSize!=22 &&
-                fontSize!=24 ){
-            throw new RuntimeException("该行号不能识别");
-        }
-        this.fontSize = fontSize;
-    }
-    public int getFontSize() {
-        return fontSize;
-    }
-    /**
-     * 获得行号中y坐标的位置<br/>
-     * 在计算的过程中，有一个比率值，该比率值是根据getY()的返回值之差决定的。
-     * @param row 第几行
-     * @return 该行的y坐标位置
-     */
+
     private int getPositionY(int row) {
-        int y = 0;
-        switch (getFontSize()) {
-            case 12:
-                y = (row * 18) - 4;
-                break;
-            case 14:
-                y = (row * 20) - 5;
-                break;
-            case 16:
-                y = (row * 23) - 6;
-                break;
-            case 18:
-                y = (row * 26) - 8;
-                break;
-            case 20:
-                y = (row * 29) - 10;
-                break;
-            case 22:
-                y = (row * 31) - 11;
-                break;
-            case 24:
-                y = (row * 34) - 12;
-                break;
-        }
-        return y;
+        // 与fontSize有关
+        return (row * 17) - 4;
     }
 
     /**
      * 执行命令
+     *
      * @param ke
      * @param ths
      * @param redisPoolManager
@@ -188,10 +139,11 @@ public class ConsoleCommandTextArea extends JTextPane {
                 log.warn("", e);
             }
 
-            cmd = cmd.trim();
-            if (StringUtils.isEmpty(cmd)) {
+            if (StringUtils.isBlank(cmd)) {
                 return;
             }
+
+            cmd = cmd.trim();
             for (String subCmd : cmd.split(";")) {
                 subCmd = subCmd.trim();
                 if (StringUtils.isEmpty(subCmd)) {
@@ -199,15 +151,23 @@ public class ConsoleCommandTextArea extends JTextPane {
                 }
 
                 String[] split = subCmd.split("\\s");
-                List<String> result = redisPoolManager.execRedisCommand(0, split[0], Arrays.copyOfRange(split, 1, split.length));
+                List<String> result = redisPoolManager.execRedisCommand(db, split[0], Arrays.copyOfRange(split, 1, split.length));
                 String text = resultArea.getText();
-                text = text + String.format("\n%s  [%s]\n%s\n%s",
+                String currentLog = String.format("\n%s [%s] [%s]\n%s\n%s",
                         DateUtils.formatDate(new Date(), "yyyy-MM-dd HH:mm:ss"),
+                        "DB" + db,
                         subCmd,
                         String.join("\n", result),
                         "----------------------------------------------------"
                 );
+                text = text + currentLog;
                 resultArea.setText(text);
+
+                if ("select".equalsIgnoreCase(split[0])) {
+                    if (currentLog.contains("OK")) {
+                        db = Integer.parseInt(split[1]);
+                    }
+                }
             }
 
         }
@@ -218,24 +178,22 @@ public class ConsoleCommandTextArea extends JTextPane {
      *
      * @param key
      * @param start
-     * @param length
      * @return
      */
-    private int setKeyColor(String key, int start, int length) {
-        for (int i = 0; i < KEYS.length; i++) {
-            int indexOf = key.indexOf(KEYS[i]);
+    private void setKeyColor(String key, int start) {
+        for (String s : KEYS) {
+            int indexOf = key.indexOf(s);
             if (indexOf < 0) {
                 continue;
             }
-            int liLegnth = indexOf + KEYS[i].length();
+            int liLegnth = indexOf + s.length();
             if (liLegnth == key.length()) {
                 //处理单独一个关键字的情况，例如：if else 等
                 if (indexOf == 0) {
-                    mDoc.setCharacterAttributes(start, KEYS[i].length(), keyAttr, true);
+                    mDoc.setCharacterAttributes(start, s.length(), keyAttr, true);
                 }
             }
         }
-        return length + 1;
     }
 
     /**
@@ -264,7 +222,7 @@ public class ConsoleCommandTextArea extends JTextPane {
                 return;
             }
             xStart = st.getCurrPosition();
-            setKeyColor(s.toLowerCase(), start + xStart, s.length());
+            setKeyColor(s.toLowerCase(), start + xStart);
         }
         inputAttributes.addAttributes(normalAttr);
     }
