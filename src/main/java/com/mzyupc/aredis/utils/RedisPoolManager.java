@@ -10,7 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import redis.clients.jedis.*;
 import redis.clients.jedis.exceptions.JedisException;
-import redis.clients.util.Pool;
+import redis.clients.jedis.util.Pool;
 
 import java.io.*;
 import java.lang.reflect.InvocationTargetException;
@@ -644,7 +644,7 @@ public class RedisPoolManager extends CloseTranscoder implements Disposable {
             do {
                 ScanResult<String> scanResult = jedis.scan(cursor, scanParams);
                 list.addAll(scanResult.getResult());
-                cursor = scanResult.getStringCursor();
+                cursor = scanResult.getCursor();
             } while (!"0".equals(cursor));
         } catch (Exception e) {
             throw new IllegalArgumentException(e);

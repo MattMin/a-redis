@@ -174,7 +174,7 @@ public class ValueDisplayPanel extends JPanel {
                         total = jedis.scard(key);
                         String setPointer = pageIndexPointerMap.get(pageIndex);
                         ScanResult<String> sscanResult = jedis.sscan(key, setPointer, scanParams);
-                        pageIndexPointerMap.put(pageIndex + 1, sscanResult.getStringCursor());
+                        pageIndexPointerMap.put(pageIndex + 1, sscanResult.getCursor());
                         value = new Value(sscanResult.getResult());
                         break;
 
@@ -183,7 +183,7 @@ public class ValueDisplayPanel extends JPanel {
                         total = jedis.zcard(key);
                         String zsetPointer = pageIndexPointerMap.get(pageIndex);
                         ScanResult<Tuple> zscanResult = jedis.zscan(key, zsetPointer, scanParams);
-                        pageIndexPointerMap.put(pageIndex + 1, zscanResult.getStringCursor());
+                        pageIndexPointerMap.put(pageIndex + 1, zscanResult.getCursor());
                         value = new Value(zscanResult.getResult());
                         break;
 
@@ -192,7 +192,7 @@ public class ValueDisplayPanel extends JPanel {
                         total = jedis.hlen(key);
                         String hashPointer = pageIndexPointerMap.get(pageIndex);
                         ScanResult<Map.Entry<String, String>> hscanResult = jedis.hscan(key, hashPointer, scanParams);
-                        pageIndexPointerMap.put(pageIndex + 1, hscanResult.getStringCursor());
+                        pageIndexPointerMap.put(pageIndex + 1, hscanResult.getCursor());
                         value = new Value(hscanResult.getResult());
                         break;
 
