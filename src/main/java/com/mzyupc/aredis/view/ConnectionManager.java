@@ -519,10 +519,12 @@ public class ConnectionManager {
             DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) selectionPath.getPath()[1];
             ConnectionInfo connectionInfo = (ConnectionInfo) connectionNode.getUserObject();
 
+            // test connection
             RedisPoolManager redis = getConnectionRedisMap().get(connectionInfo.getId());
-            Jedis jedis = redis.getJedis(0);
-            if (jedis == null) {
-                return;
+            try (Jedis jedis = redis.getJedis(0)) {
+                if (jedis == null) {
+                    return;
+                }
             }
 
             // todo console
