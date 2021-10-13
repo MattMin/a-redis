@@ -215,12 +215,11 @@ public class ConsoleCommandTextArea extends JTextPane {
                 arg.append(" ").append(s);
                 continue;
             }
-
             result.add(s);
         }
-
         return result.toArray(new String[0]);
     }
+
     /**
      * 设置关键字颜色
      *
