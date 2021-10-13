@@ -5,6 +5,7 @@ import com.intellij.ui.components.JBTextArea;
 import com.intellij.util.ui.JBUI;
 import com.mzyupc.aredis.utils.RedisPoolManager;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.compress.utils.Lists;
 import org.apache.commons.lang.StringUtils;
 import org.apache.http.client.utils.DateUtils;
 import redis.clients.jedis.Protocol;
@@ -151,7 +152,7 @@ public class ConsoleCommandTextArea extends JTextPane {
                 }
 
                 String[] split = subCmd.split("\\s");
-                List<String> result = redisPoolManager.execRedisCommand(db, split[0], Arrays.copyOfRange(split, 1, split.length));
+                List<String> result = redisPoolManager.execRedisCommand(db, split[0], assembleArgs(split));
                 String text = resultArea.getText();
                 String currentLog = String.format("\n%s [%s] [%s]\n%s\n%s",
                         DateUtils.formatDate(new Date(), "yyyy-MM-dd HH:mm:ss"),
@@ -173,6 +174,53 @@ public class ConsoleCommandTextArea extends JTextPane {
         }
     }
 
+    private String[] assembleArgs(String[] split) {
+        List<String> result = Lists.newArrayList();
+        boolean inString = false;
+        boolean doubleQuote = false;
+        StringBuilder arg = new StringBuilder();
+        for (int i = 1; i < split.length; i++) {
+            String s = split[i];
+            if (s.matches("^[\"'].*[\"']$")) {
+                result.add(s.replaceAll("[\"']", ""));
+                continue;
+            }
+            if (s.startsWith("\"") && !inString) {
+                arg.append(" ").append(s.replace("\"", ""));
+                inString = true;
+                doubleQuote = true;
+                continue;
+            }
+            if (s.startsWith("'") && !inString) {
+                arg.append(" ").append(s.replace("'", ""));
+                inString = true;
+                doubleQuote = false;
+                continue;
+            }
+            if (s.endsWith("\"") && inString && doubleQuote) {
+                arg.append(" ").append(s.replace("\"", ""));
+                inString = false;
+                result.add(arg.toString());
+                arg = new StringBuilder();
+                continue;
+            }
+            if (s.endsWith("'") && inString && !doubleQuote) {
+                arg.append(" ").append(s.replace("'", ""));
+                inString = false;
+                result.add(arg.toString());
+                arg = new StringBuilder();
+                continue;
+            }
+            if (inString) {
+                arg.append(" ").append(s);
+                continue;
+            }
+
+            result.add(s);
+        }
+
+        return result.toArray(new String[0]);
+    }
     /**
      * 设置关键字颜色
      *
