@@ -95,14 +95,21 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
     }
 
     private void initKeyTreePanel() {
-        this.keyTreeDisplayPanel = new KeyTreeDisplayPanel(
-                project,
-                this,
-                splitterContainer,
-                dbInfo,
-                redisPoolManager,
-                this::renderValueDisplayPanel);
-        keyTreeDisplayPanel.renderKeyTree(this.getKeyFilter(), this.getGroupSymbol());
+        try {
+            this.keyTreeDisplayPanel = new KeyTreeDisplayPanel(
+                    project,
+                    this,
+                    splitterContainer,
+                    dbInfo,
+                    redisPoolManager,
+                    this::renderValueDisplayPanel);
+            keyTreeDisplayPanel.renderKeyTree(this.getKeyFilter(), this.getGroupSymbol());
+        } catch (RuntimeException e) {
+            if ("exception occurred".equals(e.getMessage())) {
+                return;
+            }
+            throw e;
+        }
     }
 
     /**

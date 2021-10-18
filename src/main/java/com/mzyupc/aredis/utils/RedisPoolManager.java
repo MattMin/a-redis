@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import redis.clients.jedis.*;
+import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.jedis.util.Pool;
 
@@ -18,6 +19,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -186,7 +188,8 @@ public class RedisPoolManager implements Disposable {
             return resource;
         } catch (Exception e) {
             log.warn("Failed to get resource from the pool", e);
-            ErrorDialog.show(e.getCause().getMessage());
+            String message = Objects.requireNonNullElse(e.getCause(), e).getMessage();
+            ErrorDialog.show(message);
         }
         return null;
     }
@@ -201,7 +204,15 @@ public class RedisPoolManager implements Disposable {
             if (jedis == null) {
                 return 0;
             }
-            return Integer.parseInt(jedis.configGet("databases").get(1));
+
+            int count = 0;
+            while(true) {
+                try {
+                    jedis.select(count++);
+                } catch (JedisDataException jedisDataException) {
+                    return count - 1;
+                }
+            }
         } catch (NullPointerException e) {
             log.warn("", e);
             return 0;
@@ -268,7 +279,7 @@ public class RedisPoolManager implements Disposable {
         List<String> list = new ArrayList<>();
         try (Jedis jedis = getJedis(db)) {
             if (jedis == null) {
-                return list;
+                return null;
             }
             ScanParams scanParams = new ScanParams();
             scanParams.count(count);

@@ -468,8 +468,8 @@ public class ConnectionManager {
                 DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) selectionPath.getPath()[1];
                 ApplicationManager.getApplication().invokeLater(() -> {
                     addDbs2Connection(connectionNode);
+                    connectionTreeModel.reload(connectionNode);
                 });
-                connectionTreeModel.reload(connectionNode);
             }
             connectionTreeLoadingDecorator.stopLoading();
         });
