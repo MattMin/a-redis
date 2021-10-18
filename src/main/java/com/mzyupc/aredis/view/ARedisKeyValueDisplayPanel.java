@@ -140,7 +140,7 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
         });
 
         JPanel searchBoxPanel = new JPanel();
-        searchBoxPanel.add(new Label("Filter:"));
+        searchBoxPanel.add(new JLabel("Filter:"));
         searchBoxPanel.add(searchTextField);
         return searchBoxPanel;
     }
@@ -171,14 +171,12 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
                     // 根据输入的key, 重新渲染keyTree
                     keyTreeDisplayPanel.updateKeyTree(getGroupSymbol());
                 }
-
                 // 保存groupSymbol
                 propertyUtil.saveGroupSymbol(dbInfo, getGroupSymbol());
-
             }
         });
 
-        groupByPanel.add(new Label("Group by:"));
+        groupByPanel.add(new JLabel("Group by:"));
         groupByPanel.add(groupText);
         return groupByPanel;
     }

@@ -529,7 +529,7 @@ public class ConnectionManager {
 
             // todo console
             ConsoleVirtualFile consoleVirtualFile = new ConsoleVirtualFile(
-                    connectionInfo.getName(),
+                    connectionInfo.getName() + "-Console",
                     project,
                     connectionInfo,
                     connectionRedisMap.get(connectionInfo.getId())

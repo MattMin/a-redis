@@ -58,7 +58,7 @@ public class ConsoleCommandTextArea extends JTextPane {
         mDoc = new DefaultStyledDocument(mContext);
         this.setDocument(mDoc);
         this.setAutoscrolls(true);
-        this.setMargin(JBUI.insetsLeft(20));
+        this.setMargin(JBUI.insetsLeft(15));
 
         ConsoleCommandTextArea ths = this;
         this.addKeyListener(new KeyAdapter() {
@@ -75,7 +75,7 @@ public class ConsoleCommandTextArea extends JTextPane {
 
         // 关键字显示属性
         keyAttr = new SimpleAttributeSet();
-        StyleConstants.setForeground(keyAttr, new Color(19, 233, 208));
+        StyleConstants.setForeground(keyAttr, new Color(49, 140, 175));
         StyleConstants.setFontSize(keyAttr, this.fontSize);
         StyleConstants.setBold(keyAttr, false);
 
@@ -94,7 +94,7 @@ public class ConsoleCommandTextArea extends JTextPane {
     }
 
     /**
-     * 在每行前绘制'▶'
+     * 在每行前绘制'>'
      *
      * @param g
      */
@@ -105,7 +105,7 @@ public class ConsoleCommandTextArea extends JTextPane {
         g.setColor(JBColor.BLACK);
         g.setFont(new Font(getFont().getName(), getFont().getStyle(), this.fontSize));
         for (int row = 0; row < rows; row++) {
-            g.drawString("▶", 2, getPositionY(row + 1));
+            g.drawString(">", 2, getPositionY(row + 1));
         }
     }
 
@@ -154,13 +154,7 @@ public class ConsoleCommandTextArea extends JTextPane {
                 String[] split = subCmd.split("\\s");
                 List<String> result = redisPoolManager.execRedisCommand(db, split[0], assembleArgs(split));
                 String text = resultArea.getText();
-                String currentLog = String.format("\n%s [%s] [%s]\n%s\n%s",
-                        DateUtils.formatDate(new Date(), "yyyy-MM-dd HH:mm:ss"),
-                        "DB" + db,
-                        subCmd,
-                        String.join("\n", result),
-                        "----------------------------------------------------"
-                );
+                String currentLog = formatLog(subCmd, result);
                 text = text + currentLog;
                 resultArea.setText(text);
 
@@ -170,8 +164,18 @@ public class ConsoleCommandTextArea extends JTextPane {
                     }
                 }
             }
-
         }
+    }
+
+    private String formatLog(String subCmd, List<String> result) {
+        String currentLog = String.format("\n%s [%s] [%s]\n%s\n%s",
+                DateUtils.formatDate(new Date(), "yyyy-MM-dd HH:mm:ss"),
+                "DB" + db,
+                subCmd,
+                String.join("\n", result),
+                "----------------------------------------------------"
+        );
+        return currentLog;
     }
 
     private String[] assembleArgs(String[] split) {
