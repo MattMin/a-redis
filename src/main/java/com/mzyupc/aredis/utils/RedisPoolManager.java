@@ -1,6 +1,7 @@
 package com.mzyupc.aredis.utils;
 
 import com.alibaba.fastjson.JSON;
+import com.google.common.collect.Lists;
 import com.intellij.openapi.Disposable;
 import com.mzyupc.aredis.view.dialog.ErrorDialog;
 import com.mzyupc.aredis.vo.ConnectionInfo;
@@ -123,9 +124,14 @@ public class RedisPoolManager implements Disposable {
     public List<String> execRedisCommand(int db, String command, String... args) {
         try (Jedis jedis = getJedis(db)) {
             Protocol.Command cmd = Protocol.Command.valueOf(command.toUpperCase());
+            if (jedis == null) {
+                return Lists.newArrayList();
+            }
+
             Client client = jedis.getClient();
             Method method = MethodUtils.getMatchingMethod(Client.class, "sendCommand", Protocol.Command.class, String[].class);
             method.setAccessible(true);
+//            processArgs(cmd, args);
             method.invoke(client, cmd, args);
             try {
                 List<String> respList = new ArrayList<>();
@@ -156,13 +162,75 @@ public class RedisPoolManager implements Disposable {
                     return Collections.singletonList(response + "");
                 }
 
+                if (cmd == Protocol.Command.DUMP) {
+                   return Collections.singletonList(getPrintableString((byte[]) response));
+                }
+
                 return Collections.singletonList(new String((byte[]) response));
+
             } catch (JedisException e) {
                 return Collections.singletonList(e.getMessage());
             }
         } catch (InvocationTargetException | IllegalAccessException | IllegalArgumentException e) {
             return Collections.singletonList(e.getMessage());
         }
+    }
+
+    /**
+     * 如果是restore命令, 需要处理传入参数
+     * @param cmd
+     * @param args
+     */
+    private void processArgs(Protocol.Command cmd, String[] args) {
+        if (cmd == Protocol.Command.RESTORE) {
+            for (int i = 0; i < args.length; i++) {
+                String arg = args[i];
+                if (arg.startsWith("\\x")) {
+                    byte[] processedArg = getRestoreBytes(arg);
+                    args[i] = new String(processedArg);
+                }
+            }
+        }
+    }
+
+    private String getPrintableString(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            // printable ascii characters
+            if (b > 31 && b < 127) {
+                sb.append((char)b);
+            } else {
+                sb.append(String.format("\\x%02x", (int)b & 0xff));
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * todo 将restore命令字符串参数解析为byte[]
+     * @param dump
+     * @return
+     */
+    private byte[] getRestoreBytes(String dump) {
+        List<Byte> result = com.google.common.collect.Lists.newArrayList();
+
+        while (dump.length() >= 1) {
+            if (dump.startsWith("\\x")) {
+                result.add((byte)(0xff & Byte.parseByte(dump.substring(2, 4), 16)));
+                dump = dump.substring(4);
+            } else {
+                result.add((byte)dump.charAt(0));
+                if (dump.length() == 1) {
+                    break;
+                }
+                dump = dump.substring(1);
+            }
+        }
+        byte[] bytes = new byte[result.size()];
+        for (int i = 0; i < result.size(); i++) {
+            bytes[i] = result.get(i);
+        }
+        return bytes;
     }
 
     private void initPool() {
@@ -210,6 +278,8 @@ public class RedisPoolManager implements Disposable {
                 try {
                     jedis.select(count++);
                 } catch (JedisDataException jedisDataException) {
+                    // reset
+                    jedis.select(Protocol.DEFAULT_DATABASE);
                     return count - 1;
                 }
             }

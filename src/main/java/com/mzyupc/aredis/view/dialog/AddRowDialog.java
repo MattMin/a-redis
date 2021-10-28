@@ -19,8 +19,8 @@ import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.util.function.Consumer;
 
-import static com.mzyupc.aredis.view.ValueTextAreaManager.createValueTextArea;
-import static com.mzyupc.aredis.view.ValueTextAreaManager.formatValue;
+import static com.mzyupc.aredis.view.textfield.EditorTextFieldManager.createEditorTextField;
+import static com.mzyupc.aredis.view.textfield.EditorTextFieldManager.formatValue;
 
 /**
  * @author mzyupc@163.com
@@ -135,7 +135,7 @@ public class AddRowDialog extends DialogWrapper {
      */
     @NotNull
     private JPanel createSimpleValuePanel() {
-        valueTextArea = createValueTextArea(project, PlainTextLanguage.INSTANCE, "");
+        valueTextArea = createEditorTextField(project, PlainTextLanguage.INSTANCE, "");
         JPanel stringTypePanel = new JPanel(new BorderLayout());
         JComboBox<ValueFormatEnum> newKeyValueFormatEnumJComboBox = new JComboBox<>(ValueFormatEnum.values());
         newKeyValueFormatEnumJComboBox.addItemListener(new ItemListener() {

@@ -49,8 +49,8 @@ import java.util.List;
 import java.util.Map;
 
 import static com.intellij.openapi.ui.DialogWrapper.OK_EXIT_CODE;
-import static com.mzyupc.aredis.view.ValueTextAreaManager.createValueTextArea;
-import static com.mzyupc.aredis.view.ValueTextAreaManager.formatValue;
+import static com.mzyupc.aredis.view.textfield.EditorTextFieldManager.createEditorTextField;
+import static com.mzyupc.aredis.view.textfield.EditorTextFieldManager.formatValue;
 import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
 
 /**
@@ -409,7 +409,7 @@ public class ValueDisplayPanel extends JPanel {
         fieldTextArea.setLineWrap(true);
         fieldTextArea.setAutoscrolls(true);
 
-        valueTextArea = createValueTextArea(project, PlainTextLanguage.INSTANCE, "");
+        valueTextArea = createEditorTextField(project, PlainTextLanguage.INSTANCE, "");
 
         JPanel viewAsAndSavePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         viewAsAndSavePanel.add(new JLabel("View as:"));

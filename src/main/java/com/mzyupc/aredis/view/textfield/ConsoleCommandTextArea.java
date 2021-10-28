@@ -145,23 +145,20 @@ public class ConsoleCommandTextArea extends JTextPane {
             }
 
             cmd = cmd.trim();
-            for (String subCmd : cmd.split(";")) {
-                subCmd = subCmd.trim();
-                if (StringUtils.isEmpty(subCmd)) {
-                    continue;
-                }
+            if (StringUtils.isEmpty(cmd)) {
+                return;
+            }
 
-                String[] split = subCmd.split("\\s");
-                List<String> result = redisPoolManager.execRedisCommand(db, split[0], assembleArgs(split));
-                String text = resultArea.getText();
-                String currentLog = formatLog(subCmd, result);
-                text = text + currentLog;
-                resultArea.setText(text);
+            String[] split = cmd.split("\\s");
+            List<String> result = redisPoolManager.execRedisCommand(db, split[0], assembleArgs(split));
+            String text = resultArea.getText();
+            String currentLog = formatLog(cmd, result);
+            text = text + currentLog;
+            resultArea.setText(text);
 
-                if ("select".equalsIgnoreCase(split[0])) {
-                    if (currentLog.contains("OK")) {
-                        db = Integer.parseInt(split[1]);
-                    }
+            if ("select".equalsIgnoreCase(split[0])) {
+                if (currentLog.contains("OK")) {
+                    db = Integer.parseInt(split[1]);
                 }
             }
         }
@@ -189,34 +186,38 @@ public class ConsoleCommandTextArea extends JTextPane {
                 result.add(s.replaceAll("[\"']", ""));
                 continue;
             }
+            if (!StringUtils.isEmpty(arg.toString())) {
+                arg.append(" ");
+            }
+
             if (s.startsWith("\"") && !inString) {
-                arg.append(" ").append(s.replace("\"", ""));
+                arg.append(s.replace("\"", ""));
                 inString = true;
                 doubleQuote = true;
                 continue;
             }
             if (s.startsWith("'") && !inString) {
-                arg.append(" ").append(s.replace("'", ""));
+                arg.append(s.replace("'", ""));
                 inString = true;
                 doubleQuote = false;
                 continue;
             }
             if (s.endsWith("\"") && inString && doubleQuote) {
-                arg.append(" ").append(s.replace("\"", ""));
+                arg.append(s.replace("\"", ""));
                 inString = false;
                 result.add(arg.toString());
                 arg = new StringBuilder();
                 continue;
             }
             if (s.endsWith("'") && inString && !doubleQuote) {
-                arg.append(" ").append(s.replace("'", ""));
+                arg.append(s.replace("'", ""));
                 inString = false;
                 result.add(arg.toString());
                 arg = new StringBuilder();
                 continue;
             }
             if (inString) {
-                arg.append(" ").append(s);
+                arg.append(s);
                 continue;
             }
             result.add(s);
