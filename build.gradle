@@ -4,7 +4,7 @@ plugins {
 }
 
 group 'com.mzyupc'
-version 'beta-0.3'
+version 'beta-0.5.0'
 
 repositories {
     mavenCentral()
@@ -39,6 +39,17 @@ intellij {
 patchPluginXml {
     sinceBuild = '201.8743.12'
     changeNotes = """
+      beta-0.5.0</br>
+      <ul>
+      <li>new: redis console(The 'RESTORE' command and blocking commands such as 'SUBSCRIBE' are not supported)</li>
+      <li>fix: reload connection bug</li>
+      <li>update: query the number of DBs without using the 'CONFIG GET' command</li>
+      <li>update: replace Label with Jlabel</li>
+      </ul>
+      beta-0.3.4</br>
+      <ul>
+      <li>update: add plugin description</li>
+      </ul>
       beta-0.3</br>
       <ul>
       <li>update: value格式化</li>
