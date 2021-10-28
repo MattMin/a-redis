@@ -8,7 +8,7 @@
   - reload
   - edit
   - duplicate
-  - console
+  - console (The 'RESTORE' command and blocking commands such as 'SUBSCRIBE' are not supported)
   - close
   - view the number of keys in DB and DB
 
