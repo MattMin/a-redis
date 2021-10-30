@@ -95,14 +95,21 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
     }
 
     private void initKeyTreePanel() {
-        this.keyTreeDisplayPanel = new KeyTreeDisplayPanel(
-                project,
-                this,
-                splitterContainer,
-                dbInfo,
-                redisPoolManager,
-                this::renderValueDisplayPanel);
-        keyTreeDisplayPanel.renderKeyTree(this.getKeyFilter(), this.getGroupSymbol());
+        try {
+            this.keyTreeDisplayPanel = new KeyTreeDisplayPanel(
+                    project,
+                    this,
+                    splitterContainer,
+                    dbInfo,
+                    redisPoolManager,
+                    this::renderValueDisplayPanel);
+            keyTreeDisplayPanel.renderKeyTree(this.getKeyFilter(), this.getGroupSymbol());
+        } catch (RuntimeException e) {
+            if ("exception occurred".equals(e.getMessage())) {
+                return;
+            }
+            throw e;
+        }
     }
 
     /**
@@ -140,7 +147,7 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
         });
 
         JPanel searchBoxPanel = new JPanel();
-        searchBoxPanel.add(new Label("Filter:"));
+        searchBoxPanel.add(new JLabel("Filter:"));
         searchBoxPanel.add(searchTextField);
         return searchBoxPanel;
     }
@@ -171,14 +178,12 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
                     // 根据输入的key, 重新渲染keyTree
                     keyTreeDisplayPanel.updateKeyTree(getGroupSymbol());
                 }
-
                 // 保存groupSymbol
                 propertyUtil.saveGroupSymbol(dbInfo, getGroupSymbol());
-
             }
         });
 
-        groupByPanel.add(new Label("Group by:"));
+        groupByPanel.add(new JLabel("Group by:"));
         groupByPanel.add(groupText);
         return groupByPanel;
     }

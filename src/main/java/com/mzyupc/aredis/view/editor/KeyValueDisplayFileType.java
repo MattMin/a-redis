@@ -12,7 +12,7 @@ import javax.swing.*;
 /**
  * @author mzyupc@163.com
  */
-public class ARedisFileType implements FileType {
+public class KeyValueDisplayFileType implements FileType {
     @Override
     public @NonNls
     @NotNull

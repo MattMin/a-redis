@@ -16,14 +16,17 @@ import com.mzyupc.aredis.utils.PropertyUtil;
 import com.mzyupc.aredis.utils.RedisPoolManager;
 import com.mzyupc.aredis.view.dialog.ConfirmDialog;
 import com.mzyupc.aredis.view.dialog.ConnectionSettingsDialog;
-import com.mzyupc.aredis.view.editor.ARedisFileSystem;
-import com.mzyupc.aredis.view.editor.ARedisVirtualFile;
+import com.mzyupc.aredis.view.editor.ConsoleFileSystem;
+import com.mzyupc.aredis.view.editor.ConsoleVirtualFile;
+import com.mzyupc.aredis.view.editor.KeyValueDisplayFileSystem;
+import com.mzyupc.aredis.view.editor.KeyValueDisplayVirtualFile;
 import com.mzyupc.aredis.view.render.ConnectionTreeCellRenderer;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import com.mzyupc.aredis.vo.DbInfo;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.jetbrains.annotations.Nullable;
+import redis.clients.jedis.Jedis;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
@@ -54,7 +57,7 @@ public class ConnectionManager {
     /**
      * connectionId-editor
      */
-    private Map<String, CopyOnWriteArraySet<ARedisVirtualFile>> connectionDbEditorMap = new HashMap<>();
+    private Map<String, CopyOnWriteArraySet<KeyValueDisplayVirtualFile>> connectionDbEditorMap = new HashMap<>();
 
     private DefaultMutableTreeNode connectionTreeRoot = new DefaultMutableTreeNode();
 
@@ -141,14 +144,14 @@ public class ConnectionManager {
 
                         ApplicationManager.getApplication().invokeLater(() -> {
                             String connectionId = connectionInfo.getId();
-                            ARedisVirtualFile aRedisVirtualFile = new ARedisVirtualFile(connectionInfo.getName() + "-DB" + dbInfo.getIndex(),
+                            KeyValueDisplayVirtualFile keyValueDisplayVirtualFile = new KeyValueDisplayVirtualFile(connectionInfo.getName() + "-DB" + dbInfo.getIndex(),
                                     project,
                                     connectionInfo,
                                     dbInfo,
                                     connectionRedisMap.get(connectionId),
                                     connectionManager);
-                            ARedisFileSystem.getInstance(project).openEditor(aRedisVirtualFile);
-                            addEditorToMap(connectionId, aRedisVirtualFile);
+                            KeyValueDisplayFileSystem.getInstance(project).openEditor(keyValueDisplayVirtualFile);
+                            addEditorToMap(connectionId, keyValueDisplayVirtualFile);
                         });
                     }
                     connectionTreeLoadingDecorator.stopLoading();
@@ -363,12 +366,12 @@ public class ConnectionManager {
     /**
      * 关闭tab时移除connection-editor
      */
-    public void removeEditor(String connectionId, ARedisVirtualFile virtualFile) {
-        CopyOnWriteArraySet<ARedisVirtualFile> aRedisVirtualFiles = connectionDbEditorMap.get(connectionId);
-        if (CollectionUtils.isEmpty(aRedisVirtualFiles)) {
+    public void removeEditor(String connectionId, KeyValueDisplayVirtualFile virtualFile) {
+        CopyOnWriteArraySet<KeyValueDisplayVirtualFile> keyValueDisplayVirtualFiles = connectionDbEditorMap.get(connectionId);
+        if (CollectionUtils.isEmpty(keyValueDisplayVirtualFiles)) {
             return;
         }
-        aRedisVirtualFiles.remove(virtualFile);
+        keyValueDisplayVirtualFiles.remove(virtualFile);
     }
 
     /**
@@ -377,17 +380,17 @@ public class ConnectionManager {
      * @param connectionId
      */
     private void closeAllEditor(String connectionId) {
-        CopyOnWriteArraySet<ARedisVirtualFile> aRedisVirtualFiles = connectionDbEditorMap.get(connectionId);
-        if (CollectionUtils.isEmpty(aRedisVirtualFiles)) {
+        CopyOnWriteArraySet<KeyValueDisplayVirtualFile> keyValueDisplayVirtualFiles = connectionDbEditorMap.get(connectionId);
+        if (CollectionUtils.isEmpty(keyValueDisplayVirtualFiles)) {
             return;
         }
 
-        Iterator<ARedisVirtualFile> iterator = aRedisVirtualFiles.iterator();
+        Iterator<KeyValueDisplayVirtualFile> iterator = keyValueDisplayVirtualFiles.iterator();
         while (iterator.hasNext()) {
-            ARedisVirtualFile aRedisVirtualFile = iterator.next();
+            KeyValueDisplayVirtualFile keyValueDisplayVirtualFile = iterator.next();
             // close editor
             FileEditorManager fileEditorManager = FileEditorManager.getInstance(project);
-            fileEditorManager.closeFile(aRedisVirtualFile);
+            fileEditorManager.closeFile(keyValueDisplayVirtualFile);
         }
 
         connectionDbEditorMap.remove(connectionId);
@@ -399,14 +402,14 @@ public class ConnectionManager {
      * @param connectionId
      * @param virtualFile
      */
-    private void addEditorToMap(String connectionId, ARedisVirtualFile virtualFile) {
-        CopyOnWriteArraySet<ARedisVirtualFile> aRedisVirtualFiles = connectionDbEditorMap.get(connectionId);
-        if (aRedisVirtualFiles == null) {
-            aRedisVirtualFiles = Sets.newCopyOnWriteArraySet();
-            aRedisVirtualFiles.add(virtualFile);
-            connectionDbEditorMap.put(connectionId, aRedisVirtualFiles);
+    private void addEditorToMap(String connectionId, KeyValueDisplayVirtualFile virtualFile) {
+        CopyOnWriteArraySet<KeyValueDisplayVirtualFile> keyValueDisplayVirtualFiles = connectionDbEditorMap.get(connectionId);
+        if (keyValueDisplayVirtualFiles == null) {
+            keyValueDisplayVirtualFiles = Sets.newCopyOnWriteArraySet();
+            keyValueDisplayVirtualFiles.add(virtualFile);
+            connectionDbEditorMap.put(connectionId, keyValueDisplayVirtualFiles);
         } else {
-            aRedisVirtualFiles.add(virtualFile);
+            keyValueDisplayVirtualFiles.add(virtualFile);
         }
     }
 
@@ -465,8 +468,8 @@ public class ConnectionManager {
                 DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) selectionPath.getPath()[1];
                 ApplicationManager.getApplication().invokeLater(() -> {
                     addDbs2Connection(connectionNode);
+                    connectionTreeModel.reload(connectionNode);
                 });
-                connectionTreeModel.reload(connectionNode);
             }
             connectionTreeLoadingDecorator.stopLoading();
         });
@@ -505,10 +508,33 @@ public class ConnectionManager {
         return duplicateAction;
     }
 
-    private ConsoleAction createConsoleAction() {
+    private ConsoleAction createConsoleAction(Tree connectionTree) {
         ConsoleAction consoleAction = new ConsoleAction();
         consoleAction.setAction(e -> {
+            TreePath selectionPath = connectionTree.getSelectionPath();
+            if (selectionPath == null || selectionPath.getPathCount() != 2) {
+                return;
+            }
+
+            DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) selectionPath.getPath()[1];
+            ConnectionInfo connectionInfo = (ConnectionInfo) connectionNode.getUserObject();
+
+            // test connection
+            RedisPoolManager redis = getConnectionRedisMap().get(connectionInfo.getId());
+            try (Jedis jedis = redis.getJedis(0)) {
+                if (jedis == null) {
+                    return;
+                }
+            }
+
             // todo console
+            ConsoleVirtualFile consoleVirtualFile = new ConsoleVirtualFile(
+                    connectionInfo.getName() + "-Console",
+                    project,
+                    connectionInfo,
+                    connectionRedisMap.get(connectionInfo.getId())
+            );
+            ConsoleFileSystem.getInstance(project).openEditor(consoleVirtualFile);
         });
         return consoleAction;
     }
@@ -553,9 +579,8 @@ public class ConnectionManager {
         actionGroup.add(createEditAction(connectionTree));
         actionGroup.add(createDuplicateAction(connectionTree));
         actionGroup.add(createDeleteAction(connectionTree));
-        // todo console 待实现
-//        actionGroup.addSeparator();
-//        actionGroup.add(createConsoleAction());
+        actionGroup.addSeparator();
+        actionGroup.add(createConsoleAction(connectionTree));
         actionGroup.addSeparator();
         actionGroup.add(createCloseAction(connectionTree, connectionTreeModel));
         ActionPopupMenu menu = ActionManager.getInstance().createActionPopupMenu(ActionPlaces.POPUP, actionGroup);

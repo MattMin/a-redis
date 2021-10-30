@@ -1,4 +1,4 @@
-package com.mzyupc.aredis.view;
+package com.mzyupc.aredis.view.textfield;
 
 import com.intellij.ide.DataManager;
 import com.intellij.json.JsonLanguage;
@@ -16,7 +16,6 @@ import com.intellij.openapi.project.Project;
 import com.intellij.ui.EditorSettingsProvider;
 import com.intellij.ui.EditorTextField;
 import com.mzyupc.aredis.enums.ValueFormatEnum;
-import com.mzyupc.aredis.view.textfield.ValueTextField;
 
 import javax.swing.*;
 import java.awt.*;
@@ -25,13 +24,12 @@ import java.awt.*;
  * @author mzyupc@163.com
  * @date 2021/9/9 8:57 下午
  */
-public class ValueTextAreaManager {
+public class EditorTextFieldManager {
 
-    public static EditorTextField createValueTextArea(Project project, Language language, String text) {
+    public static EditorTextField createEditorTextField(Project project, Language language, String text) {
         EditorTextField valueTextArea = new ValueTextField(language, project, text, false);
         valueTextArea.setAutoscrolls(true);
         valueTextArea.setOneLineMode(false);
-        valueTextArea.setAutoscrolls(true);
         valueTextArea.setMinimumSize(new Dimension(100, 100));
         valueTextArea.addSettingsProvider(new EditorSettingsProvider() {
             @Override
@@ -60,16 +58,16 @@ public class ValueTextAreaManager {
         EditorTextField valueTextArea;
         switch (formatEnum) {
             case HTML:
-                valueTextArea = createValueTextArea(project, HTMLLanguage.INSTANCE, oldTextFiled.getText());
+                valueTextArea = createEditorTextField(project, HTMLLanguage.INSTANCE, oldTextFiled.getText());
                 break;
             case XML:
-                valueTextArea = createValueTextArea(project, XMLLanguage.INSTANCE, oldTextFiled.getText());
+                valueTextArea = createEditorTextField(project, XMLLanguage.INSTANCE, oldTextFiled.getText());
                 break;
             case JSON:
-                valueTextArea = createValueTextArea(project, JsonLanguage.INSTANCE, oldTextFiled.getText());
+                valueTextArea = createEditorTextField(project, JsonLanguage.INSTANCE, oldTextFiled.getText());
                 break;
             case PLAIN:
-                valueTextArea = createValueTextArea(project, PlainTextLanguage.INSTANCE, oldTextFiled.getText());
+                valueTextArea = createEditorTextField(project, PlainTextLanguage.INSTANCE, oldTextFiled.getText());
                 break;
             default:
                 return null;

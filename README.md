@@ -13,7 +13,7 @@
   - reload
   - edit
   - duplicate
-  - console(not finished)
+  - console (The 'RESTORE' command and blocking commands such as 'SUBSCRIBE' are not supported)
   - close
   - view the number of keys in DB and DB
 
@@ -50,5 +50,7 @@ Value display
 ![value-display](./img/value-display.png)
 Add a row
 ![add-row](./img/add-row.png)
+Console
+![console](./img/console.png)
 
 ![star](./img/star.jpg)

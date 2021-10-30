@@ -91,6 +91,11 @@ public class KeyTreeDisplayPanel extends JPanel {
 
         allKeys = redisPoolManager.scan(SCAN_POINTER_START, parent.getKeyFilter(), pageSize, dbInfo.getIndex());
 
+        // exception occurred
+        if (allKeys == null) {
+            throw new RuntimeException("exception occurred");
+        }
+
         keyTree = new Tree();
         // 搜索功能
         new TreeSpeedSearch(keyTree, new Convertor<TreePath, String>() {
@@ -298,6 +303,12 @@ public class KeyTreeDisplayPanel extends JPanel {
             flatRootNode = new DefaultMutableTreeNode(dbInfo);
             // redis 查询前pageSize个key
             allKeys = redisPoolManager.scan(SCAN_POINTER_START, keyFilter, pageSize, dbInfo.getIndex());
+
+            // exception occurred
+            if (allKeys == null) {
+                throw new RuntimeException("exception occurred");
+            }
+
             if (CollectionUtils.isNotEmpty(allKeys)) {
                 allKeys = allKeys.stream().sorted().collect(Collectors.toList());
 

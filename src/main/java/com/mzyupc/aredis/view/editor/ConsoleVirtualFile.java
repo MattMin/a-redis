@@ -6,10 +6,8 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileSystem;
 import com.mzyupc.aredis.utils.RedisPoolManager;
-import com.mzyupc.aredis.view.ARedisKeyValueDisplayPanel;
-import com.mzyupc.aredis.view.ConnectionManager;
+import com.mzyupc.aredis.view.ConsolePanel;
 import com.mzyupc.aredis.vo.ConnectionInfo;
-import com.mzyupc.aredis.vo.DbInfo;
 import lombok.Getter;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
@@ -23,26 +21,24 @@ import java.io.OutputStream;
  * @author mzyupc@163.com
  */
 @Getter
-public class ARedisVirtualFile extends VirtualFile {
+public class ConsoleVirtualFile extends VirtualFile {
     private final String name;
     private final Project project;
-    private ConnectionInfo connectionInfo;
-    private DbInfo dbInfo;
-    private ARedisKeyValueDisplayPanel aRedisKeyValueDisplayPanel;
-    private ConnectionManager connectionManager;
+    private final ConnectionInfo connectionInfo;
+    private final RedisPoolManager redisPoolManager;
+    private final ConsolePanel consolePanel;
 
     @Override
     public @NotNull FileType getFileType() {
-        return new ARedisFileType();
+        return new KeyValueDisplayFileType();
     }
 
-    public ARedisVirtualFile(String name, Project project, ConnectionInfo connectionInfo, DbInfo dbInfo, RedisPoolManager redisPoolManager, ConnectionManager connectionManager) {
+    public ConsoleVirtualFile(String name, Project project, ConnectionInfo connectionInfo, RedisPoolManager redisPoolManager) {
         this.project = project;
         this.name = name;
         this.connectionInfo = connectionInfo;
-        this.dbInfo = dbInfo;
-        this.aRedisKeyValueDisplayPanel = new ARedisKeyValueDisplayPanel(project, connectionInfo, dbInfo, redisPoolManager);
-        this.connectionManager = connectionManager;
+        this.redisPoolManager = redisPoolManager;
+        this.consolePanel = new ConsolePanel(project, connectionInfo, redisPoolManager);
     }
 
     @Override
@@ -53,7 +49,7 @@ public class ARedisVirtualFile extends VirtualFile {
 
     @Override
     public @NotNull VirtualFileSystem getFileSystem() {
-        return ARedisFileSystem.getInstance(project);
+        return KeyValueDisplayFileSystem.getInstance(project);
     }
 
     @Override
@@ -130,12 +126,16 @@ public class ARedisVirtualFile extends VirtualFile {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        ARedisVirtualFile that = (ARedisVirtualFile) o;
-        return Objects.equal(connectionInfo, that.connectionInfo) && Objects.equal(dbInfo, that.dbInfo);
+        ConsoleVirtualFile that = (ConsoleVirtualFile) o;
+        return Objects.equal(connectionInfo, that.connectionInfo);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(connectionInfo, dbInfo);
+        return Objects.hashCode(connectionInfo);
+    }
+
+    public ConsolePanel getConsolePanel() {
+        return this.consolePanel;
     }
 }

@@ -24,8 +24,8 @@ import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.util.function.Consumer;
 
-import static com.mzyupc.aredis.view.ValueTextAreaManager.createValueTextArea;
-import static com.mzyupc.aredis.view.ValueTextAreaManager.formatValue;
+import static com.mzyupc.aredis.view.textfield.EditorTextFieldManager.createEditorTextField;
+import static com.mzyupc.aredis.view.textfield.EditorTextFieldManager.formatValue;
 
 /**
  * @author mzyupc@163.com
@@ -227,7 +227,7 @@ public class NewKeyDialog extends DialogWrapper {
         JComboBox<ValueFormatEnum> newKeyValueFormatEnumJComboBox = new JComboBox<>(ValueFormatEnum.values());
         switch (typeEnum) {
             case String:
-                stringValueTextArea = createValueTextArea(project, PlainTextLanguage.INSTANCE, "");
+                stringValueTextArea = createEditorTextField(project, PlainTextLanguage.INSTANCE, "");
                 newKeyValueFormatEnumJComboBox.addItemListener(new ItemListener() {
                     @Override
                     public void itemStateChanged(ItemEvent e) {
@@ -240,7 +240,7 @@ public class NewKeyDialog extends DialogWrapper {
                 stringTypePanel.add(stringValueTextArea, BorderLayout.CENTER);
                 break;
             case List:
-                listValueTextArea = createValueTextArea(project, PlainTextLanguage.INSTANCE, "");
+                listValueTextArea = createEditorTextField(project, PlainTextLanguage.INSTANCE, "");
                 newKeyValueFormatEnumJComboBox.addItemListener(new ItemListener() {
                     @Override
                     public void itemStateChanged(ItemEvent e) {
@@ -253,7 +253,7 @@ public class NewKeyDialog extends DialogWrapper {
                 stringTypePanel.add(listValueTextArea, BorderLayout.CENTER);
                 break;
             case Set:
-                setValueTextArea = createValueTextArea(project, PlainTextLanguage.INSTANCE, "");
+                setValueTextArea = createEditorTextField(project, PlainTextLanguage.INSTANCE, "");
                 newKeyValueFormatEnumJComboBox.addItemListener(new ItemListener() {
                     @Override
                     public void itemStateChanged(ItemEvent e) {
@@ -266,7 +266,7 @@ public class NewKeyDialog extends DialogWrapper {
                 stringTypePanel.add(setValueTextArea, BorderLayout.CENTER);
                 break;
             case Zset:
-                zsetValueTextArea = createValueTextArea(project, PlainTextLanguage.INSTANCE, "");
+                zsetValueTextArea = createEditorTextField(project, PlainTextLanguage.INSTANCE, "");
                 newKeyValueFormatEnumJComboBox.addItemListener(new ItemListener() {
                     @Override
                     public void itemStateChanged(ItemEvent e) {
@@ -279,7 +279,7 @@ public class NewKeyDialog extends DialogWrapper {
                 stringTypePanel.add(zsetValueTextArea, BorderLayout.CENTER);
                 break;
             default:
-                hashValueTextArea = createValueTextArea(project, PlainTextLanguage.INSTANCE, "");
+                hashValueTextArea = createEditorTextField(project, PlainTextLanguage.INSTANCE, "");
                 newKeyValueFormatEnumJComboBox.addItemListener(new ItemListener() {
                     @Override
                     public void itemStateChanged(ItemEvent e) {

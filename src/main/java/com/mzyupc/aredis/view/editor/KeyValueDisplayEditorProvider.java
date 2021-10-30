@@ -14,15 +14,15 @@ import org.jetbrains.annotations.NotNull;
 /**
  * @author mzyupc@163.com
  */
-public class ARedisEditorProvider implements FileEditorProvider, DumbAware {
+public class KeyValueDisplayEditorProvider implements FileEditorProvider, DumbAware {
     @Override
     public boolean accept(@NotNull Project project, @NotNull VirtualFile virtualFile) {
-        return virtualFile instanceof ARedisVirtualFile;
+        return virtualFile instanceof KeyValueDisplayVirtualFile;
     }
 
     @Override
     public @NotNull FileEditor createEditor(@NotNull Project project, @NotNull VirtualFile virtualFile) {
-        return new ARedisEditor(virtualFile);
+        return new KeyValueDisplayEditor(virtualFile);
     }
 
     @Override
