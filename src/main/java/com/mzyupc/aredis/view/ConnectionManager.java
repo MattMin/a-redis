@@ -16,6 +16,7 @@ import com.mzyupc.aredis.utils.PropertyUtil;
 import com.mzyupc.aredis.utils.RedisPoolManager;
 import com.mzyupc.aredis.view.dialog.ConfirmDialog;
 import com.mzyupc.aredis.view.dialog.ConnectionSettingsDialog;
+import com.mzyupc.aredis.view.dialog.InfoDialog;
 import com.mzyupc.aredis.view.editor.ConsoleFileSystem;
 import com.mzyupc.aredis.view.editor.ConsoleVirtualFile;
 import com.mzyupc.aredis.view.editor.KeyValueDisplayFileSystem;
@@ -527,7 +528,7 @@ public class ConnectionManager {
                 }
             }
 
-            // todo console
+            // console
             ConsoleVirtualFile consoleVirtualFile = new ConsoleVirtualFile(
                     connectionInfo.getName() + "-Console",
                     project,
@@ -537,6 +538,22 @@ public class ConnectionManager {
             ConsoleFileSystem.getInstance(project).openEditor(consoleVirtualFile);
         });
         return consoleAction;
+    }
+
+    private InfoAction createInfoAction(Tree connectionTree) {
+        InfoAction infoAction = new InfoAction();
+        infoAction.setAction(anActionEvent -> {
+            TreePath selectionPath = connectionTree.getSelectionPath();
+            if (selectionPath == null || selectionPath.getPathCount() != 2) {
+                return;
+            }
+
+            DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) selectionPath.getPath()[1];
+            ConnectionInfo connectionInfo = (ConnectionInfo) connectionNode.getUserObject();
+            RedisPoolManager redis = getConnectionRedisMap().get(connectionInfo.getId());
+            new InfoDialog(project, redis).show();
+        });
+        return infoAction;
     }
 
     private CloseAction createCloseAction(Tree connectionTree, DefaultTreeModel connectionTreeModel) {
@@ -581,6 +598,7 @@ public class ConnectionManager {
         actionGroup.add(createDeleteAction(connectionTree));
         actionGroup.addSeparator();
         actionGroup.add(createConsoleAction(connectionTree));
+        actionGroup.add(createInfoAction(connectionTree));
         actionGroup.addSeparator();
         actionGroup.add(createCloseAction(connectionTree, connectionTreeModel));
         ActionPopupMenu menu = ActionManager.getInstance().createActionPopupMenu(ActionPlaces.POPUP, actionGroup);
