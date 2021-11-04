@@ -2,10 +2,10 @@ package com.mzyupc.aredis.view.dialog;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
-import com.intellij.ui.components.JBLabel;
+import com.intellij.ui.JBColor;
 import com.intellij.ui.components.JBScrollPane;
+import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.ui.table.JBTable;
-import com.mzyupc.aredis.layout.VFlowLayout;
 import com.mzyupc.aredis.utils.RedisPoolManager;
 import lombok.Getter;
 import lombok.Setter;
@@ -15,9 +15,10 @@ import org.jetbrains.annotations.Nullable;
 import redis.clients.jedis.Jedis;
 
 import javax.swing.*;
+import javax.swing.border.LineBorder;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
-import java.awt.*;
+import javax.swing.table.JTableHeader;
 import java.awt.event.ActionEvent;
 import java.util.Optional;
 
@@ -34,7 +35,8 @@ public class InfoDialog extends DialogWrapper {
             "cluster", "keyspace"
     };
 
-    private RedisPoolManager redisPoolManager;
+    private final RedisPoolManager redisPoolManager;
+    private JBTabbedPane sectionTabPane;
 
     /**
      * @param project
@@ -45,7 +47,6 @@ public class InfoDialog extends DialogWrapper {
         this.setTitle("Info");
         this.setResizable(true);
         this.setAutoAdjustable(true);
-        this.setSize(750, 750);
         this.init();
     }
 
@@ -57,45 +58,25 @@ public class InfoDialog extends DialogWrapper {
     @Override
     protected @Nullable
     JComponent createCenterPanel() {
-        JPanel container = new JPanel(new VFlowLayout());
+        sectionTabPane = new JBTabbedPane(JTabbedPane.LEFT, JTabbedPane.WRAP_TAB_LAYOUT);
 
         try (Jedis jedis = redisPoolManager.getJedis(0)) {
+            if (jedis == null) {
+                return sectionTabPane;
+            }
             for (String section : SECTIONS) {
                 String info = jedis.info(section);
                 Optional<SectionInfo> optionalSectionInfo = parseSectionInfo(info);
                 if (optionalSectionInfo.isPresent()) {
                     SectionInfo sectionInfo = optionalSectionInfo.get();
-                    DefaultTableModel tableModel = new DefaultTableModel(sectionInfo.infoArray, new String[]{"Key", "Value"});
-                    JBTable infoTable = new JBTable(tableModel) {
-                        @Override
-                        public boolean isCellEditable(int row, int column) {
-                            return false;
-                        }
-                    };
-
-                    // 只能选中一行
-                    infoTable.setRowSelectionAllowed(true);
-                    infoTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-
-                    DefaultTableCellRenderer tableCellRenderer = new DefaultTableCellRenderer();
-                    tableCellRenderer.setHorizontalAlignment(SwingConstants.CENTER);
-                    // 数据局中
-                    infoTable.setDefaultRenderer(Object.class, tableCellRenderer);
-                    // 表头居中
-                    infoTable.getTableHeader().setDefaultRenderer(tableCellRenderer);
-                    infoTable.setAutoCreateRowSorter(true);
-                    infoTable.setDoubleBuffered(true);
-                    JPanel titleBorder = new JPanel(new BorderLayout());
-                    titleBorder.setBorder(BorderFactory.createEmptyBorder(20, 0, 20, 0));
-                    titleBorder.add(new JBLabel(sectionInfo.getTitle(), SwingConstants.CENTER), BorderLayout.NORTH);
-                    titleBorder.add(infoTable.getTableHeader(), BorderLayout.CENTER);
-                    titleBorder.add(infoTable, BorderLayout.SOUTH);
-                    container.add(titleBorder);
+                    JBTable infoTable = createInfoTable(sectionInfo);
+                    // 使用tab展示
+                    sectionTabPane.addTab(sectionInfo.getTitle(), new JBScrollPane(infoTable));
                 }
             }
         }
 
-        return new JBScrollPane(container);
+        return sectionTabPane;
     }
 
     /**
@@ -136,15 +117,16 @@ public class InfoDialog extends DialogWrapper {
     @Override
     protected Action[] createActions() {
         CustomOKAction okAction = new CustomOKAction();
+        RefreshAction refreshAction = new RefreshAction();
         // 设置默认的焦点按钮
         okAction.putValue(DialogWrapper.DEFAULT_ACTION, true);
-        return new Action[]{okAction};
+        return new Action[]{refreshAction, okAction};
     }
 
     /**
      * 自定义 ok Action
      */
-    protected class CustomOKAction extends DialogWrapperAction {
+    private class CustomOKAction extends DialogWrapperAction {
         protected CustomOKAction() {
             super("OK");
         }
@@ -153,6 +135,63 @@ public class InfoDialog extends DialogWrapper {
         protected void doAction(ActionEvent e) {
             close(OK_EXIT_CODE);
         }
+    }
+
+    /**
+     * 自定义 ok Action
+     */
+    private class RefreshAction extends DialogWrapperAction {
+        protected RefreshAction() {
+            super("Refresh");
+        }
+
+        @Override
+        protected void doAction(ActionEvent e) {
+            // 实现刷新功能
+            try (Jedis jedis = redisPoolManager.getJedis(0)) {
+                if (jedis == null) {
+                    return;
+                }
+
+                // 选中的title
+                int selectedIndex = sectionTabPane.getSelectedIndex();
+                String title = sectionTabPane.getTitleAt(selectedIndex);
+
+                String info = jedis.info(title.replaceAll("\\s|#", ""));
+                Optional<SectionInfo> optionalSectionInfo = parseSectionInfo(info);
+                if (optionalSectionInfo.isPresent()) {
+                    JBTable infoTable = createInfoTable(optionalSectionInfo.get());
+                    sectionTabPane.setComponentAt(selectedIndex, new JBScrollPane(infoTable));
+                }
+            }
+        }
+    }
+
+    @NotNull
+    private JBTable createInfoTable(SectionInfo sectionInfo) {
+        DefaultTableModel tableModel = new DefaultTableModel(sectionInfo.infoArray, new String[]{"Key", "Value"});
+        JBTable infoTable = new JBTable(tableModel) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+
+        // 只能选中一行
+        infoTable.setRowSelectionAllowed(true);
+        infoTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+
+        DefaultTableCellRenderer tableCellRenderer = new DefaultTableCellRenderer();
+        tableCellRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+        tableCellRenderer.setBorder(new LineBorder(JBColor.RED));
+        // 数据局中
+        infoTable.setDefaultRenderer(Object.class, tableCellRenderer);
+        // 表头居中
+        JTableHeader tableHeader = infoTable.getTableHeader();
+        tableHeader.setDefaultRenderer(tableCellRenderer);
+        // 单击表头排序
+        infoTable.setAutoCreateRowSorter(true);
+        return infoTable;
     }
 
     @Getter
