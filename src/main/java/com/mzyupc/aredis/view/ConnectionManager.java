@@ -245,6 +245,9 @@ public class ConnectionManager {
         // 添加新节点
         for (int i = 0; i < dbCount; i++) {
             Long keyCount = redisPoolManager.dbSize(i);
+            if (keyCount == null) {
+                return;
+            }
             DbInfo dbInfo = DbInfo.builder()
                     .index(i)
                     .keyCount(keyCount)

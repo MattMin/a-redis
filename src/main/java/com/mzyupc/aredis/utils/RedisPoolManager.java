@@ -14,6 +14,7 @@ import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.jedis.util.Pool;
 
+import javax.annotation.Nullable;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Duration;
@@ -247,6 +248,7 @@ public class RedisPoolManager implements Disposable {
      *
      * @return
      */
+    @Nullable
     public Jedis getJedis(int db) {
         try {
             Jedis resource = getJedisPool().getResource();
@@ -295,10 +297,11 @@ public class RedisPoolManager implements Disposable {
      * @param db
      * @return
      */
+    @Nullable
     public Long dbSize(int db) {
         try (Jedis jedis = getJedis(db)) {
             if (jedis == null) {
-                return 0L;
+                return null;
             }
             return jedis.dbSize();
         }
@@ -325,12 +328,13 @@ public class RedisPoolManager implements Disposable {
      *
      * @param key
      */
-    public void del(String key, int db) {
+    @Nullable
+    public Long del(String key, int db) {
         try (Jedis jedis = getJedis(db)) {
             if (jedis == null) {
-                return;
+                return null;
             }
-            jedis.del(key);
+            return jedis.del(key);
         } catch (Exception e) {
             throw new IllegalArgumentException("删除失败", e);
         }

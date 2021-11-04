@@ -299,6 +299,9 @@ public class KeyTreeDisplayPanel extends JPanel {
 
         ApplicationManager.getApplication().invokeLater(() -> {
             Long dbSize = redisPoolManager.dbSize(dbInfo.getIndex());
+            if (dbSize == null) {
+                return;
+            }
             dbInfo.setKeyCount(dbSize);
             flatRootNode = new DefaultMutableTreeNode(dbInfo);
             // redis 查询前pageSize个key
@@ -306,7 +309,7 @@ public class KeyTreeDisplayPanel extends JPanel {
 
             // exception occurred
             if (allKeys == null) {
-                throw new RuntimeException("exception occurred");
+                return;
             }
 
             if (CollectionUtils.isNotEmpty(allKeys)) {
@@ -384,7 +387,9 @@ public class KeyTreeDisplayPanel extends JPanel {
                     "Are you sure you want to delete all the keys of the currently selected DB?",
                     actionEvent -> {
                         try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
-                            jedis.flushDB();
+                            if (jedis != null) {
+                                jedis.flushDB();
+                            }
                         }
                         resetPageIndex();
                         renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
@@ -481,7 +486,9 @@ public class KeyTreeDisplayPanel extends JPanel {
                                 ErrorDialog.show("Score can not be empty");
                             } else {
                                 try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
-                                    jedis.zadd(key, Double.parseDouble(score), valueString);
+                                    if (jedis != null) {
+                                        jedis.zadd(key, Double.parseDouble(score), valueString);
+                                    }
                                 }
                                 // 关闭对话框
                                 newKeyDialog.close(OK_EXIT_CODE);
@@ -555,8 +562,10 @@ public class KeyTreeDisplayPanel extends JPanel {
                                 findDeleteKeys(selectNode, keys, valueDisplayPanel);
                                 if (CollectionUtils.isNotEmpty(keys)) {
                                     try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
-                                        jedis.del(keys.toArray(new String[]{}));
-                                        dbInfo.setKeyCount(dbInfo.getKeyCount() - keys.size());
+                                        if (jedis != null) {
+                                            jedis.del(keys.toArray(new String[]{}));
+                                            dbInfo.setKeyCount(dbInfo.getKeyCount() - keys.size());
+                                        }
                                     }
                                 }
                             }
