@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - CHANGELOG.md
+- Redis连接右键菜单添加"Info"功能
 
 ### Changed
 - 修正redis console行高
