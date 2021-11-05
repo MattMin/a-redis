@@ -1,6 +1,5 @@
 package com.mzyupc.aredis.utils;
 
-import com.alibaba.fastjson.JSON;
 import com.google.common.collect.Lists;
 import com.intellij.openapi.Disposable;
 import com.mzyupc.aredis.view.dialog.ErrorDialog;

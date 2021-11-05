@@ -1,6 +1,5 @@
 package com.mzyupc.aredis.view;
 
-import com.alibaba.fastjson.JSON;
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.CommonActionsManager;
 import com.intellij.openapi.actionSystem.*;
@@ -17,6 +16,7 @@ import com.mzyupc.aredis.action.AddAction;
 import com.mzyupc.aredis.action.ClearAction;
 import com.mzyupc.aredis.action.DeleteAction;
 import com.mzyupc.aredis.action.RefreshAction;
+import com.mzyupc.aredis.utils.JSON;
 import com.mzyupc.aredis.utils.RedisPoolManager;
 import com.mzyupc.aredis.view.dialog.ConfirmDialog;
 import com.mzyupc.aredis.view.dialog.ErrorDialog;
