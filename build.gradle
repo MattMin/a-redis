@@ -11,33 +11,29 @@ repositories {
 }
 
 dependencies {
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.0'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
 
     // jedis
-    compile (group: 'redis.clients', name: 'jedis', version: '3.7.0') {
+    implementation (group: 'redis.clients', name: 'jedis', version: '3.7.0') {
         exclude group: "org.slf4j"
     }
 
     // lombok
-    compileOnly 'org.projectlombok:lombok:1.18.20'
-    annotationProcessor 'org.projectlombok:lombok:1.18.20'
-    testCompileOnly 'org.projectlombok:lombok:1.18.20'
-    testAnnotationProcessor 'org.projectlombok:lombok:1.18.20'
-
-    // fastjson
-    compile 'com.alibaba:fastjson:1.2.76'
-
+    compileOnly 'org.projectlombok:lombok:1.18.22'
+    annotationProcessor 'org.projectlombok:lombok:1.18.22'
+    testCompileOnly 'org.projectlombok:lombok:1.18.22'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.22'
 }
 
 // See https://github.com/JetBrains/gradle-intellij-plugin/
 intellij {
     version = '2021.2'
-    updateSinceUntilBuild = true
 }
 
 patchPluginXml {
     sinceBuild = '201.8743.12'
+    untilBuild = provider { null }
     changeNotes = """
       beta-0.5.0</br>
       <ul>
