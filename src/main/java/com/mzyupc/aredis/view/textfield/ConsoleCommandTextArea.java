@@ -104,9 +104,9 @@ public class ConsoleCommandTextArea extends JTextPane {
         // 绘制行号的颜色
         g.setColor(JBColor.BLACK);
         g.setFont(new Font(getFont().getName(), getFont().getStyle(), this.fontSize));
-        final int lineGHeight = g.getFontMetrics().getHeight();
+        final int lineHeight = g.getFontMetrics().getHeight();
         for (int row = 0; row < rows; row++) {
-            g.drawString(">", 2, getPositionY(row + 1, lineGHeight));
+            g.drawString(">", 2, getPositionY(row + 1, lineHeight));
         }
     }
 

@@ -1,5 +1,6 @@
 package com.mzyupc.aredis.utils;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;
 
@@ -16,12 +17,12 @@ public class JSON {
         return parseObject(text, Object.class);
     }
 
-    @SneakyThrows
+    @SneakyThrows(JsonProcessingException.class)
     public static <T> T parseObject(String text, Class<T> clazz) {
         return objectMapper.readValue(text, clazz);
     }
 
-    @SneakyThrows
+    @SneakyThrows(JsonProcessingException.class)
     public static String toJSONString(Object value, boolean format) {
         if (format) {
             return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(value);
@@ -34,7 +35,7 @@ public class JSON {
         return toJSONString(value, false);
     }
 
-    @SneakyThrows
+    @SneakyThrows(JsonProcessingException.class)
     public static <T> List<T> parseArray(String text, Class<T> clazz) {
         return objectMapper.readValue(text, objectMapper.getTypeFactory().constructCollectionType(List.class, clazz));
     }
