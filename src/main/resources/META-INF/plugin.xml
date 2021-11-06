@@ -39,6 +39,8 @@
 
 <!--        <fileType name="Redis Cmd" extensions="rcmd"-->
 <!--                  implementationClass="com.mzyupc.aredis.view.language.RedisCmdLanguageFileType" language="REDIS_CMD"/>-->
+        <projectService serviceImplementation="com.mzyupc.aredis.service.ConnectionsService"/>
+        <applicationService serviceImplementation="com.mzyupc.aredis.service.GlobalConnectionsService"/>
     </extensions>
 
     <extensionPoints>

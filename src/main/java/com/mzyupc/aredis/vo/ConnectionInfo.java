@@ -3,6 +3,8 @@ package com.mzyupc.aredis.vo;
 import com.google.common.base.Objects;
 import lombok.*;
 
+import java.util.Map;
+
 /**
  * @author mzyupc@163.com
  */
@@ -22,6 +24,16 @@ public class ConnectionInfo {
     private String port;
 
     private String password;
+
+    /**
+     * 每个db的分组标识
+     */
+    private Map<Integer, String> groupSymbols;
+
+    /**
+     * 是否全局配置
+     */
+    private Boolean global;
 
     @Override
     public String toString() {

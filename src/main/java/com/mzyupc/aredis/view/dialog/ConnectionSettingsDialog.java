@@ -35,8 +35,9 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
     JTextField hostField;
     JTextField portField;
     JPasswordField passwordField;
+    JCheckBox globalCheckBox;
     private PropertyUtil propertyUtil;
-    private String connectionId;
+    private ConnectionInfo connection;
     private CustomOKAction okAction;
     private Tree connectionTree;
     private ConnectionManager connectionManager;
@@ -44,13 +45,13 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
     /**
      * if connectionId is blank ? New Connection : Edit Connection
      * @param project
-     * @param connectionId
+     * @param connection
      * @param connectionTree
      */
-    public ConnectionSettingsDialog(Project project, String connectionId, Tree connectionTree, ConnectionManager connectionManager) {
+    public ConnectionSettingsDialog(Project project, ConnectionInfo connection, Tree connectionTree, ConnectionManager connectionManager) {
         super(project);
         this.propertyUtil = PropertyUtil.getInstance(project);
-        this.connectionId = connectionId;
+        this.connection = connection;
         this.connectionTree = connectionTree;
         this.connectionManager = connectionManager;
         this.setTitle("Connection Settings");
@@ -71,7 +72,6 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
     @Override
     protected @Nullable
     JComponent createCenterPanel() {
-        ConnectionInfo connection = propertyUtil.getConnection(connectionId);
         boolean newConnection = connection == null;
 
         // TODO 参数校验, 输入框下面展示提示
@@ -99,6 +99,11 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
             }
         });
         checkBox.setBounds(300, 81, 135, 27);
+
+        // 设为全局
+        globalCheckBox = new JCheckBox("As global");
+        globalCheckBox.setSelected(!newConnection && connection.getGlobal());
+        globalCheckBox.setBounds(300, 81, 135, 27);
 
         // 测试连接按钮
         JButton testButton = new JButton("Test Connection");
@@ -236,6 +241,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         connectionSettingsPanel.add(passwordLabel);
         connectionSettingsPanel.add(passwordField);
         connectionSettingsPanel.add(checkBox);
+        connectionSettingsPanel.add(globalCheckBox);
 
         JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT));
         row.add(testButton);
@@ -317,7 +323,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                 ErrorDialog.show(validationInfo.message);
             } else {
                 DefaultTreeModel connectionTreeModel = (DefaultTreeModel) connectionTree.getModel();
-                if (StringUtils.isEmpty(connectionId)) {
+                if (connection == null) {
                     // 保存connection
                     String password = null;
                     if (StringUtils.isNotBlank(new String(passwordField.getPassword()))) {
@@ -341,25 +347,25 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                     if (StringUtils.isNotBlank(new String(passwordField.getPassword()))) {
                         password = new String(passwordField.getPassword());
                     }
-                    ConnectionInfo connectionInfo = ConnectionInfo.builder()
-                            .id(connectionId)
-                            .name(nameTextField.getText())
-                            .url(hostField.getText())
-                            .port(portField.getText())
-                            .password(password)
-                            .build();
+                    // 更新持久化信息
+                    connection.setName(nameTextField.getText());
+                    connection.setUrl(hostField.getText());
+                    connection.setPort(portField.getText());
+                    connection.setPassword(password);
+                    if (connection.getGlobal() != globalCheckBox.isSelected()) {
+                        // 更改了配置级别
+                        connection.setGlobal(globalCheckBox.isSelected());
+                        propertyUtil.saveConnection(connection);
+                    }
                     // 更新redisPoolMgr
-                    RedisPoolManager redisPoolManager = new RedisPoolManager(connectionInfo);
-                    connectionManager.getConnectionRedisMap().put(connectionId, redisPoolManager);
+                    RedisPoolManager redisPoolManager = new RedisPoolManager(connection);
+                    connectionManager.getConnectionRedisMap().put(connection.getId(), redisPoolManager);
                     // 设置connectionNode的connectionInfo
                     TreePath selectionPath = connectionTree.getSelectionPath();
                     DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) selectionPath.getPath()[1];
-                    connectionNode.setUserObject(connectionInfo);
+                    connectionNode.setUserObject(connection);
                     // 重新载入connectionNode
                     connectionTreeModel.reload(connectionNode);
-                    // 更新持久化信息
-                    propertyUtil.removeConnection(connectionId, redisPoolManager);
-                    propertyUtil.saveConnection(connectionInfo);
 
                     close(OK_EXIT_CODE);
                 }
