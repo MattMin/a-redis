@@ -334,6 +334,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                             .name(nameTextField.getText())
                             .url(hostField.getText())
                             .port(portField.getText())
+                            .global(globalCheckBox.isSelected())
                             .password(password)
                             .build();
                     propertyUtil.saveConnection(connectionInfo);
