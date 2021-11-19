@@ -107,8 +107,8 @@ public class ConnectionManager {
                 int x = e.getX();
                 int y = e.getY();
 
-                // connectionTree的双击事件
-                if (e.getClickCount() == 2) {
+                // connectionTree的双击事件 && 不是右键
+                if (e.getClickCount() == 2 && !e.isMetaDown()) {
 
                     // 第一个选中的节点路径
                     TreePath selectionPath = connectionTree.getSelectionPath();
