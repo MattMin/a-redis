@@ -294,12 +294,12 @@ public class ValueDisplayPanel extends JPanel {
                                     return;
                                 }
 
-                                int newTtl = Integer.parseInt(text);
+                                long newTtl = Long.parseLong(text);
                                 if (newTtl < 0) {
                                     newTtl = -1;
                                 }
                                 jedis.expire(key, newTtl);
-                                ttl = (long) newTtl;
+                                ttl = newTtl;
                                 ttlTextField.setText(ttl.toString());
                             } catch (NumberFormatException exception) {
                                 ErrorDialog.show("Wrong TTL format for input: " + text);

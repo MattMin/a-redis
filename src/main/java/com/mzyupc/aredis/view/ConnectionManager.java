@@ -295,7 +295,7 @@ public class ConnectionManager {
             connectionRedisMap.remove(connectionInfoId);
 
             // 从properties中移除
-            propertyUtil.removeConnection(connectionInfoId, redisPoolManager);
+            propertyUtil.removeConnection(connectionInfo, redisPoolManager);
 
             // 查询过DB才有
             if (redisPoolManager != null) {
@@ -491,7 +491,7 @@ public class ConnectionManager {
             DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) selectionPath.getPath()[1];
             ConnectionInfo connectionInfo = (ConnectionInfo) connectionNode.getUserObject();
             // 弹出连接配置窗口
-            ConnectionSettingsDialog connectionSettingsDialog = new ConnectionSettingsDialog(project, connectionInfo.getId(), connectionTree, this);
+            ConnectionSettingsDialog connectionSettingsDialog = new ConnectionSettingsDialog(project, connectionInfo, connectionTree, this);
             connectionSettingsDialog.show();
         });
         return editAction;
