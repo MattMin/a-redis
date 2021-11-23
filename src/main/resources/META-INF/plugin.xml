@@ -37,13 +37,14 @@
         <fileEditorProvider implementation="com.mzyupc.aredis.view.editor.ConsoleEditorProvider"/>
         <projectService serviceImplementation="com.mzyupc.aredis.view.editor.ConsoleFileSystem"/>
 
-<!--        <fileType name="Redis Cmd" extensions="rcmd"-->
-<!--                  implementationClass="com.mzyupc.aredis.view.language.RedisCmdLanguageFileType" language="REDIS_CMD"/>-->
         <projectService serviceImplementation="com.mzyupc.aredis.service.ConnectionsService"/>
         <applicationService serviceImplementation="com.mzyupc.aredis.service.GlobalConnectionsService"/>
+
+        <projectService serviceImplementation="com.mzyupc.aredis.view.ConnectionManager"/>
     </extensions>
 
-    <extensionPoints>
+    <projectListeners>
+        <listener class="com.mzyupc.aredis.message.GlobalConnectionChangeListener" topic="com.mzyupc.aredis.message.ARedisStateChangeListener"/>
+    </projectListeners>
 
-    </extensionPoints>
 </idea-plugin>

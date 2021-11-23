@@ -9,7 +9,9 @@ import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.NumberDocument;
 import com.intellij.ui.treeStructure.Tree;
+import com.intellij.util.messages.MessageBus;
 import com.intellij.util.ui.JBUI;
+import com.mzyupc.aredis.message.ARedisStateChangeListener;
 import com.mzyupc.aredis.utils.PropertyUtil;
 import com.mzyupc.aredis.utils.RedisPoolManager;
 import com.mzyupc.aredis.view.ConnectionManager;
@@ -26,6 +28,8 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
+
+import static com.mzyupc.aredis.message.ARedisStateChangeListener.AREDIS_STATE_CHANGE_TOPIC;
 
 /**
  * @author mzyupc@163.com
@@ -319,6 +323,11 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
 
                     close(OK_EXIT_CODE);
                 }
+
+                // 通知其他项目更新connectionTree
+                MessageBus messageBus = ApplicationManager.getApplication().getMessageBus();
+                ARedisStateChangeListener stateChangeListener = messageBus.syncPublisher(AREDIS_STATE_CHANGE_TOPIC);
+                stateChangeListener.stateChanged();
             }
         }
     }

@@ -64,7 +64,7 @@ public class ARedisToolWindow implements Disposable {
         connectionPanel.setLayout(new BorderLayout());
 
         // 连接树
-        connectionManager = new ConnectionManager(project);
+        connectionManager = ConnectionManager.getInstance(project);
         connectionTree = connectionManager.createConnectionTree(this, connectionPanel);
 
         // 工具栏

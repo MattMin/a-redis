@@ -28,42 +28,41 @@ public class PropertyUtil {
 
     private static final String DB_COUNT_KEY = "dbCount:";
 
-    private static PropertiesComponent properties;
+    private PropertiesComponent properties;
 
-    private static PropertyUtil instance = new PropertyUtil();
+    private GlobalConnectionsService globalConnectionsService;
 
-    private static GlobalConnectionsService globalConnectionsService;
+    private ConnectionsService connectionsService;
 
-    private static ConnectionsService connectionsService;
-
-    private PropertyUtil() {
-    }
-
-    public static PropertyUtil getInstance(Project project) {
+    private PropertyUtil(Project project) {
         properties = PropertiesComponent.getInstance(project);
         globalConnectionsService = GlobalConnectionsService.getInstance();
         connectionsService = ConnectionsService.getInstance(project);
+    }
+
+    public static PropertyUtil getInstance(Project project) {
+        PropertyUtil propertyUtil = new PropertyUtil(project);
 
         // 迁移之前的配置
         // 迁移RELOAD_AFTER_ADDING_THE_KEY
-        if (properties.isValueSet(RELOAD_AFTER_ADDING_THE_KEY)) {
-            final boolean aBoolean = properties.getBoolean(RELOAD_AFTER_ADDING_THE_KEY, false);
-            globalConnectionsService.setReloadAfterAddingTheKey(aBoolean);
-            properties.unsetValue(RELOAD_AFTER_ADDING_THE_KEY);
+        if (propertyUtil.properties.isValueSet(RELOAD_AFTER_ADDING_THE_KEY)) {
+            final boolean aBoolean = propertyUtil.properties.getBoolean(RELOAD_AFTER_ADDING_THE_KEY, false);
+            propertyUtil.globalConnectionsService.setReloadAfterAddingTheKey(aBoolean);
+            propertyUtil.properties.unsetValue(RELOAD_AFTER_ADDING_THE_KEY);
         }
 
         // 迁移CONNECTION_ID_LIST_KEY
-        final List<ConnectionInfo> connections = instance.getConnectionsOld();
+        final List<ConnectionInfo> connections = propertyUtil.getConnectionsOld();
         if (!connections.isEmpty()) {
-            final List<ConnectionInfo> newConnections = connectionsService.getConnections();
+            final List<ConnectionInfo> newConnections = propertyUtil.connectionsService.getConnections();
             for (ConnectionInfo connection : connections) {
                 connection.setGlobal(false);
-                instance.removeConnectionOld(connection.getId());
+                propertyUtil.removeConnectionOld(connection.getId());
                 newConnections.add(connection);
             }
-            properties.unsetValue(CONNECTION_ID_LIST_KEY);
+            propertyUtil.properties.unsetValue(CONNECTION_ID_LIST_KEY);
         }
-        return instance;
+        return propertyUtil;
     }
 
     /**
