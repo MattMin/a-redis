@@ -43,8 +43,9 @@
         <projectService serviceImplementation="com.mzyupc.aredis.view.ConnectionManager"/>
     </extensions>
 
+    <!-- 此处的警告可以忽略 -->
     <projectListeners>
-        <listener class="com.mzyupc.aredis.message.GlobalConnectionChangeListener" topic="com.mzyupc.aredis.message.ARedisStateChangeListener"/>
+        <listener class="com.mzyupc.aredis.message.ConnectionChangeListener" topic="com.mzyupc.aredis.message.ARedisStateChangeListener"/>
     </projectListeners>
 
 </idea-plugin>

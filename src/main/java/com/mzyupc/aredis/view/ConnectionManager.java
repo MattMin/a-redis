@@ -12,6 +12,8 @@ import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.treeStructure.Tree;
 import com.intellij.util.messages.MessageBus;
 import com.mzyupc.aredis.action.*;
+import com.mzyupc.aredis.message.ARedisEventType;
+import com.mzyupc.aredis.message.ARedisStateChangeEvent;
 import com.mzyupc.aredis.message.ARedisStateChangeListener;
 import com.mzyupc.aredis.utils.JTreeUtil;
 import com.mzyupc.aredis.utils.PropertyUtil;
@@ -289,7 +291,11 @@ public class ConnectionManager {
         // 通知其他项目更新connectionTree
         MessageBus messageBus = ApplicationManager.getApplication().getMessageBus();
         ARedisStateChangeListener stateChangeListener = messageBus.syncPublisher(AREDIS_STATE_CHANGE_TOPIC);
-        stateChangeListener.stateChanged();
+        stateChangeListener.stateChanged(
+                ARedisStateChangeEvent.builder()
+                        .eventType(ARedisEventType.CONNECTION_CHANGE)
+                        .build()
+        );
     }
 
     /**
