@@ -14,6 +14,7 @@
   - edit
   - duplicate
   - console (The 'RESTORE' command and blocking commands such as 'SUBSCRIBE' are not supported)
+  - info (Various information and statistical values about the Redis server)
   - close
   - view the number of keys in DB and DB
 
@@ -52,5 +53,7 @@ Add a row
 ![add-row](./img/add-row.png)
 Console
 ![console](./img/console.png)
+Info
+![Info](./img/info.png)
 
 ![star](./img/star.jpg)

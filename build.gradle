@@ -4,7 +4,7 @@ plugins {
 }
 
 group 'com.mzyupc'
-version 'beta-0.5.0'
+version 'beta-0.6.0'
 
 sourceCompatibility = JavaVersion.VERSION_11
 targetCompatibility = JavaVersion.VERSION_11
@@ -38,6 +38,13 @@ patchPluginXml {
     sinceBuild = '201.8743.12'
     untilBuild = provider { null }
     changeNotes = """
+      beta-0.6.0</br>
+      <ul>
+      <li>new: redis connection right-click menu adds "Info" function</li>
+      <li>new: the connection can be set to global in the connection settings popup</li>
+      <li>update: fix redis console line height</li>
+      <li>update: use jackson to serialize json</li>
+      </ul>
       beta-0.5.0</br>
       <ul>
       <li>new: redis console(The 'RESTORE' command and blocking commands such as 'SUBSCRIBE' are not supported)</li>

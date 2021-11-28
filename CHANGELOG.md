@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [beta-0.6.0] - 2021-11-28
 ### Added
 - CHANGELOG.md
 - Redis连接右键菜单添加"Info"功能
@@ -28,5 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-[Unreleased]: https://github.com/MattMin/a-redis/compare/beta-0.5.0...HEAD
+[Unreleased]: https://github.com/MattMin/a-redis/compare/beta-0.6.0...HEAD
+[beta-0.6.0]: https://github.com/MattMin/a-redis/releases/tag/beta-0.6.0
 [beta-0.5.0]: https://github.com/MattMin/a-redis/releases/tag/beta-0.5.0
