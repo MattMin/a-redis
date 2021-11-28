@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - fastjson
 
+### Fixed
+- duplicate connection bug
+
 ## [beta-0.5.0] - 2021-10-30
 ### Added
 - redis console(The 'RESTORE' command and blocking commands such as 'SUBSCRIBE' are not supported)
