@@ -288,6 +288,13 @@ public class ConnectionManager {
             closeAllEditor(connectionInfoId);
         }
 
+        emitConnectionChange();
+    }
+
+    /**
+     * 触发连接更新事件
+     */
+    public void emitConnectionChange() {
         // 通知其他项目更新connectionTree
         MessageBus messageBus = ApplicationManager.getApplication().getMessageBus();
         ARedisStateChangeListener stateChangeListener = messageBus.syncPublisher(AREDIS_STATE_CHANGE_TOPIC);
@@ -313,6 +320,7 @@ public class ConnectionManager {
         // remove
         DefaultMutableTreeNode root = (DefaultMutableTreeNode) connectionTreeModel.getRoot();
         root.removeAllChildren();
+        connectionTreeModel.reload();
 
         // add
         List<ConnectionInfo> connections = propertyUtil.getConnections();
@@ -410,6 +418,7 @@ public class ConnectionManager {
                 .url(connectionInfo.getUrl())
                 .port(connectionInfo.getPort())
                 .password(connectionInfo.getPassword())
+                .global(connectionInfo.getGlobal())
                 .build();
         addConnectionToList((DefaultTreeModel) connectionTree.getModel(), newConnectionInfo);
         return newConnectionInfo;
@@ -545,6 +554,7 @@ public class ConnectionManager {
 
             ConnectionInfo newConnectionInfo = duplicateConnections(connectionTree);
             propertyUtil.saveConnection(newConnectionInfo);
+            emitConnectionChange();
         });
         return duplicateAction;
     }

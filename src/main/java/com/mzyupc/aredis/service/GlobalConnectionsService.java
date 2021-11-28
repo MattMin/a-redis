@@ -1,7 +1,7 @@
 package com.mzyupc.aredis.service;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.PersistentStateComponent;
-import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
 import com.mzyupc.aredis.vo.ConnectionInfo;
@@ -17,17 +17,11 @@ import java.util.List;
 })
 public class GlobalConnectionsService implements PersistentStateComponent<GlobalConnectionsService.State> {
 
-    public static GlobalConnectionsService getInstance() {
-        return ServiceManager.getService(GlobalConnectionsService.class);
-    }
-
-    @Data
-    static class State {
-        private List<ConnectionInfo> connections = new ArrayList<>();
-        private Boolean reloadAfterAddingTheKey;
-    }
-
     private State myState = new State();
+
+    public static GlobalConnectionsService getInstance() {
+        return ApplicationManager.getApplication().getService(GlobalConnectionsService.class);
+    }
 
     @Nullable
     @Override
@@ -50,5 +44,11 @@ public class GlobalConnectionsService implements PersistentStateComponent<Global
 
     public void setReloadAfterAddingTheKey(Boolean reloadAfterAddingTheKey) {
         myState.setReloadAfterAddingTheKey(reloadAfterAddingTheKey);
+    }
+
+    @Data
+    static class State {
+        private List<ConnectionInfo> connections = new ArrayList<>();
+        private Boolean reloadAfterAddingTheKey;
     }
 }
