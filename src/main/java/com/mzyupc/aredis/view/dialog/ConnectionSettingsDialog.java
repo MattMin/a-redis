@@ -9,6 +9,11 @@ import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.NumberDocument;
 import com.intellij.ui.treeStructure.Tree;
+import com.intellij.util.messages.MessageBus;
+import com.intellij.util.ui.JBUI;
+import com.mzyupc.aredis.message.ARedisEventType;
+import com.mzyupc.aredis.message.ARedisStateChangeEvent;
+import com.mzyupc.aredis.message.ARedisStateChangeListener;
 import com.mzyupc.aredis.utils.PropertyUtil;
 import com.mzyupc.aredis.utils.RedisPoolManager;
 import com.mzyupc.aredis.view.ConnectionManager;
@@ -26,6 +31,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 
+import static com.mzyupc.aredis.message.ARedisStateChangeListener.AREDIS_STATE_CHANGE_TOPIC;
+
 /**
  * @author mzyupc@163.com
  */
@@ -35,26 +42,28 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
     JTextField hostField;
     JTextField portField;
     JPasswordField passwordField;
+    JCheckBox globalCheckBox;
     private PropertyUtil propertyUtil;
-    private String connectionId;
+    private ConnectionInfo connection;
     private CustomOKAction okAction;
     private Tree connectionTree;
     private ConnectionManager connectionManager;
 
     /**
      * if connectionId is blank ? New Connection : Edit Connection
+     *
      * @param project
-     * @param connectionId
+     * @param connection
      * @param connectionTree
      */
-    public ConnectionSettingsDialog(Project project, String connectionId, Tree connectionTree, ConnectionManager connectionManager) {
+    public ConnectionSettingsDialog(Project project, ConnectionInfo connection, Tree connectionTree, ConnectionManager connectionManager) {
         super(project);
         this.propertyUtil = PropertyUtil.getInstance(project);
-        this.connectionId = connectionId;
+        this.connection = connection;
         this.connectionTree = connectionTree;
         this.connectionManager = connectionManager;
         this.setTitle("Connection Settings");
-        this.setSize(600, 300);
+        this.setSize(650, 240);
         this.init();
     }
 
@@ -71,7 +80,6 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
     @Override
     protected @Nullable
     JComponent createCenterPanel() {
-        ConnectionInfo connection = propertyUtil.getConnection(connectionId);
         boolean newConnection = connection == null;
 
         // TODO 参数校验, 输入框下面展示提示
@@ -90,29 +98,33 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         passwordField = new JPasswordField(newConnection ? null : connection.getPassword());
 
         // 显示密码
-        JCheckBox checkBox = new JCheckBox("Show Password");
-        checkBox.addItemListener(e -> {
+        JCheckBox showPasswordCheckBox = new JCheckBox("Show Password");
+        showPasswordCheckBox.setBorder(JBUI.Borders.emptyRight(10));
+        showPasswordCheckBox.setPreferredSize(new Dimension(140, 12));
+        showPasswordCheckBox.addItemListener(e -> {
             if (e.getStateChange() == ItemEvent.SELECTED) {
                 passwordField.setEchoChar((char) 0);
             } else {
                 passwordField.setEchoChar('*');
             }
         });
-        checkBox.setBounds(300, 81, 135, 27);
 
-        // 测试连接按钮
-        JButton testButton = new JButton("Test Connection");
+        // 设为全局
+        globalCheckBox = new JCheckBox("As Global");
+        globalCheckBox.setSelected(!newConnection && connection.getGlobal());
+        globalCheckBox.setBorder(JBUI.Borders.emptyRight(10));
+        globalCheckBox.setPreferredSize(new Dimension(140, 12));
 
         JTextPane testResult = new JTextPane();
-        testResult.setMargin(new Insets(0, 10, 0, 0));
+        testResult.setMargin(JBUI.insetsLeft(10));
         testResult.setOpaque(false);
         testResult.setEditable(false);
         testResult.setFocusable(false);
         testResult.setAlignmentX(SwingConstants.LEFT);
 
-
         LoadingDecorator loadingDecorator = new LoadingDecorator(testResult, this, 0);
-
+        // 测试连接按钮
+        JButton testButton = new JButton("Test Connection");
         testButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -128,7 +140,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                     }
 
                     loadingDecorator.startLoading(false);
-                    ApplicationManager.getApplication().invokeLater(()->{
+                    ApplicationManager.getApplication().invokeLater(() -> {
                         RedisPoolManager.TestConnectionResult testConnectionResult = RedisPoolManager.getTestConnectionResult(hostField.getText(), Integer.parseInt(portField.getText()), password);
                         testResult.setText(testConnectionResult.getMsg());
                         if (testConnectionResult.isSuccess()) {
@@ -142,100 +154,48 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
             }
         });
 
-        // 使用 GridBagLayout 布局
-        GridBagLayout gridBagLayout = new GridBagLayout();
-        GridBagConstraints constraints = new GridBagConstraints();
-        constraints.fill = GridBagConstraints.BOTH;
         JPanel connectionSettingsPanel = new JPanel();
-        connectionSettingsPanel.setLayout(gridBagLayout);
+        BoxLayout boxLayout = new BoxLayout(connectionSettingsPanel, BoxLayout.Y_AXIS);
+        connectionSettingsPanel.setLayout(boxLayout);
 
-        constraints.gridx = 0;
-        constraints.gridy = 0;
-        constraints.gridwidth = 1;
-        constraints.gridheight = 1;
-        constraints.weightx = 0.15;
-        constraints.weighty = 0.33;
         JLabel connectionNameLabel = new JLabel("Connection Name:");
-        gridBagLayout.setConstraints(connectionNameLabel, constraints);
+        connectionNameLabel.setPreferredSize(new Dimension(130, 12));
+        connectionNameLabel.setBorder(JBUI.Borders.emptyLeft(10));
 
-        constraints.gridx = 1;
-        constraints.gridy = 0;
-        constraints.gridwidth = 3;
-        constraints.gridheight = 1;
-        constraints.weightx = 0.85;
-        constraints.weighty = 0.33;
-        gridBagLayout.setConstraints(nameTextField, constraints);
-
-        connectionSettingsPanel.add(connectionNameLabel);
-        connectionSettingsPanel.add(nameTextField);
-
-        constraints.gridx = 0;
-        constraints.gridy = 1;
-        constraints.gridwidth = 1;
-        constraints.gridheight = 1;
-        constraints.weightx = 0.15;
-        constraints.weighty = 0.33;
         JLabel hostLabel = new JLabel("Host:");
-        gridBagLayout.setConstraints(hostLabel, constraints);
+        hostLabel.setBorder(JBUI.Borders.emptyLeft(10));
+        hostLabel.setPreferredSize(new Dimension(130, 12));
 
-        constraints.gridx = 1;
-        constraints.gridy = 1;
-        constraints.gridwidth = 1;
-        constraints.gridheight = 1;
-        constraints.weightx = 0.55;
-        constraints.weighty = 0.33;
-        gridBagLayout.setConstraints(hostField, constraints);
+        JLabel portLabel = new JLabel("Port:");
+        portLabel.setBorder(JBUI.Borders.emptyLeft(4));
+        JPanel portPanel = new JPanel(new BorderLayout());
+        portPanel.add(portLabel, BorderLayout.WEST);
+        portPanel.add(portField, BorderLayout.CENTER);
+        portPanel.setPreferredSize(new Dimension(140, 12));
+        portPanel.setBorder(JBUI.Borders.emptyRight(40));
 
-        constraints.gridx = 2;
-        constraints.gridy = 1;
-        constraints.gridwidth = 1;
-        constraints.gridheight = 1;
-        constraints.weightx = 0.15;
-        constraints.weighty = 0.33;
-        JLabel portLabel = new JLabel("Port:", SwingConstants.CENTER);
-        gridBagLayout.setConstraints(portLabel, constraints);
-
-        constraints.gridx = 3;
-        constraints.gridy = 1;
-        constraints.gridwidth = 1;
-        constraints.gridheight = 1;
-        constraints.weightx = 0.15;
-        constraints.weighty = 0.33;
-        gridBagLayout.setConstraints(portField, constraints);
-
-        connectionSettingsPanel.add(hostLabel);
-        connectionSettingsPanel.add(hostField);
-        connectionSettingsPanel.add(portLabel);
-        connectionSettingsPanel.add(portField);
-
-        constraints.gridx = 0;
-        constraints.gridy = 2;
-        constraints.gridwidth = 1;
-        constraints.gridheight = 1;
-        constraints.weightx = 0.15;
-        constraints.weighty = 0.33;
         JLabel passwordLabel = new JLabel("Password:");
-        gridBagLayout.setConstraints(passwordLabel, constraints);
+        passwordLabel.setBorder(JBUI.Borders.emptyLeft(10));
+        passwordLabel.setPreferredSize(new Dimension(130, 12));
 
-        constraints.gridx = 1;
-        constraints.gridy = 2;
-        constraints.gridwidth = 2;
-        constraints.gridheight = 1;
-        constraints.weightx = 0.7;
-        constraints.weighty = 0.33;
-        gridBagLayout.setConstraints(passwordField, constraints);
+        JPanel connectionNameRowPanel = new JPanel(new BorderLayout());
+        connectionNameRowPanel.add(connectionNameLabel, BorderLayout.WEST);
+        connectionNameRowPanel.add(nameTextField, BorderLayout.CENTER);
+        connectionNameRowPanel.add(globalCheckBox, BorderLayout.EAST);
 
-        constraints.gridx = 3;
-        constraints.gridy = 2;
-        constraints.gridwidth = 1;
-        constraints.gridheight = 1;
-        constraints.weightx = 0.15;
-        constraints.weighty = 0.33;
-        gridBagLayout.setConstraints(checkBox, constraints);
+        JPanel hostRowPanel = new JPanel(new BorderLayout());
+        hostRowPanel.add(hostLabel, BorderLayout.WEST);
+        hostRowPanel.add(hostField, BorderLayout.CENTER);
+        hostRowPanel.add(portPanel, BorderLayout.EAST);
 
-        connectionSettingsPanel.add(passwordLabel);
-        connectionSettingsPanel.add(passwordField);
-        connectionSettingsPanel.add(checkBox);
+        JPanel passwordRowPanel = new JPanel(new BorderLayout());
+        passwordRowPanel.add(passwordLabel, BorderLayout.WEST);
+        passwordRowPanel.add(passwordField, BorderLayout.CENTER);
+        passwordRowPanel.add(showPasswordCheckBox, BorderLayout.EAST);
+
+        connectionSettingsPanel.add(connectionNameRowPanel);
+        connectionSettingsPanel.add(hostRowPanel);
+        connectionSettingsPanel.add(passwordRowPanel);
 
         JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT));
         row.add(testButton);
@@ -245,12 +205,13 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
 
         JPanel centerPanel = new JPanel(new BorderLayout());
         centerPanel.add(connectionSettingsPanel, BorderLayout.NORTH);
-        centerPanel.add(testConnectionSettingsPanel, BorderLayout.SOUTH);
+        centerPanel.add(testConnectionSettingsPanel, BorderLayout.CENTER);
         return centerPanel;
     }
 
     @Override
-    public @Nullable JComponent getPreferredFocusedComponent() {
+    public @Nullable
+    JComponent getPreferredFocusedComponent() {
         return nameTextField;
     }
 
@@ -317,7 +278,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                 ErrorDialog.show(validationInfo.message);
             } else {
                 DefaultTreeModel connectionTreeModel = (DefaultTreeModel) connectionTree.getModel();
-                if (StringUtils.isEmpty(connectionId)) {
+                if (connection == null) {
                     // 保存connection
                     String password = null;
                     if (StringUtils.isNotBlank(new String(passwordField.getPassword()))) {
@@ -328,6 +289,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                             .name(nameTextField.getText())
                             .url(hostField.getText())
                             .port(portField.getText())
+                            .global(globalCheckBox.isSelected())
                             .password(password)
                             .build();
                     propertyUtil.saveConnection(connectionInfo);
@@ -341,28 +303,37 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                     if (StringUtils.isNotBlank(new String(passwordField.getPassword()))) {
                         password = new String(passwordField.getPassword());
                     }
-                    ConnectionInfo connectionInfo = ConnectionInfo.builder()
-                            .id(connectionId)
-                            .name(nameTextField.getText())
-                            .url(hostField.getText())
-                            .port(portField.getText())
-                            .password(password)
-                            .build();
+                    // 更新持久化信息
+                    connection.setName(nameTextField.getText());
+                    connection.setUrl(hostField.getText());
+                    connection.setPort(portField.getText());
+                    connection.setPassword(password);
+                    if (connection.getGlobal() != globalCheckBox.isSelected()) {
+                        // 更改了配置级别
+                        connection.setGlobal(globalCheckBox.isSelected());
+                        propertyUtil.saveConnection(connection);
+                    }
                     // 更新redisPoolMgr
-                    RedisPoolManager redisPoolManager = new RedisPoolManager(connectionInfo);
-                    connectionManager.getConnectionRedisMap().put(connectionId, redisPoolManager);
+                    RedisPoolManager redisPoolManager = new RedisPoolManager(connection);
+                    connectionManager.getConnectionRedisMap().put(connection.getId(), redisPoolManager);
                     // 设置connectionNode的connectionInfo
                     TreePath selectionPath = connectionTree.getSelectionPath();
                     DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) selectionPath.getPath()[1];
-                    connectionNode.setUserObject(connectionInfo);
+                    connectionNode.setUserObject(connection);
                     // 重新载入connectionNode
                     connectionTreeModel.reload(connectionNode);
-                    // 更新持久化信息
-                    propertyUtil.removeConnection(connectionId, redisPoolManager);
-                    propertyUtil.saveConnection(connectionInfo);
 
                     close(OK_EXIT_CODE);
                 }
+
+                // 通知其他项目更新connectionTree
+                MessageBus messageBus = ApplicationManager.getApplication().getMessageBus();
+                ARedisStateChangeListener stateChangeListener = messageBus.syncPublisher(AREDIS_STATE_CHANGE_TOPIC);
+                stateChangeListener.stateChanged(
+                        ARedisStateChangeEvent.builder()
+                                .eventType(ARedisEventType.CONNECTION_CHANGE)
+                                .build()
+                );
             }
         }
     }

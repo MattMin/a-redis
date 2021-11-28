@@ -1,6 +1,5 @@
 package com.mzyupc.aredis.utils;
 
-import com.alibaba.fastjson.JSON;
 import com.google.common.collect.Lists;
 import com.intellij.openapi.Disposable;
 import com.mzyupc.aredis.view.dialog.ErrorDialog;
@@ -8,14 +7,12 @@ import com.mzyupc.aredis.vo.ConnectionInfo;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.reflect.MethodUtils;
 import redis.clients.jedis.*;
 import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.jedis.util.Pool;
 
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
+import javax.annotation.Nullable;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -129,10 +126,8 @@ public class RedisPoolManager implements Disposable {
             }
 
             Client client = jedis.getClient();
-            Method method = MethodUtils.getMatchingMethod(Client.class, "sendCommand", Protocol.Command.class, String[].class);
-            method.setAccessible(true);
 //            processArgs(cmd, args);
-            method.invoke(client, cmd, args);
+            client.sendCommand(cmd, args);
             try {
                 List<String> respList = new ArrayList<>();
                 Object response = client.getOne();
@@ -171,7 +166,7 @@ public class RedisPoolManager implements Disposable {
             } catch (JedisException e) {
                 return Collections.singletonList(e.getMessage());
             }
-        } catch (InvocationTargetException | IllegalAccessException | IllegalArgumentException e) {
+        } catch (IllegalArgumentException e) {
             return Collections.singletonList(e.getMessage());
         }
     }
@@ -247,6 +242,7 @@ public class RedisPoolManager implements Disposable {
      *
      * @return
      */
+    @Nullable
     public Jedis getJedis(int db) {
         try {
             Jedis resource = getJedisPool().getResource();
@@ -295,10 +291,11 @@ public class RedisPoolManager implements Disposable {
      * @param db
      * @return
      */
+    @Nullable
     public Long dbSize(int db) {
         try (Jedis jedis = getJedis(db)) {
             if (jedis == null) {
-                return 0L;
+                return null;
             }
             return jedis.dbSize();
         }
@@ -325,12 +322,13 @@ public class RedisPoolManager implements Disposable {
      *
      * @param key
      */
-    public void del(String key, int db) {
+    @Nullable
+    public Long del(String key, int db) {
         try (Jedis jedis = getJedis(db)) {
             if (jedis == null) {
-                return;
+                return null;
             }
-            jedis.del(key);
+            return jedis.del(key);
         } catch (Exception e) {
             throw new IllegalArgumentException("删除失败", e);
         }

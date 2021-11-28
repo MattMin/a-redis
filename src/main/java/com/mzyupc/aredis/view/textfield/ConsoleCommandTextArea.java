@@ -104,14 +104,15 @@ public class ConsoleCommandTextArea extends JTextPane {
         // 绘制行号的颜色
         g.setColor(JBColor.BLACK);
         g.setFont(new Font(getFont().getName(), getFont().getStyle(), this.fontSize));
+        final int lineHeight = g.getFontMetrics().getHeight();
         for (int row = 0; row < rows; row++) {
-            g.drawString(">", 2, getPositionY(row + 1));
+            g.drawString(">", 2, getPositionY(row + 1, lineHeight));
         }
     }
 
-    private int getPositionY(int row) {
+    private int getPositionY(int row, int lineHeight) {
         // 与fontSize有关
-        return (row * 17) - 4;
+        return (row * lineHeight) - 4;
     }
 
     /**

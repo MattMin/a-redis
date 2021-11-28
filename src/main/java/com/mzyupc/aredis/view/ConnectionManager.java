@@ -10,12 +10,17 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.LoadingDecorator;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.treeStructure.Tree;
+import com.intellij.util.messages.MessageBus;
 import com.mzyupc.aredis.action.*;
+import com.mzyupc.aredis.message.ARedisEventType;
+import com.mzyupc.aredis.message.ARedisStateChangeEvent;
+import com.mzyupc.aredis.message.ARedisStateChangeListener;
 import com.mzyupc.aredis.utils.JTreeUtil;
 import com.mzyupc.aredis.utils.PropertyUtil;
 import com.mzyupc.aredis.utils.RedisPoolManager;
 import com.mzyupc.aredis.view.dialog.ConfirmDialog;
 import com.mzyupc.aredis.view.dialog.ConnectionSettingsDialog;
+import com.mzyupc.aredis.view.dialog.InfoDialog;
 import com.mzyupc.aredis.view.editor.ConsoleFileSystem;
 import com.mzyupc.aredis.view.editor.ConsoleVirtualFile;
 import com.mzyupc.aredis.view.editor.KeyValueDisplayFileSystem;
@@ -39,6 +44,7 @@ import java.util.List;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArraySet;
 
+import static com.mzyupc.aredis.message.ARedisStateChangeListener.AREDIS_STATE_CHANGE_TOPIC;
 import static com.mzyupc.aredis.utils.JTreeUtil.expandTree;
 
 /**
@@ -65,9 +71,47 @@ public class ConnectionManager {
 
     private LoadingDecorator connectionTreeLoadingDecorator;
 
-    public ConnectionManager(Project project) {
+    /**
+     * 插件初始化时会调用
+     *
+     * @param project
+     */
+    protected ConnectionManager(Project project) {
         this.project = project;
         this.propertyUtil = PropertyUtil.getInstance(project);
+    }
+
+    public static ConnectionManager getInstance(Project project) {
+        return project.getService(ConnectionManager.class);
+    }
+
+    private static TreeExpander getTreeExpander(JTree tree) {
+        return new TreeExpander() {
+            @Override
+            public void expandAll() {
+                expandTree(tree, true);
+            }
+
+            @Override
+            public boolean canExpand() {
+                return true;
+            }
+
+            @Override
+            public void collapseAll() {
+                DefaultMutableTreeNode root = (DefaultMutableTreeNode) tree.getModel().getRoot();
+                for (int i = 0; i < root.getChildCount(); i++) {
+                    DefaultMutableTreeNode child = (DefaultMutableTreeNode) root.getChildAt(i);
+                    JTreeUtil.expandAll(tree, new TreePath(child.getPath()), false);
+                }
+            }
+
+            @Override
+            public boolean canCollapse() {
+                return true;
+            }
+
+        };
     }
 
     /**
@@ -106,8 +150,8 @@ public class ConnectionManager {
                 int x = e.getX();
                 int y = e.getY();
 
-                // connectionTree的双击事件
-                if (e.getClickCount() == 2) {
+                // connectionTree的双击事件 && 不是右键
+                if (e.getClickCount() == 2 && !e.isMetaDown()) {
 
                     // 第一个选中的节点路径
                     TreePath selectionPath = connectionTree.getSelectionPath();
@@ -195,64 +239,6 @@ public class ConnectionManager {
         return actionToolbar;
     }
 
-    private static TreeExpander getTreeExpander(JTree tree) {
-        return new TreeExpander() {
-            @Override
-            public void expandAll() {
-                expandTree(tree, true);
-            }
-
-            @Override
-            public boolean canExpand() {
-                return true;
-            }
-
-            @Override
-            public void collapseAll() {
-                DefaultMutableTreeNode root = (DefaultMutableTreeNode) tree.getModel().getRoot();
-                for (int i = 0; i < root.getChildCount(); i++) {
-                    DefaultMutableTreeNode child = (DefaultMutableTreeNode) root.getChildAt(i);
-                    JTreeUtil.expandAll(tree, new TreePath(child.getPath()), false);
-                }
-            }
-
-            @Override
-            public boolean canCollapse() {
-                return true;
-            }
-
-        };
-    }
-
-    /**
-     * 添加DB子节点到connection节点下面
-     *
-     * @param connectionNode
-     */
-    private void addDbs2Connection(DefaultMutableTreeNode connectionNode) {
-        ConnectionInfo connection = (ConnectionInfo) connectionNode.getUserObject();
-        if (connection == null) {
-            return;
-        }
-
-        RedisPoolManager redisPoolManager = connectionRedisMap.get(connection.getId());
-        int dbCount = redisPoolManager.getDbCount();
-        propertyUtil.setDbCount(connection.getId(), dbCount);
-
-        // 移除原有节点
-        connectionNode.removeAllChildren();
-        // 添加新节点
-        for (int i = 0; i < dbCount; i++) {
-            Long keyCount = redisPoolManager.dbSize(i);
-            DbInfo dbInfo = DbInfo.builder()
-                    .index(i)
-                    .keyCount(keyCount)
-                    .connectionId(connection.getId())
-                    .build();
-            connectionNode.add(new DefaultMutableTreeNode(dbInfo, false));
-        }
-    }
-
     /**
      * 添加连接到connectionPanel
      *
@@ -291,7 +277,7 @@ public class ConnectionManager {
             connectionRedisMap.remove(connectionInfoId);
 
             // 从properties中移除
-            propertyUtil.removeConnection(connectionInfoId, redisPoolManager);
+            propertyUtil.removeConnection(connectionInfo, redisPoolManager);
 
             // 查询过DB才有
             if (redisPoolManager != null) {
@@ -301,8 +287,74 @@ public class ConnectionManager {
             // 关闭所有KeyValueDisplayPanel
             closeAllEditor(connectionInfoId);
         }
+
+        // 通知其他项目更新connectionTree
+        MessageBus messageBus = ApplicationManager.getApplication().getMessageBus();
+        ARedisStateChangeListener stateChangeListener = messageBus.syncPublisher(AREDIS_STATE_CHANGE_TOPIC);
+        stateChangeListener.stateChanged(
+                ARedisStateChangeEvent.builder()
+                        .eventType(ARedisEventType.CONNECTION_CHANGE)
+                        .build()
+        );
     }
 
+    /**
+     * 关闭tab时移除connection-editor
+     */
+    public void removeEditor(String connectionId, KeyValueDisplayVirtualFile virtualFile) {
+        CopyOnWriteArraySet<KeyValueDisplayVirtualFile> keyValueDisplayVirtualFiles = connectionDbEditorMap.get(connectionId);
+        if (CollectionUtils.isEmpty(keyValueDisplayVirtualFiles)) {
+            return;
+        }
+        keyValueDisplayVirtualFiles.remove(virtualFile);
+    }
+
+    public void reloadConnections() {
+        // remove
+        DefaultMutableTreeNode root = (DefaultMutableTreeNode) connectionTreeModel.getRoot();
+        root.removeAllChildren();
+
+        // add
+        List<ConnectionInfo> connections = propertyUtil.getConnections();
+        for (ConnectionInfo connection : connections) {
+            if (connection != null && StringUtils.isNotEmpty(connection.getId())) {
+                addConnectionToList(connectionTreeModel, connection);
+            }
+        }
+
+    }
+
+    /**
+     * 添加DB子节点到connection节点下面
+     *
+     * @param connectionNode
+     */
+    private void addDbs2Connection(DefaultMutableTreeNode connectionNode) {
+        ConnectionInfo connection = (ConnectionInfo) connectionNode.getUserObject();
+        if (connection == null) {
+            return;
+        }
+
+        RedisPoolManager redisPoolManager = connectionRedisMap.get(connection.getId());
+        int dbCount = redisPoolManager.getDbCount();
+        propertyUtil.setDbCount(connection.getId(), dbCount);
+
+        // 移除原有节点
+        connectionNode.removeAllChildren();
+        // 添加新节点
+        for (int i = 0; i < dbCount; i++) {
+            Long keyCount = redisPoolManager.dbSize(i);
+            if (keyCount == null) {
+                return;
+            }
+            DbInfo dbInfo = DbInfo.builder()
+                    .index(i)
+                    .keyCount(keyCount)
+                    .connectionId(connection.getId())
+                    .build();
+            connectionNode.add(new DefaultMutableTreeNode(dbInfo, false));
+        }
+    }
 
     /**
      * 查询connectionPanel中选中的connectionInfo, 并删除选中的tree
@@ -361,17 +413,6 @@ public class ConnectionManager {
                 .build();
         addConnectionToList((DefaultTreeModel) connectionTree.getModel(), newConnectionInfo);
         return newConnectionInfo;
-    }
-
-    /**
-     * 关闭tab时移除connection-editor
-     */
-    public void removeEditor(String connectionId, KeyValueDisplayVirtualFile virtualFile) {
-        CopyOnWriteArraySet<KeyValueDisplayVirtualFile> keyValueDisplayVirtualFiles = connectionDbEditorMap.get(connectionId);
-        if (CollectionUtils.isEmpty(keyValueDisplayVirtualFiles)) {
-            return;
-        }
-        keyValueDisplayVirtualFiles.remove(virtualFile);
     }
 
     /**
@@ -487,7 +528,7 @@ public class ConnectionManager {
             DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) selectionPath.getPath()[1];
             ConnectionInfo connectionInfo = (ConnectionInfo) connectionNode.getUserObject();
             // 弹出连接配置窗口
-            ConnectionSettingsDialog connectionSettingsDialog = new ConnectionSettingsDialog(project, connectionInfo.getId(), connectionTree, this);
+            ConnectionSettingsDialog connectionSettingsDialog = new ConnectionSettingsDialog(project, connectionInfo, connectionTree, this);
             connectionSettingsDialog.show();
         });
         return editAction;
@@ -527,7 +568,7 @@ public class ConnectionManager {
                 }
             }
 
-            // todo console
+            // console
             ConsoleVirtualFile consoleVirtualFile = new ConsoleVirtualFile(
                     connectionInfo.getName() + "-Console",
                     project,
@@ -537,6 +578,27 @@ public class ConnectionManager {
             ConsoleFileSystem.getInstance(project).openEditor(consoleVirtualFile);
         });
         return consoleAction;
+    }
+
+    private InfoAction createInfoAction(Tree connectionTree) {
+        InfoAction infoAction = new InfoAction();
+        infoAction.setAction(anActionEvent -> {
+            TreePath selectionPath = connectionTree.getSelectionPath();
+            if (selectionPath == null || selectionPath.getPathCount() != 2) {
+                return;
+            }
+
+            DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) selectionPath.getPath()[1];
+            ConnectionInfo connectionInfo = (ConnectionInfo) connectionNode.getUserObject();
+            RedisPoolManager redis = getConnectionRedisMap().get(connectionInfo.getId());
+            try (Jedis jedis = redis.getJedis(0)) {
+                if (jedis == null) {
+                    return;
+                }
+            }
+            new InfoDialog(project, redis).show();
+        });
+        return infoAction;
     }
 
     private CloseAction createCloseAction(Tree connectionTree, DefaultTreeModel connectionTreeModel) {
@@ -581,6 +643,7 @@ public class ConnectionManager {
         actionGroup.add(createDeleteAction(connectionTree));
         actionGroup.addSeparator();
         actionGroup.add(createConsoleAction(connectionTree));
+        actionGroup.add(createInfoAction(connectionTree));
         actionGroup.addSeparator();
         actionGroup.add(createCloseAction(connectionTree, connectionTreeModel));
         ActionPopupMenu menu = ActionManager.getInstance().createActionPopupMenu(ActionPlaces.POPUP, actionGroup);

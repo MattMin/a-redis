@@ -139,6 +139,10 @@ public class ValueDisplayPanel extends JPanel {
 
         ApplicationManager.getApplication().invokeLater(() -> {
             try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                if (jedis == null) {
+                    return;
+                }
+
                 Boolean exists = jedis.exists(key);
                 if (exists == null || !exists) {
                     ErrorDialog.show("No such key: " + key);
@@ -286,12 +290,16 @@ public class ValueDisplayPanel extends JPanel {
                         String.format("Are you sure you want to set TTL to %s?", text),
                         actionEvent -> {
                             try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
-                                int newTtl = Integer.parseInt(text);
+                                if (jedis == null) {
+                                    return;
+                                }
+
+                                long newTtl = Long.parseLong(text);
                                 if (newTtl < 0) {
                                     newTtl = -1;
                                 }
                                 jedis.expire(key, newTtl);
-                                ttl = (long) newTtl;
+                                ttl = newTtl;
                                 ttlTextField.setText(ttl.toString());
                             } catch (NumberFormatException exception) {
                                 ErrorDialog.show("Wrong TTL format for input: " + text);
@@ -313,6 +321,11 @@ public class ValueDisplayPanel extends JPanel {
                         "Confirm",
                         "Are you sure you want to delete this key?",
                         actionEvent -> {
+                            try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                                if (jedis == null) {
+                                    return;
+                                }
+                            }
                             DefaultTreeModel treeModel = keyTreeDisplayPanel.getTreeModel();
                             DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
                             DefaultMutableTreeNode deletedNode = deleteNode(root, key);
@@ -654,6 +667,9 @@ public class ValueDisplayPanel extends JPanel {
                         "Do you really want to remove this row?",
                         actionEvent -> {
                             try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                                if (jedis == null) {
+                                    return;
+                                }
                                 if (!jedis.exists(key)) {
                                     ErrorDialog.show(String.format("No such key: %s", key));
                                 } else {
@@ -698,6 +714,9 @@ public class ValueDisplayPanel extends JPanel {
                 AddRowDialog addRowDialog = new AddRowDialog(project, typeEnum);
                 addRowDialog.setCustomOkAction(actionEvent -> {
                     try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                        if (jedis == null) {
+                            return;
+                        }
                         if (!jedis.exists(key)) {
                             ErrorDialog.show(String.format("No such key: %s", key));
                             addRowDialog.close(OK_EXIT_CODE);
@@ -782,12 +801,18 @@ public class ValueDisplayPanel extends JPanel {
         switch (typeEnum) {
             case String:
                 try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                    if (jedis == null) {
+                        return;
+                    }
                     jedis.set(key, newValue);
                 }
                 break;
 
             case List:
                 try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                    if (jedis == null) {
+                        return;
+                    }
                     int selectedIndex = getSelectedIndex();
                     if (selectedIndex >= 0) {
                         jedis.lset(key, selectedIndex, newValue);
@@ -797,6 +822,9 @@ public class ValueDisplayPanel extends JPanel {
 
             case Set:
                 try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                    if (jedis == null) {
+                        return;
+                    }
                     if (selectedRow >= 0 && !getSelectedValue().equals(newValue)) {
                         jedis.srem(key, getSelectedValue());
                         jedis.sadd(key, newValue);
@@ -806,6 +834,9 @@ public class ValueDisplayPanel extends JPanel {
 
             case Zset:
                 try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                    if (jedis == null) {
+                        return;
+                    }
                     if (selectedRow >= 0 && StringUtils.isNotEmpty(newFieldOrScore)) {
                         jedis.zrem(key, getSelectedValue());
                         jedis.zadd(key, Double.parseDouble(newFieldOrScore), newValue);
@@ -815,6 +846,9 @@ public class ValueDisplayPanel extends JPanel {
 
             case Hash:
                 try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                    if (jedis == null) {
+                        return;
+                    }
                     if (selectedRow >= 0 && StringUtils.isNotEmpty(getSelectedFieldOrScore())) {
                         jedis.hdel(key, getSelectedFieldOrScore());
                         jedis.hset(key, newFieldOrScore, newValue);
@@ -844,6 +878,9 @@ public class ValueDisplayPanel extends JPanel {
                         String.format("Do you want to rename \"%s\" to \"%s\"?", key, newKey),
                         actionEvent -> {
                             try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                                if (jedis == null) {
+                                    return;
+                                }
                                 final Long renamenx = jedis.renamenx(key, newKey);
                                 if (renamenx == 0) {
                                     ErrorDialog.show(String.format("\"%s\" already exists!", newKey));

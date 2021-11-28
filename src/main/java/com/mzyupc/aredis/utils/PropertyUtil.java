@@ -1,26 +1,24 @@
 package com.mzyupc.aredis.utils;
 
-import com.alibaba.fastjson.JSON;
 import com.google.common.collect.Lists;
 import com.intellij.ide.util.PropertiesComponent;
-import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.project.Project;
+import com.mzyupc.aredis.service.ConnectionsService;
+import com.mzyupc.aredis.service.GlobalConnectionsService;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import com.mzyupc.aredis.vo.DbInfo;
 import org.apache.commons.lang.StringUtils;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static com.mzyupc.aredis.view.ARedisKeyValueDisplayPanel.DEFAULT_GROUP_SYMBOL;
 
 /**
  * @author mzyupc@163.com
  */
-public class PropertyUtil implements PersistentStateComponent {
+public class PropertyUtil {
     /**
      * connection id集合的key
      */
@@ -30,15 +28,41 @@ public class PropertyUtil implements PersistentStateComponent {
 
     private static final String DB_COUNT_KEY = "dbCount:";
 
-    private static PropertiesComponent properties;
+    private PropertiesComponent properties;
 
-    private static PropertyUtil instance = new PropertyUtil();
+    private GlobalConnectionsService globalConnectionsService;
 
-    private PropertyUtil () {}
+    private ConnectionsService connectionsService;
+
+    private PropertyUtil(Project project) {
+        properties = PropertiesComponent.getInstance(project);
+        globalConnectionsService = GlobalConnectionsService.getInstance();
+        connectionsService = ConnectionsService.getInstance(project);
+    }
 
     public static PropertyUtil getInstance(Project project) {
-        properties = PropertiesComponent.getInstance(project);
-        return instance;
+        PropertyUtil propertyUtil = new PropertyUtil(project);
+
+        // 迁移之前的配置
+        // 迁移RELOAD_AFTER_ADDING_THE_KEY
+        if (propertyUtil.properties.isValueSet(RELOAD_AFTER_ADDING_THE_KEY)) {
+            final boolean aBoolean = propertyUtil.properties.getBoolean(RELOAD_AFTER_ADDING_THE_KEY, false);
+            propertyUtil.globalConnectionsService.setReloadAfterAddingTheKey(aBoolean);
+            propertyUtil.properties.unsetValue(RELOAD_AFTER_ADDING_THE_KEY);
+        }
+
+        // 迁移CONNECTION_ID_LIST_KEY
+        final List<ConnectionInfo> connections = propertyUtil.getConnectionsOld();
+        if (!connections.isEmpty()) {
+            final List<ConnectionInfo> newConnections = propertyUtil.connectionsService.getConnections();
+            for (ConnectionInfo connection : connections) {
+                connection.setGlobal(false);
+                propertyUtil.removeConnectionOld(connection.getId());
+                newConnections.add(connection);
+            }
+            propertyUtil.properties.unsetValue(CONNECTION_ID_LIST_KEY);
+        }
+        return propertyUtil;
     }
 
     /**
@@ -46,7 +70,7 @@ public class PropertyUtil implements PersistentStateComponent {
      *
      * @return 连接列表元素
      */
-    public List<ConnectionInfo> getConnections() {
+    public List<ConnectionInfo> getConnectionsOld() {
         String[] ids = properties.getValues(CONNECTION_ID_LIST_KEY);
         if (ids == null || ids.length == 0) {
             return Lists.newArrayList();
@@ -56,7 +80,7 @@ public class PropertyUtil implements PersistentStateComponent {
         for (String id : ids) {
             String connection = properties.getValue(id);
             if (StringUtils.isEmpty(connection)) {
-                removeConnection(id, null);
+                removeConnectionOld(id);
                 continue;
             }
             result.add(JSON.parseObject(connection, ConnectionInfo.class));
@@ -64,12 +88,32 @@ public class PropertyUtil implements PersistentStateComponent {
         return result;
     }
 
+    public List<ConnectionInfo> getConnections() {
+        final List<ConnectionInfo> globalConnections = globalConnectionsService.getConnections();
+        final List<ConnectionInfo> connections = connectionsService.getConnections();
+        if (connections.isEmpty() && globalConnections.isEmpty()) {
+            return Lists.newArrayList();
+        }
+
+        List<ConnectionInfo> result = new ArrayList<>(globalConnections.size() + connections.size());
+        for (ConnectionInfo connection : globalConnections) {
+            connection.setGlobal(true);
+            result.add(connection);
+        }
+        for (ConnectionInfo connection : connections) {
+            connection.setGlobal(false);
+            result.add(connection);
+        }
+        return result;
+    }
+
     /**
      * 保存连接信息
+     * <p>
+     * todo 持久化敏感信息
+     *
      * @param connectionInfo 连接信息
      * @return 连接ID
-     *
-     * todo 持久化敏感信息
      */
     public String saveConnection(ConnectionInfo connectionInfo) {
         if (connectionInfo == null) {
@@ -82,15 +126,14 @@ public class PropertyUtil implements PersistentStateComponent {
         }
 
         connectionInfo.setId(connectionInfoId);
-        properties.setValue(connectionInfoId, JSON.toJSONString(connectionInfo));
 
-        String[] ids = properties.getValues(CONNECTION_ID_LIST_KEY);
-        if (ids == null || ids.length == 0) {
-            properties.setValues(CONNECTION_ID_LIST_KEY, new String[]{connectionInfoId});
+        // Brainless deletion
+        globalConnectionsService.getConnections().remove(connectionInfo);
+        connectionsService.getConnections().remove(connectionInfo);
+        if (Boolean.TRUE.equals(connectionInfo.getGlobal())) {
+            globalConnectionsService.getConnections().add(connectionInfo);
         } else {
-            ArrayList<String> idList = Lists.newArrayList(ids);
-            idList.add(connectionInfoId);
-            properties.setValues(CONNECTION_ID_LIST_KEY, idList.toArray(new String[]{}));
+            connectionsService.getConnections().add(connectionInfo);
         }
         return connectionInfoId;
     }
@@ -99,9 +142,8 @@ public class PropertyUtil implements PersistentStateComponent {
      * 删除连接
      *
      * @param id 连接ID
-     * @param redisPoolManager
      */
-    public void removeConnection(String id, RedisPoolManager redisPoolManager) {
+    public void removeConnectionOld(String id) {
         String[] ids = properties.getValues(CONNECTION_ID_LIST_KEY);
         if (ids == null || ids.length == 0) {
             return;
@@ -117,14 +159,18 @@ public class PropertyUtil implements PersistentStateComponent {
         properties.unsetValue(id);
 
         // 移除groupSymbol
-        if (redisPoolManager != null) {
-            for (int i = 0; i < getDbCount(id); i++) {
-                removeGroupSymbol(DbInfo.builder()
-                        .connectionId(id)
-                        .index(i)
-                        .build());
-            }
+        for (int i = 0; i < getDbCountOld(id); i++) {
+            properties.unsetValue(getGroupSymbolKey(DbInfo.builder()
+                    .connectionId(id)
+                    .index(i)
+                    .build()));
         }
+        properties.unsetValue(DB_COUNT_KEY + id);
+    }
+
+    public void removeConnection(ConnectionInfo connectionInfo, RedisPoolManager redisPoolManager) {
+        globalConnectionsService.getConnections().remove(connectionInfo);
+        connectionsService.getConnections().remove(connectionInfo);
     }
 
     /**
@@ -138,54 +184,45 @@ public class PropertyUtil implements PersistentStateComponent {
             return null;
         }
 
-        String value = properties.getValue(id);
-        if (StringUtils.isEmpty(value)) {
-            return null;
-        }
+        final Map<String, ConnectionInfo> collect = getConnections().stream()
+                .collect(Collectors.toMap(ConnectionInfo::getId, Function.identity()));
 
-        return JSON.parseObject(value, ConnectionInfo.class);
+        return collect.get(id);
     }
 
     public boolean getReloadAfterAddingTheKey() {
-        return properties.getBoolean(RELOAD_AFTER_ADDING_THE_KEY, false);
+        return globalConnectionsService.getReloadAfterAddingTheKey() != null && globalConnectionsService.getReloadAfterAddingTheKey();
     }
 
     public void setReloadAfterAddingTheKey(boolean reloadAfterAddingTheKey) {
-        properties.setValue(RELOAD_AFTER_ADDING_THE_KEY, reloadAfterAddingTheKey);
+        globalConnectionsService.setReloadAfterAddingTheKey(reloadAfterAddingTheKey);
     }
 
     public void saveGroupSymbol(DbInfo dbInfo, String groupSymbol) {
-        properties.setValue(getGroupSymbolKey(dbInfo), groupSymbol);
+        final ConnectionInfo connection = getConnection(dbInfo.getConnectionId());
+        Map<Integer, String> groupSymbols = connection.getGroupSymbols();
+        if (groupSymbols == null) {
+            groupSymbols = new HashMap<>();
+            connection.setGroupSymbols(groupSymbols);
+        }
+        groupSymbols.put(dbInfo.getIndex(), groupSymbol);
     }
 
     public String getGroupSymbol(DbInfo dbInfo) {
-        return properties.getValue(getGroupSymbolKey(dbInfo), DEFAULT_GROUP_SYMBOL);
-    }
-
-    public void removeGroupSymbol(DbInfo dbInfo) {
-        properties.unsetValue(getGroupSymbolKey(dbInfo));
+        return Optional.ofNullable(getConnection(dbInfo.getConnectionId()).getGroupSymbols())
+                .map(e -> e.getOrDefault(dbInfo.getIndex(), DEFAULT_GROUP_SYMBOL))
+                .orElse(DEFAULT_GROUP_SYMBOL);
     }
 
     public void setDbCount(String connectionId, int dbCount) {
-        properties.setValue(DB_COUNT_KEY + connectionId, dbCount + "");
+        //properties.setValue(DB_COUNT_KEY + connectionId, dbCount + "");
     }
 
-    public int getDbCount(String connectionId) {
+    public int getDbCountOld(String connectionId) {
         return properties.getInt(DB_COUNT_KEY + connectionId, 0);
     }
 
     private String getGroupSymbolKey(DbInfo dbInfo) {
         return dbInfo.getConnectionId() + ":" + dbInfo.getIndex();
-    }
-
-    @Nullable
-    @Override
-    public Object getState() {
-        return null;
-    }
-
-    @Override
-    public void loadState(@NotNull Object o) {
-
     }
 }
