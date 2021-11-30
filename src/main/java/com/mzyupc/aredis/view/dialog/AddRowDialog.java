@@ -42,7 +42,7 @@ public class AddRowDialog extends DialogWrapper {
         super(project);
         this.project = project;
         this.valueTypeEnum = valueTypeEnum;
-
+        this.myOKAction = new CustomOKAction();
         this.init();
     }
 
@@ -64,16 +64,6 @@ public class AddRowDialog extends DialogWrapper {
     @Override
     public @Nullable JComponent getPreferredFocusedComponent() {
         return scoreOrFieldTextField == null ? valueTextArea : scoreOrFieldTextField;
-    }
-
-    @NotNull
-    @Override
-    protected Action[] createActions() {
-        DialogWrapperExitAction exitAction = new DialogWrapperExitAction("Cancel", CANCEL_EXIT_CODE);
-        AddRowDialog.CustomOKAction okAction = new AddRowDialog.CustomOKAction();
-        // 设置默认的焦点按钮
-        okAction.putValue(DialogWrapper.DEFAULT_ACTION, true);
-        return new Action[]{exitAction, okAction};
     }
 
     private JPanel createValuePanel() {
@@ -167,6 +157,7 @@ public class AddRowDialog extends DialogWrapper {
     protected class CustomOKAction extends DialogWrapperAction {
         protected CustomOKAction() {
             super("OK");
+            putValue(DialogWrapper.DEFAULT_ACTION, true);
         }
 
         @Override

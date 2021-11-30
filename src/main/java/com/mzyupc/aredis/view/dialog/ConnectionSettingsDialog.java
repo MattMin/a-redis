@@ -15,7 +15,6 @@ import com.mzyupc.aredis.utils.RedisPoolManager;
 import com.mzyupc.aredis.view.ConnectionManager;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import org.apache.commons.lang.StringUtils;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
@@ -39,7 +38,6 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
     JCheckBox globalCheckBox;
     private PropertyUtil propertyUtil;
     private ConnectionInfo connection;
-    private CustomOKAction okAction;
     private Tree connectionTree;
     private ConnectionManager connectionManager;
 
@@ -58,6 +56,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         this.connectionManager = connectionManager;
         this.setTitle("Connection Settings");
         this.setSize(650, 240);
+        this.myOKAction = new CustomOKAction();
         this.init();
     }
 
@@ -210,22 +209,6 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
     }
 
     /**
-     * 覆盖默认的ok/cancel按钮
-     *
-     * @return
-     */
-    @NotNull
-    @Override
-    protected Action[] createActions() {
-        DialogWrapperExitAction exitAction = new DialogWrapperExitAction("Cancel", CANCEL_EXIT_CODE);
-        okAction = new CustomOKAction();
-
-        // 设置默认的焦点按钮
-        okAction.putValue(DialogWrapper.DEFAULT_ACTION, true);
-        return new Action[]{exitAction, okAction};
-    }
-
-    /**
      * 校验数据
      *
      * @return 通过必须返回null，不通过返回一个 ValidationInfo 信息
@@ -262,6 +245,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
 
         protected CustomOKAction() {
             super("OK");
+            putValue(DialogWrapper.DEFAULT_ACTION, true);
         }
 
         @Override
