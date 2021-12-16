@@ -40,7 +40,6 @@ public class KeyValueDisplayEditor extends UserDataHolderBase implements FileEdi
     @Override
     public @Nls(capitalization = Nls.Capitalization.Title)
     @NotNull String getName() {
-        // todo
         return "Editor Name";
     }
 

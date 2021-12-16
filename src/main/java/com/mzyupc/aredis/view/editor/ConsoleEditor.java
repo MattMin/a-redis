@@ -40,7 +40,6 @@ public class ConsoleEditor extends UserDataHolderBase implements FileEditor {
     @Override
     public @Nls(capitalization = Nls.Capitalization.Title)
     @NotNull String getName() {
-        // todo
         return "Editor Name";
     }
 

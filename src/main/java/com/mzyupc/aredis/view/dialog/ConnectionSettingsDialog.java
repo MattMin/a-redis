@@ -75,7 +75,6 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
     JComponent createCenterPanel() {
         boolean newConnection = connection == null;
 
-        // TODO 参数校验, 输入框下面展示提示
         nameTextField = new JTextField(newConnection ? null : connection.getName());
         nameTextField.setToolTipText("Connection Name");
 
