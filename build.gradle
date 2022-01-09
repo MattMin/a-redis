@@ -4,7 +4,7 @@ plugins {
 }
 
 group 'com.mzyupc'
-version 'beta-0.6.0'
+version 'beta-0.7.0'
 
 sourceCompatibility = JavaVersion.VERSION_11
 targetCompatibility = JavaVersion.VERSION_11
@@ -38,6 +38,10 @@ patchPluginXml {
     sinceBuild = '201.8743.12'
     untilBuild = provider { null }
     changeNotes = """
+      beta-0.7.0</br>
+      <ul>
+      <li>update: the Dialog's OK/Cancel buttons are arranged in a different order depending on the operating system.</li>
+      </ul>
       beta-0.6.0</br>
       <ul>
       <li>new: redis connection right-click menu adds "Info" function</li>
