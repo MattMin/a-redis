@@ -81,6 +81,7 @@ public class NewKeyDialog extends DialogWrapper {
         propertyUtil = PropertyUtil.getInstance(project);
         reloadSelected = propertyUtil.getReloadAfterAddingTheKey();
         this.project = project;
+        this.myOKAction = new CustomOKAction();
         this.init();
     }
 
@@ -306,23 +307,13 @@ public class NewKeyDialog extends DialogWrapper {
         return stringTypePanel;
     }
 
-    @NotNull
-    @Override
-    protected Action[] createActions() {
-        DialogWrapperExitAction exitAction = new DialogWrapperExitAction("Cancel", CANCEL_EXIT_CODE);
-        NewKeyDialog.CustomOKAction okAction = new NewKeyDialog.CustomOKAction();
-        // 设置默认的焦点按钮
-        okAction.putValue(DialogWrapper.DEFAULT_ACTION, true);
-        return new Action[]{exitAction, okAction};
-    }
-
-
     /**
      * 自定义 ok Action
      */
     protected class CustomOKAction extends DialogWrapperAction {
         protected CustomOKAction() {
             super("OK");
+            putValue(DialogWrapper.DEFAULT_ACTION, true);
         }
 
         @Override

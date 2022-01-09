@@ -644,9 +644,6 @@ public class ValueDisplayPanel extends JPanel {
             }
         });
 
-        // 单击表头排序
-        valueTable.setAutoCreateRowSorter(true);
-
         return valueTable;
     }
 

@@ -109,8 +109,6 @@ public class PropertyUtil {
 
     /**
      * 保存连接信息
-     * <p>
-     * todo 持久化敏感信息
      *
      * @param connectionInfo 连接信息
      * @return 连接ID

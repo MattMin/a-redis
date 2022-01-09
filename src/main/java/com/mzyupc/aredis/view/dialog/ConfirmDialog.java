@@ -33,6 +33,7 @@ public class ConfirmDialog extends DialogWrapper {
         this.setTitle(title);
         this.setResizable(false);
         this.setAutoAdjustable(true);
+        this.myOKAction = new CustomOKAction();
         this.init();
     }
 
@@ -50,26 +51,12 @@ public class ConfirmDialog extends DialogWrapper {
     }
 
     /**
-     * 覆盖默认的ok/cancel按钮
-     *
-     * @return
-     */
-    @NotNull
-    @Override
-    protected Action[] createActions() {
-        DialogWrapperExitAction exitAction = new DialogWrapperExitAction("Cancel", CANCEL_EXIT_CODE);
-        CustomOKAction okAction = new CustomOKAction();
-        // 设置默认的焦点按钮
-        okAction.putValue(DialogWrapper.DEFAULT_ACTION, true);
-        return new Action[]{exitAction, okAction};
-    }
-
-    /**
      * 自定义 ok Action
      */
     protected class CustomOKAction extends DialogWrapperAction {
         protected CustomOKAction() {
             super("OK");
+            putValue(DialogWrapper.DEFAULT_ACTION, true);
         }
 
         @Override
