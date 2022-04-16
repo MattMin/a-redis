@@ -4,7 +4,7 @@ plugins {
 }
 
 group 'com.mzyupc'
-version 'beta-0.7.0'
+version 'beta-0.8.0'
 
 sourceCompatibility = JavaVersion.VERSION_11
 targetCompatibility = JavaVersion.VERSION_11
