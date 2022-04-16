@@ -136,6 +136,7 @@ public class ConnectionManager {
      */
     public Tree createConnectionTree(ARedisToolWindow parent, JPanel connectionPanel) {
         Tree connectionTree = new Tree();
+        // TODO 2022/4/16 开启链接的时候 因为读DB下的key数量导致整个软件卡住
         connectionTreeLoadingDecorator = new LoadingDecorator(new JBScrollPane(connectionTree), parent, 0);
         connectionPanel.add(connectionTreeLoadingDecorator.getComponent(), BorderLayout.CENTER);
 
