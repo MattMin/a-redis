@@ -5,6 +5,7 @@ import com.intellij.ide.CommonActionsManager;
 import com.intellij.ide.TreeExpander;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.LoadingDecorator;
@@ -18,6 +19,7 @@ import com.mzyupc.aredis.message.ARedisStateChangeListener;
 import com.mzyupc.aredis.utils.JTreeUtil;
 import com.mzyupc.aredis.utils.PropertyUtil;
 import com.mzyupc.aredis.utils.RedisPoolManager;
+import com.mzyupc.aredis.utils.ThreadPoolManager;
 import com.mzyupc.aredis.view.dialog.ConfirmDialog;
 import com.mzyupc.aredis.view.dialog.ConnectionSettingsDialog;
 import com.mzyupc.aredis.view.dialog.InfoDialog;
@@ -139,6 +141,7 @@ public class ConnectionManager {
         // TODO 2022/4/16 开启链接的时候 因为读DB下的key数量导致整个软件卡住
         connectionTreeLoadingDecorator = new LoadingDecorator(new JBScrollPane(connectionTree), parent, 0);
         connectionPanel.add(connectionTreeLoadingDecorator.getComponent(), BorderLayout.CENTER);
+//        connectionPanel.add(new JBScrollPane(connectionTree), BorderLayout.CENTER);
 
         connectionTree.setCellRenderer(new ConnectionTreeCellRenderer());
         connectionTree.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -167,13 +170,17 @@ public class ConnectionManager {
                         if (connectionNode.getChildCount() == 0) {
                             // 添加DB子节点
                             connectionTreeLoadingDecorator.startLoading(false);
-                            ApplicationManager.getApplication().invokeLater(() -> {
-                                addDbs2Connection(connectionNode);
-                                // 刷新节点
-                                connectionTreeModel.reload(connectionNode);
-                                // 展开当前连接
-                                JTreeUtil.expandAll(connectionTree, new TreePath(new Object[]{connectionTreeRoot, connectionNode}), true);
-                            });
+                            ReadAction.nonBlocking(() -> {
+                                try {
+                                    addDbs2Connection(connectionNode);
+                                    // 刷新节点
+                                    connectionTreeModel.reload(connectionNode);
+                                    // 展开当前连接
+                                    JTreeUtil.expandAll(connectionTree, new TreePath(new Object[]{connectionTreeRoot, connectionNode}), true);
+                                } finally {
+                                    connectionTreeLoadingDecorator.stopLoading();
+                                }
+                            }).submit(ThreadPoolManager.getExecutor());
                         }
                     }
 
@@ -187,19 +194,25 @@ public class ConnectionManager {
                         DbInfo dbInfo = (DbInfo) dbNode.getUserObject();
                         connectionTreeLoadingDecorator.startLoading(false);
 
-                        ApplicationManager.getApplication().invokeLater(() -> {
-                            String connectionId = connectionInfo.getId();
-                            KeyValueDisplayVirtualFile keyValueDisplayVirtualFile = new KeyValueDisplayVirtualFile(connectionInfo.getName() + "-DB" + dbInfo.getIndex(),
-                                    project,
-                                    connectionInfo,
-                                    dbInfo,
-                                    connectionRedisMap.get(connectionId),
-                                    connectionManager);
-                            KeyValueDisplayFileSystem.getInstance(project).openEditor(keyValueDisplayVirtualFile);
-                            addEditorToMap(connectionId, keyValueDisplayVirtualFile);
-                        });
+                        ReadAction.nonBlocking(() -> {
+                            try {
+                                String connectionId = connectionInfo.getId();
+                                KeyValueDisplayVirtualFile keyValueDisplayVirtualFile = new KeyValueDisplayVirtualFile(connectionInfo.getName() + "-DB" + dbInfo.getIndex(),
+                                        project,
+                                        connectionInfo,
+                                        dbInfo,
+                                        connectionRedisMap.get(connectionId),
+                                        connectionManager);
+                                ApplicationManager.getApplication().invokeLater(() -> {
+                                    KeyValueDisplayFileSystem.getInstance(project).openEditor(keyValueDisplayVirtualFile);
+                                    addEditorToMap(connectionId, keyValueDisplayVirtualFile);
+                                });
+                            } finally {
+                                connectionTreeLoadingDecorator.stopLoading();
+                            }
+                        }).submit(ThreadPoolManager.getExecutor());
                     }
-                    connectionTreeLoadingDecorator.stopLoading();
+
                 }
 
                 if (e.getButton() == MouseEvent.BUTTON3) {
@@ -504,25 +517,28 @@ public class ConnectionManager {
     private RefreshAction createRefreshAction(Tree connectionTree, DefaultTreeModel connectionTreeModel, LoadingDecorator connectionTreeLoadingDecorator) {
         RefreshAction refreshAction = new RefreshAction();
         refreshAction.setAction(e -> {
-            connectionTreeLoadingDecorator.startLoading(false);
             // reload server function
             TreePath[] selectionPaths = connectionTree.getSelectionPaths();
             if (selectionPaths == null) {
                 return;
             }
 
-            for (TreePath selectionPath : selectionPaths) {
-                if (selectionPath.getPathCount() != 2) {
-                    continue;
+            connectionTreeLoadingDecorator.startLoading(false);
+            ReadAction.nonBlocking(() -> {
+                try {
+                    for (TreePath selectionPath : selectionPaths) {
+                        if (selectionPath.getPathCount() != 2) {
+                            continue;
+                        }
+                        DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) selectionPath.getPath()[1];
+                        addDbs2Connection(connectionNode);
+                        connectionTreeModel.reload(connectionNode);
+                    }
+                } finally {
+                    connectionTreeLoadingDecorator.stopLoading();
                 }
+            }).submit(ThreadPoolManager.getExecutor());
 
-                DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) selectionPath.getPath()[1];
-                ApplicationManager.getApplication().invokeLater(() -> {
-                    addDbs2Connection(connectionNode);
-                    connectionTreeModel.reload(connectionNode);
-                });
-            }
-            connectionTreeLoadingDecorator.stopLoading();
         });
         return refreshAction;
     }

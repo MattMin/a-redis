@@ -1,5 +1,6 @@
 package com.mzyupc.aredis.view.dialog;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.ui.Messages;
 
 /**
@@ -8,6 +9,8 @@ import com.intellij.openapi.ui.Messages;
  */
 public class ErrorDialog {
     public static void show(String message) {
-        Messages.showMessageDialog(message, "Error", Messages.getErrorIcon());
+        ApplicationManager.getApplication().invokeLater(() -> {
+            Messages.showMessageDialog(message, "Error", Messages.getErrorIcon());
+        });
     }
 }

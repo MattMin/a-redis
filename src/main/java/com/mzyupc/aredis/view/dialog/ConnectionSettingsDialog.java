@@ -1,7 +1,7 @@
 package com.mzyupc.aredis.view.dialog;
 
 import com.intellij.openapi.Disposable;
-import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.LoadingDecorator;
@@ -12,6 +12,7 @@ import com.intellij.ui.treeStructure.Tree;
 import com.intellij.util.ui.JBUI;
 import com.mzyupc.aredis.utils.PropertyUtil;
 import com.mzyupc.aredis.utils.RedisPoolManager;
+import com.mzyupc.aredis.utils.ThreadPoolManager;
 import com.mzyupc.aredis.view.ConnectionManager;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import org.apache.commons.lang.StringUtils;
@@ -132,16 +133,20 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                     }
 
                     loadingDecorator.startLoading(false);
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        RedisPoolManager.TestConnectionResult testConnectionResult = RedisPoolManager.getTestConnectionResult(hostField.getText(), Integer.parseInt(portField.getText()), password);
-                        testResult.setText(testConnectionResult.getMsg());
-                        if (testConnectionResult.isSuccess()) {
-                            testResult.setForeground(JBColor.GREEN);
-                        } else {
-                            testResult.setForeground(JBColor.RED);
+                    ReadAction.nonBlocking(() -> {
+                        try {
+                            RedisPoolManager.TestConnectionResult testConnectionResult = RedisPoolManager.getTestConnectionResult(hostField.getText(), Integer.parseInt(portField.getText()), password);
+                            testResult.setText(testConnectionResult.getMsg());
+                            if (testConnectionResult.isSuccess()) {
+                                testResult.setForeground(JBColor.GREEN);
+                            } else {
+                                testResult.setForeground(JBColor.RED);
+                            }
+                        } finally {
+                            loadingDecorator.stopLoading();
                         }
-                    });
-                    loadingDecorator.stopLoading();
+                    }).submit(ThreadPoolManager.getExecutor());
+
                 }
             }
         });
