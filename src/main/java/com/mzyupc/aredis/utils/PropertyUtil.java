@@ -7,6 +7,7 @@ import com.mzyupc.aredis.service.ConnectionsService;
 import com.mzyupc.aredis.service.GlobalConnectionsService;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import com.mzyupc.aredis.vo.DbInfo;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 
 import java.util.*;
@@ -71,8 +72,8 @@ public class PropertyUtil {
      * @return 连接列表元素
      */
     public List<ConnectionInfo> getConnectionsOld() {
-        String[] ids = properties.getValues(CONNECTION_ID_LIST_KEY);
-        if (ids == null || ids.length == 0) {
+        List<String> ids = properties.getList(CONNECTION_ID_LIST_KEY);
+        if (CollectionUtils.isEmpty(ids)) {
             return Lists.newArrayList();
         }
 
@@ -142,18 +143,17 @@ public class PropertyUtil {
      * @param id 连接ID
      */
     public void removeConnectionOld(String id) {
-        String[] ids = properties.getValues(CONNECTION_ID_LIST_KEY);
-        if (ids == null || ids.length == 0) {
+        List<String> ids = properties.getList(CONNECTION_ID_LIST_KEY);
+        if (CollectionUtils.isEmpty(ids)) {
             return;
         }
 
-        ArrayList<String> idList = Lists.newArrayList(ids);
-        if (!idList.contains(id)) {
+        if (!ids.contains(id)) {
             return;
         }
 
-        idList.remove(id);
-        properties.setValues(CONNECTION_ID_LIST_KEY, idList.toArray(new String[]{}));
+        ids.remove(id);
+        properties.setList(CONNECTION_ID_LIST_KEY, ids);
         properties.unsetValue(id);
 
         // 移除groupSymbol

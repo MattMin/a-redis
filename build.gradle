@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'org.jetbrains.intellij' version '1.1.4'
+    id 'org.jetbrains.intellij' version '1.5.3'
 }
 
 group 'com.mzyupc'
@@ -31,11 +31,11 @@ dependencies {
 
 // See https://github.com/JetBrains/gradle-intellij-plugin/
 intellij {
-    version = '2021.2.3'
+    version = '2022.1'
 }
 
 patchPluginXml {
-    sinceBuild = '201.8743.12'
+    sinceBuild = '221.3427.89'
     untilBuild = provider { null }
     changeNotes = """
       beta-0.7.0</br>
@@ -45,7 +45,7 @@ patchPluginXml {
       beta-0.6.0</br>
       <ul>
       <li>new: redis connection right-click menu adds "Info" function</li>
-      <li>new: the connection can be set to global in the connection settings popup</li>
+      <li>new: the connection can be set to global in the connection PropertyUtilsettings popup</li>
       <li>update: fix redis console line height</li>
       <li>update: use jackson to serialize json</li>
       </ul>

@@ -6,7 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## TODO
-- Update deprecated API
 - Support for TLS
 
 ## [Unreleased]
@@ -15,6 +14,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - 使用第三方主题时, 背景错误
 - 开启链接的时候 因为读DB下的key数量导致整个软件卡住 (Loading 时冻结 UI)
+
+### Changed
+- Update deprecated API
 
 ## [beta-0.7.0]
 
