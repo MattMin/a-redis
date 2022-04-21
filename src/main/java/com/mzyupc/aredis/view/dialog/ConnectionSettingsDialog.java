@@ -2,12 +2,16 @@ package com.mzyupc.aredis.view.dialog;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.LoadingDecorator;
+import com.intellij.openapi.ui.TextFieldWithBrowseButton;
 import com.intellij.openapi.ui.ValidationInfo;
+import com.intellij.openapi.util.Comparing;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.NumberDocument;
+import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.treeStructure.Tree;
 import com.intellij.util.ui.JBUI;
 import com.mzyupc.aredis.utils.PropertyUtil;
@@ -42,6 +46,8 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
     private Tree connectionTree;
     private ConnectionManager connectionManager;
 
+    private Project project;
+
     /**
      * if connectionId is blank ? New Connection : Edit Connection
      *
@@ -51,6 +57,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
      */
     public ConnectionSettingsDialog(Project project, ConnectionInfo connection, Tree connectionTree, ConnectionManager connectionManager) {
         super(project);
+        this.project = project;
         this.propertyUtil = PropertyUtil.getInstance(project);
         this.connection = connection;
         this.connectionTree = connectionTree;
@@ -190,9 +197,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         passwordRowPanel.add(passwordField, BorderLayout.CENTER);
         passwordRowPanel.add(showPasswordCheckBox, BorderLayout.EAST);
 
-        connectionSettingsPanel.add(connectionNameRowPanel);
-        connectionSettingsPanel.add(hostRowPanel);
-        connectionSettingsPanel.add(passwordRowPanel);
+
 
         JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT));
         row.add(testButton);
@@ -200,9 +205,48 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         testConnectionSettingsPanel.add(row);
         testConnectionSettingsPanel.add(loadingDecorator.getComponent());
 
+        // todo ssl/tls
+        JPanel sslPanel = new JPanel(new BorderLayout());
+        JCheckBox sslCheckBox = new JCheckBox("SSL/TLS");
+
+        JPanel sslCheckBoxRow = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        sslCheckBoxRow.add(sslCheckBox);
+
+        TextFieldWithBrowseButton publicKeyField = new TextFieldWithBrowseButton();
+        publicKeyField.setEditable(false);
+        publicKeyField.addBrowseFolderListener(
+                "Select a Public Key",
+                "Select a public key description",
+                project,
+                getFileChooserDescriptor());
+
+        JBLabel publicKeyLabel = new JBLabel("Public Key");
+        JPanel publicKeyRow = new JPanel(new BorderLayout());
+
+        JPanel keySelectPanel = new JPanel(new BorderLayout());
+        keySelectPanel.add(publicKeyField, BorderLayout.NORTH);
+        keySelectPanel.setVisible(false);
+
+        sslPanel.add(sslCheckBoxRow, BorderLayout.NORTH);
+        sslPanel.add(keySelectPanel, BorderLayout.CENTER);
+
+        sslCheckBox.addItemListener(e -> {
+            if (e.getStateChange() == ItemEvent.SELECTED) {
+                keySelectPanel.setVisible(true);
+            } else {
+                keySelectPanel.setVisible(false);
+            }
+        });
+
+
+        connectionSettingsPanel.add(connectionNameRowPanel);
+        connectionSettingsPanel.add(hostRowPanel);
+        connectionSettingsPanel.add(passwordRowPanel);
+        connectionSettingsPanel.add(sslPanel);
+
         JPanel centerPanel = new JPanel(new BorderLayout());
         centerPanel.add(connectionSettingsPanel, BorderLayout.NORTH);
-        centerPanel.add(testConnectionSettingsPanel, BorderLayout.CENTER);
+        centerPanel.add(testConnectionSettingsPanel, BorderLayout.SOUTH);
         return centerPanel;
     }
 
@@ -311,6 +355,14 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                 connectionManager.emitConnectionChange();
             }
         }
+    }
+
+    private FileChooserDescriptor getFileChooserDescriptor() {
+        return new FileChooserDescriptor(true, false, false, false, false, false)
+                .withFileFilter((file) ->
+                        Comparing.equal(file.getExtension(), "crt", false)
+                                || Comparing.equal(file.getExtension(), "key", false)
+                                || Comparing.equal(file.getExtension(), "pem", false));
     }
 
 }
