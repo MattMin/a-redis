@@ -2,6 +2,7 @@ package com.mzyupc.aredis.view;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileTypes.PlainTextLanguage;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.LoadingDecorator;
@@ -17,6 +18,7 @@ import com.mzyupc.aredis.enums.RedisValueTypeEnum;
 import com.mzyupc.aredis.enums.ValueFormatEnum;
 import com.mzyupc.aredis.layout.VFlowLayout;
 import com.mzyupc.aredis.utils.RedisPoolManager;
+import com.mzyupc.aredis.utils.ThreadPoolManager;
 import com.mzyupc.aredis.view.dialog.AddRowDialog;
 import com.mzyupc.aredis.view.dialog.ConfirmDialog;
 import com.mzyupc.aredis.view.dialog.ErrorDialog;
@@ -137,16 +139,16 @@ public class ValueDisplayPanel extends JPanel {
 
         loadingDecorator.startLoading(false);
 
-        ApplicationManager.getApplication().invokeLater(() -> {
+        ReadAction.nonBlocking(() -> {
             try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
                 if (jedis == null) {
-                    return;
+                    return null;
                 }
 
                 Boolean exists = jedis.exists(key);
                 if (exists == null || !exists) {
                     ErrorDialog.show("No such key: " + key);
-                    return;
+                    return null;
                 }
 
                 this.key = key;
@@ -201,14 +203,16 @@ public class ValueDisplayPanel extends JPanel {
                         break;
 
                     default:
-                        return;
+                        return null;
                 }
 
-                this.initWithValue();
+                ApplicationManager.getApplication().invokeLater(this::initWithValue);
+            } finally {
+                loadingDecorator.stopLoading();
             }
-        });
+            return null;
+        }).submit(ThreadPoolManager.getExecutor());
 
-        loadingDecorator.stopLoading();
     }
 
     private void initWithValue() {

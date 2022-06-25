@@ -1,10 +1,10 @@
 plugins {
     id 'java'
-    id 'org.jetbrains.intellij' version '1.1.4'
+    id "org.jetbrains.intellij" version "1.6.0"
 }
 
 group 'com.mzyupc'
-version 'beta-0.7.0'
+version 'beta-0.8.0'
 
 sourceCompatibility = JavaVersion.VERSION_11
 targetCompatibility = JavaVersion.VERSION_11
@@ -30,14 +30,22 @@ dependencies {
 }
 
 // See https://github.com/JetBrains/gradle-intellij-plugin/
+// 调试插件的 IDEA 版本
 intellij {
-    version = '2021.2.3'
+    version = '2022.1'
 }
 
 patchPluginXml {
+    // 声明插件适用的版本
     sinceBuild = '201.8743.12'
     untilBuild = provider { null }
     changeNotes = """
+      beta-0.8.0</br>
+      <ul>
+      <li>update: update deprecated API</li>
+      <li>fix: background display issues when using third party themes</li>
+      <li>fix: freezing the UI while loading</li>
+      </ul>
       beta-0.7.0</br>
       <ul>
       <li>update: the Dialog's OK/Cancel buttons are arranged in a different order depending on the operating system.</li>
@@ -45,7 +53,7 @@ patchPluginXml {
       beta-0.6.0</br>
       <ul>
       <li>new: redis connection right-click menu adds "Info" function</li>
-      <li>new: the connection can be set to global in the connection settings popup</li>
+      <li>new: the connection can be set to global in the connection PropertyUtilsettings popup</li>
       <li>update: fix redis console line height</li>
       <li>update: use jackson to serialize json</li>
       </ul>

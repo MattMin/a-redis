@@ -3,7 +3,7 @@ package com.mzyupc.aredis.view;
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.CommonActionsManager;
 import com.intellij.openapi.actionSystem.*;
-import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.LoadingDecorator;
 import com.intellij.ui.JBSplitter;
@@ -18,6 +18,7 @@ import com.mzyupc.aredis.action.DeleteAction;
 import com.mzyupc.aredis.action.RefreshAction;
 import com.mzyupc.aredis.utils.JSON;
 import com.mzyupc.aredis.utils.RedisPoolManager;
+import com.mzyupc.aredis.utils.ThreadPoolManager;
 import com.mzyupc.aredis.view.dialog.ConfirmDialog;
 import com.mzyupc.aredis.view.dialog.ErrorDialog;
 import com.mzyupc.aredis.view.dialog.NewKeyDialog;
@@ -296,46 +297,49 @@ public class KeyTreeDisplayPanel extends JPanel {
     @SneakyThrows
     public void renderKeyTree(String keyFilter, String groupSymbol) {
         keyDisplayLoadingDecorator.startLoading(false);
+        ReadAction.nonBlocking(() -> {
+            try {
+                Long dbSize = redisPoolManager.dbSize(dbInfo.getIndex());
+                if (dbSize == null) {
+                    return null;
+                }
+                dbInfo.setKeyCount(dbSize);
+                flatRootNode = new DefaultMutableTreeNode(dbInfo);
+                // redis 查询前pageSize个key
+                allKeys = redisPoolManager.scan(SCAN_POINTER_START, keyFilter, pageSize, dbInfo.getIndex());
 
-        ApplicationManager.getApplication().invokeLater(() -> {
-            Long dbSize = redisPoolManager.dbSize(dbInfo.getIndex());
-            if (dbSize == null) {
-                return;
-            }
-            dbInfo.setKeyCount(dbSize);
-            flatRootNode = new DefaultMutableTreeNode(dbInfo);
-            // redis 查询前pageSize个key
-            allKeys = redisPoolManager.scan(SCAN_POINTER_START, keyFilter, pageSize, dbInfo.getIndex());
+                // exception occurred
+                if (allKeys == null) {
+                    return null;
+                }
 
-            // exception occurred
-            if (allKeys == null) {
-                return;
-            }
+                if (CollectionUtils.isNotEmpty(allKeys)) {
+                    allKeys = allKeys.stream().sorted().collect(Collectors.toList());
 
-            if (CollectionUtils.isNotEmpty(allKeys)) {
-                allKeys = allKeys.stream().sorted().collect(Collectors.toList());
-
-                int size = allKeys.size();
-                int start = (pageIndex - 1) * pageSize;
-                int end = Math.min(start + pageSize, size);
-                currentPageKeys = allKeys.subList(start, end);
-                if (!CollectionUtils.isEmpty(currentPageKeys)) {
-                    for (String key : currentPageKeys) {
-                        DefaultMutableTreeNode keyNode = new DefaultMutableTreeNode(KeyInfo.builder()
-                                .key(key)
-                                .del(false)
-                                .build());
-                        flatRootNode.add(keyNode);
+                    int size = allKeys.size();
+                    int start = (pageIndex - 1) * pageSize;
+                    int end = Math.min(start + pageSize, size);
+                    currentPageKeys = allKeys.subList(start, end);
+                    if (!CollectionUtils.isEmpty(currentPageKeys)) {
+                        for (String key : currentPageKeys) {
+                            DefaultMutableTreeNode keyNode = new DefaultMutableTreeNode(KeyInfo.builder()
+                                    .key(key)
+                                    .del(false)
+                                    .build());
+                            flatRootNode.add(keyNode);
+                        }
                     }
                 }
+
+                updateKeyTree(groupSymbol);
+                updatePageLabel();
+                keyDisplayPanel.updateUI();
+            } finally {
+                keyDisplayLoadingDecorator.stopLoading();
             }
+            return null;
+        }).submit(ThreadPoolManager.getExecutor());
 
-            updateKeyTree(groupSymbol);
-            updatePageLabel();
-        });
-
-        keyDisplayLoadingDecorator.stopLoading();
-        keyDisplayPanel.updateUI();
     }
 
     /**
