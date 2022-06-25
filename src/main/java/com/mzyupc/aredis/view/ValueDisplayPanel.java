@@ -142,13 +142,13 @@ public class ValueDisplayPanel extends JPanel {
         ReadAction.nonBlocking(() -> {
             try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
                 if (jedis == null) {
-                    return;
+                    return null;
                 }
 
                 Boolean exists = jedis.exists(key);
                 if (exists == null || !exists) {
                     ErrorDialog.show("No such key: " + key);
-                    return;
+                    return null;
                 }
 
                 this.key = key;
@@ -203,13 +203,14 @@ public class ValueDisplayPanel extends JPanel {
                         break;
 
                     default:
-                        return;
+                        return null;
                 }
 
                 ApplicationManager.getApplication().invokeLater(this::initWithValue);
             } finally {
                 loadingDecorator.stopLoading();
             }
+            return null;
         }).submit(ThreadPoolManager.getExecutor());
 
     }

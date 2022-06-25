@@ -6,12 +6,10 @@ import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.LoadingDecorator;
-import com.intellij.openapi.ui.TextFieldWithBrowseButton;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.openapi.util.Comparing;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.NumberDocument;
-import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.treeStructure.Tree;
 import com.intellij.util.ui.JBUI;
 import com.mzyupc.aredis.utils.PropertyUtil;
@@ -142,7 +140,10 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                     loadingDecorator.startLoading(false);
                     ReadAction.nonBlocking(() -> {
                         try {
-                            RedisPoolManager.TestConnectionResult testConnectionResult = RedisPoolManager.getTestConnectionResult(hostField.getText(), Integer.parseInt(portField.getText()), password);
+                            RedisPoolManager.TestConnectionResult testConnectionResult =
+                                    RedisPoolManager.getTestConnectionResult(hostField.getText(),
+                                            Integer.parseInt(portField.getText()),
+                                            password);
                             testResult.setText(testConnectionResult.getMsg());
                             if (testConnectionResult.isSuccess()) {
                                 testResult.setForeground(JBColor.GREEN);
@@ -152,6 +153,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                         } finally {
                             loadingDecorator.stopLoading();
                         }
+                        return null;
                     }).submit(ThreadPoolManager.getExecutor());
 
                 }
@@ -197,8 +199,6 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         passwordRowPanel.add(passwordField, BorderLayout.CENTER);
         passwordRowPanel.add(showPasswordCheckBox, BorderLayout.EAST);
 
-
-
         JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT));
         row.add(testButton);
         JPanel testConnectionSettingsPanel = new JPanel(new GridLayout(2, 1));
@@ -206,43 +206,43 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         testConnectionSettingsPanel.add(loadingDecorator.getComponent());
 
         // todo ssl/tls
-        JPanel sslPanel = new JPanel(new BorderLayout());
-        JCheckBox sslCheckBox = new JCheckBox("SSL/TLS");
-
-        JPanel sslCheckBoxRow = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        sslCheckBoxRow.add(sslCheckBox);
-
-        TextFieldWithBrowseButton publicKeyField = new TextFieldWithBrowseButton();
-        publicKeyField.setEditable(false);
-        publicKeyField.addBrowseFolderListener(
-                "Select a Public Key",
-                "Select a public key description",
-                project,
-                getFileChooserDescriptor());
-
-        JBLabel publicKeyLabel = new JBLabel("Public Key");
-        JPanel publicKeyRow = new JPanel(new BorderLayout());
-
-        JPanel keySelectPanel = new JPanel(new BorderLayout());
-        keySelectPanel.add(publicKeyField, BorderLayout.NORTH);
-        keySelectPanel.setVisible(false);
-
-        sslPanel.add(sslCheckBoxRow, BorderLayout.NORTH);
-        sslPanel.add(keySelectPanel, BorderLayout.CENTER);
-
-        sslCheckBox.addItemListener(e -> {
-            if (e.getStateChange() == ItemEvent.SELECTED) {
-                keySelectPanel.setVisible(true);
-            } else {
-                keySelectPanel.setVisible(false);
-            }
-        });
+//        JPanel sslPanel = new JPanel(new BorderLayout());
+//        JCheckBox sslCheckBox = new JCheckBox("SSL/TLS");
+//
+//        JPanel sslCheckBoxRow = new JPanel(new FlowLayout(FlowLayout.LEFT));
+//        sslCheckBoxRow.add(sslCheckBox);
+//
+//        TextFieldWithBrowseButton publicKeyField = new TextFieldWithBrowseButton();
+//        publicKeyField.setEditable(false);
+//        publicKeyField.addBrowseFolderListener(
+//                "Select a Public Key",
+//                "Select a public key description",
+//                project,
+//                getFileChooserDescriptor());
+//
+//        JBLabel publicKeyLabel = new JBLabel("Public Key");
+//        JPanel publicKeyRow = new JPanel(new BorderLayout());
+//
+//        JPanel keySelectPanel = new JPanel(new BorderLayout());
+//        keySelectPanel.add(publicKeyField, BorderLayout.NORTH);
+//        keySelectPanel.setVisible(false);
+//
+//        sslPanel.add(sslCheckBoxRow, BorderLayout.NORTH);
+//        sslPanel.add(keySelectPanel, BorderLayout.CENTER);
+//
+//        sslCheckBox.addItemListener(e -> {
+//            if (e.getStateChange() == ItemEvent.SELECTED) {
+//                keySelectPanel.setVisible(true);
+//            } else {
+//                keySelectPanel.setVisible(false);
+//            }
+//        });
 
 
         connectionSettingsPanel.add(connectionNameRowPanel);
         connectionSettingsPanel.add(hostRowPanel);
         connectionSettingsPanel.add(passwordRowPanel);
-        connectionSettingsPanel.add(sslPanel);
+//        connectionSettingsPanel.add(sslPanel);
 
         JPanel centerPanel = new JPanel(new BorderLayout());
         centerPanel.add(connectionSettingsPanel, BorderLayout.NORTH);

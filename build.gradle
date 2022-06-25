@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'org.jetbrains.intellij' version '1.5.3'
+    id "org.jetbrains.intellij" version "1.6.0"
 }
 
 group 'com.mzyupc'
@@ -30,14 +30,22 @@ dependencies {
 }
 
 // See https://github.com/JetBrains/gradle-intellij-plugin/
+// 调试插件的 IDEA 版本
 intellij {
     version = '2022.1'
 }
 
 patchPluginXml {
-    sinceBuild = '221.3427.89'
+    // 声明插件适用的版本
+    sinceBuild = '201.8743.12'
     untilBuild = provider { null }
     changeNotes = """
+      beta-0.8.0</br>
+      <ul>
+      <li>update: update deprecated API</li>
+      <li>fix: background display issues when using third party themes</li>
+      <li>fix: freezing the UI while loading</li>
+      </ul>
       beta-0.7.0</br>
       <ul>
       <li>update: the Dialog's OK/Cancel buttons are arranged in a different order depending on the operating system.</li>

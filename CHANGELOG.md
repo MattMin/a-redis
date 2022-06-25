@@ -8,7 +8,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## TODO
 - Support for TLS
 
-## [Unreleased]
+## [beta-0.8.0] - 2022-06-25
 
 ### Fixed
 
@@ -16,7 +16,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - 开启链接的时候 因为读DB下的key数量导致整个软件卡住 (Loading 时冻结 UI)
 
 ### Changed
-- Update deprecated API
+- 更新过时的API
 
 ## [beta-0.7.0]
 
@@ -58,6 +58,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - replace Label with Jlabel
 
 [Unreleased]: https://github.com/MattMin/a-redis/compare/beta-0.7.0...HEAD
+
+[beta-0.8.0]: https://github.com/MattMin/a-redis/releases/tag/beta-0.8.0
 
 [beta-0.7.0]: https://github.com/MattMin/a-redis/releases/tag/beta-0.7.0
 

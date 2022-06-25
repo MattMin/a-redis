@@ -301,7 +301,7 @@ public class KeyTreeDisplayPanel extends JPanel {
             try {
                 Long dbSize = redisPoolManager.dbSize(dbInfo.getIndex());
                 if (dbSize == null) {
-                    return;
+                    return null;
                 }
                 dbInfo.setKeyCount(dbSize);
                 flatRootNode = new DefaultMutableTreeNode(dbInfo);
@@ -310,7 +310,7 @@ public class KeyTreeDisplayPanel extends JPanel {
 
                 // exception occurred
                 if (allKeys == null) {
-                    return;
+                    return null;
                 }
 
                 if (CollectionUtils.isNotEmpty(allKeys)) {
@@ -337,6 +337,7 @@ public class KeyTreeDisplayPanel extends JPanel {
             } finally {
                 keyDisplayLoadingDecorator.stopLoading();
             }
+            return null;
         }).submit(ThreadPoolManager.getExecutor());
 
     }

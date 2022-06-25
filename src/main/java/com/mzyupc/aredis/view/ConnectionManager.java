@@ -180,6 +180,7 @@ public class ConnectionManager {
                                 } finally {
                                     connectionTreeLoadingDecorator.stopLoading();
                                 }
+                                return null;
                             }).submit(ThreadPoolManager.getExecutor());
                         }
                     }
@@ -210,6 +211,7 @@ public class ConnectionManager {
                             } finally {
                                 connectionTreeLoadingDecorator.stopLoading();
                             }
+                            return null;
                         }).submit(ThreadPoolManager.getExecutor());
                     }
 
@@ -537,6 +539,7 @@ public class ConnectionManager {
                 } finally {
                     connectionTreeLoadingDecorator.stopLoading();
                 }
+                return null;
             }).submit(ThreadPoolManager.getExecutor());
 
         });
