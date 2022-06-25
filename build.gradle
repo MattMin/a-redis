@@ -32,12 +32,12 @@ dependencies {
 // See https://github.com/JetBrains/gradle-intellij-plugin/
 // 调试插件的 IDEA 版本
 intellij {
-    version = '2022.1'
+    version = '2022.1.3'
 }
 
 patchPluginXml {
-    // 声明插件适用的版本
-    sinceBuild = '201.8743.12'
+    // 声明插件适用的版本 221.5921.22(2022.1.3)
+    sinceBuild = '221.5921.22'
     untilBuild = provider { null }
     changeNotes = """
       beta-0.8.0</br>
