@@ -17,6 +17,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 - 更新过时的API
+- 最低可用版本更新 221.5921.22(2022.1.3)
 
 ## [beta-0.7.0]
 
