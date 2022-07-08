@@ -8,6 +8,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## TODO
 - Support for TLS
 
+## [Unreleased]
+
+### Changed
+- 更新 readme.md
+- 优化 `RedisPoolManager` 代码
+
+### Added
+- `Connection Settings` 中支持配置 `Username`
+
+
 ## [beta-0.8.0] - 2022-06-25
 
 ### Fixed

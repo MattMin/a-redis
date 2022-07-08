@@ -36,7 +36,7 @@
   - edit/save(include Value/Field of Hash/Score of ZSet)
   - add(a row in List/Set/ZSet/Hash)
   - paging(List/Set/ZSet/Hash)
-  - format value to json(not finished)
+  - format value to json
 
 ## Some Screenshots
 Add a connection

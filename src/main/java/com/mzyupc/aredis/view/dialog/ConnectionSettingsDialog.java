@@ -175,10 +175,6 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
             }
         });
 
-        JPanel connectionSettingsPanel = new JPanel();
-        BoxLayout boxLayout = new BoxLayout(connectionSettingsPanel, BoxLayout.Y_AXIS);
-        connectionSettingsPanel.setLayout(boxLayout);
-
         JLabel connectionNameLabel = new JLabel("Connection Name:");
         connectionNameLabel.setPreferredSize(new Dimension(130, 12));
         connectionNameLabel.setBorder(JBUI.Borders.emptyLeft(10));
@@ -199,6 +195,10 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         passwordLabel.setBorder(JBUI.Borders.emptyLeft(10));
         passwordLabel.setPreferredSize(new Dimension(130, 12));
 
+        JLabel usernameLabel = new JLabel("Username:");
+        usernameLabel.setBorder(JBUI.Borders.emptyLeft(10));
+        usernameLabel.setPreferredSize(new Dimension(130, 12));
+
         JPanel connectionNameRowPanel = new JPanel(new BorderLayout());
         connectionNameRowPanel.add(connectionNameLabel, BorderLayout.WEST);
         connectionNameRowPanel.add(nameTextField, BorderLayout.CENTER);
@@ -213,6 +213,13 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         passwordRowPanel.add(passwordLabel, BorderLayout.WEST);
         passwordRowPanel.add(passwordField, BorderLayout.CENTER);
         passwordRowPanel.add(showPasswordCheckBox, BorderLayout.EAST);
+
+        JPanel usernameRowPanel = new JPanel(new BorderLayout());
+        usernameRowPanel.add(usernameLabel, BorderLayout.WEST);
+        usernameRowPanel.add(userNameTextField, BorderLayout.CENTER);
+        JLabel emptyLabel = new JLabel();
+        emptyLabel.setBorder(JBUI.Borders.emptyRight(140));
+        usernameRowPanel.add(emptyLabel, BorderLayout.EAST);
 
         JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT));
         row.add(testButton);
@@ -253,10 +260,13 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
 //            }
 //        });
 
-
+        JPanel connectionSettingsPanel = new JPanel();
+        BoxLayout boxLayout = new BoxLayout(connectionSettingsPanel, BoxLayout.Y_AXIS);
+        connectionSettingsPanel.setLayout(boxLayout);
         connectionSettingsPanel.add(connectionNameRowPanel);
         connectionSettingsPanel.add(hostRowPanel);
         connectionSettingsPanel.add(passwordRowPanel);
+        connectionSettingsPanel.add(usernameRowPanel);
 //        connectionSettingsPanel.add(sslPanel);
 
         JPanel centerPanel = new JPanel(new BorderLayout());
@@ -321,9 +331,13 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                 DefaultTreeModel connectionTreeModel = (DefaultTreeModel) connectionTree.getModel();
                 if (connection == null) {
                     // 保存connection
-                    String password = null;
-                    if (StringUtils.isNotBlank(new String(passwordField.getPassword()))) {
-                        password = new String(passwordField.getPassword());
+                    String password = new String(passwordField.getPassword());
+                    if (StringUtils.isEmpty(password)) {
+                        password = null;
+                    }
+                    String username = userNameTextField.getText();
+                    if (StringUtils.isEmpty(username)) {
+                        username = null;
                     }
                     // 持久化连接信息
                     ConnectionInfo connectionInfo = ConnectionInfo.builder()
@@ -332,6 +346,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                             .port(portField.getText())
                             .global(globalCheckBox.isSelected())
                             .password(password)
+                            .user(username)
                             .build();
                     propertyUtil.saveConnection(connectionInfo);
                     // connectionTree 中添加节点
@@ -340,15 +355,20 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
 
                 } else {
                     // 更新connection
-                    String password = null;
-                    if (StringUtils.isNotBlank(new String(passwordField.getPassword()))) {
-                        password = new String(passwordField.getPassword());
+                    String password = new String(passwordField.getPassword());
+                    if (StringUtils.isEmpty(password)) {
+                        password = null;
+                    }
+                    String username = userNameTextField.getText();
+                    if (StringUtils.isEmpty(username)) {
+                        username = null;
                     }
                     // 更新持久化信息
                     connection.setName(nameTextField.getText());
                     connection.setUrl(hostField.getText());
                     connection.setPort(portField.getText());
                     connection.setPassword(password);
+                    connection.setUser(username);
                     if (connection.getGlobal() != globalCheckBox.isSelected()) {
                         // 更改了配置级别
                         connection.setGlobal(globalCheckBox.isSelected());
