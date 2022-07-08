@@ -39,6 +39,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
     JTextField portField;
     JPasswordField passwordField;
     JCheckBox globalCheckBox;
+    JTextField userNameTextField;
     private PropertyUtil propertyUtil;
     private ConnectionInfo connection;
     private Tree connectionTree;
@@ -94,6 +95,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
 
         // password输入框
         passwordField = new JPasswordField(newConnection ? null : connection.getPassword());
+        passwordField.setToolTipText("Redis-server authentication password (Optional)");
 
         // 显示密码
         JCheckBox showPasswordCheckBox = new JCheckBox("Show Password");
@@ -113,6 +115,9 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         globalCheckBox.setBorder(JBUI.Borders.emptyRight(10));
         globalCheckBox.setPreferredSize(new Dimension(140, 12));
 
+        userNameTextField = new JTextField(newConnection ? null : connection.getUser());
+        userNameTextField.setToolTipText("Redis-server authentication username (Optional, Redis > 6.0)");
+
         JTextPane testResult = new JTextPane();
         testResult.setMargin(JBUI.insetsLeft(10));
         testResult.setOpaque(false);
@@ -131,10 +136,19 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                     ErrorDialog.show(validationInfo.message);
                 } else {
                     String password;
-                    if (StringUtils.isNotBlank(new String(passwordField.getPassword()))) {
-                        password = new String(passwordField.getPassword());
-                    } else {
+                    String pwd = new String(passwordField.getPassword());
+                    if (StringUtils.isEmpty(pwd)) {
                         password = null;
+                    } else {
+                        password = pwd;
+                    }
+
+                    String username;
+                    String user = userNameTextField.getText();
+                    if (StringUtils.isEmpty(user)) {
+                        username = null;
+                    } else {
+                        username = user;
                     }
 
                     loadingDecorator.startLoading(false);
@@ -143,6 +157,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                             RedisPoolManager.TestConnectionResult testConnectionResult =
                                     RedisPoolManager.getTestConnectionResult(hostField.getText(),
                                             Integer.parseInt(portField.getText()),
+                                            username,
                                             password);
                             testResult.setText(testConnectionResult.getMsg());
                             if (testConnectionResult.isSuccess()) {

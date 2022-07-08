@@ -46,6 +46,7 @@ public class RedisPoolManager implements Disposable {
 
     private final String host;
     private final Integer port;
+    private final String user;
     private final String password;
     private final Integer db;
     private JedisPool pool = null;
@@ -53,12 +54,13 @@ public class RedisPoolManager implements Disposable {
     public RedisPoolManager(ConnectionInfo connectionInfo) {
         this.host = connectionInfo.getUrl();
         this.port = Integer.parseInt(connectionInfo.getPort());
+        this.user = connectionInfo.getUser();
         this.password = connectionInfo.getPassword();
         this.db = Protocol.DEFAULT_DATABASE;
     }
 
-    public static TestConnectionResult getTestConnectionResult(String host, Integer port, String password) {
-        try (Pool<Jedis> pool = new JedisPool(jedisPoolConfig, host, port, Protocol.DEFAULT_TIMEOUT, password);
+    public static TestConnectionResult getTestConnectionResult(String host, Integer port, String user, String password) {
+        try (Pool<Jedis> pool = new JedisPool(jedisPoolConfig, host, port, Protocol.DEFAULT_TIMEOUT, user, password);
              Jedis jedis = pool.getResource()) {
             String pong = jedis.ping();
             if ("PONG".equalsIgnoreCase(pong)) {
@@ -230,7 +232,7 @@ public class RedisPoolManager implements Disposable {
 
     private void initPool() {
         try {
-            pool = new JedisPool(jedisPoolConfig, host, port, Protocol.DEFAULT_TIMEOUT, password);
+            pool = new JedisPool(jedisPoolConfig, host, port, Protocol.DEFAULT_TIMEOUT, user, password);
         } catch (Exception e) {
             log.error("初始化redis pool失败", e);
             ErrorDialog.show("Failed to initialize the Redis pool." + "\n" + e.getMessage());

@@ -23,6 +23,8 @@ public class ConnectionInfo {
 
     private String port;
 
+    private String user;
+
     private String password;
 
     /**
