@@ -732,6 +732,13 @@ public class ValueDisplayPanel extends JPanel {
                                     break;
 
                                 case Zset:
+
+                                    // Double.parseDouble(""), throws a NumberFormatException
+                                    if (StringUtils.isEmpty(addRowDialog.getScoreOrField())) {
+                                        ErrorDialog.show("Please enter a score.");
+                                        return;
+                                    }
+
                                     jedis.zadd(key, Double.parseDouble(addRowDialog.getScoreOrField()), addRowDialog.getValue());
                                     break;
 
@@ -773,7 +780,7 @@ public class ValueDisplayPanel extends JPanel {
                     }
                 }
 
-                if (typeEnum == RedisValueTypeEnum.Hash) {
+                if (typeEnum == RedisValueTypeEnum.Zset) {
                     if (StringUtils.isEmpty(newField)) {
                         ErrorDialog.show("Please enter a valid Score!");
                         return;
