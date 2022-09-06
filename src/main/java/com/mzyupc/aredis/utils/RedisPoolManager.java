@@ -4,11 +4,11 @@ import com.google.common.collect.Lists;
 import com.intellij.openapi.Disposable;
 import com.mzyupc.aredis.view.dialog.ErrorDialog;
 import com.mzyupc.aredis.vo.ConnectionInfo;
+import com.mzyupc.aredis.vo.Keyspace;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import redis.clients.jedis.*;
-import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
@@ -16,10 +16,8 @@ import redis.clients.jedis.util.Pool;
 
 import javax.annotation.Nullable;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -230,15 +228,13 @@ public class RedisPoolManager implements Disposable {
             }
 
             int count = 0;
-            while(true) {
-                try {
-                    jedis.select(count++);
-                } catch (JedisDataException jedisDataException) {
-                    // reset
-                    jedis.select(Protocol.DEFAULT_DATABASE);
-                    return count - 1;
-                }
+            List<String> databases = jedis.configGet("databases");
+            if (databases.size() == 2) {
+                count = Integer.parseInt(databases.get(1));
             }
+            // reset
+            jedis.select(Protocol.DEFAULT_DATABASE);
+            return count;
         } catch (NullPointerException e) {
             log.warn("", e);
             return 0;
@@ -258,6 +254,39 @@ public class RedisPoolManager implements Disposable {
                 return null;
             }
             return jedis.dbSize();
+        }
+    }
+
+    public Map<Integer, Keyspace> infoKeyspace() {
+        try (Jedis jedis = getJedis(db)) {
+            if (jedis == null) {
+                return null;
+            }
+            String keyspace = jedis.info("keyspace");
+            return keyspace.lines().filter(e -> !e.startsWith("#")).map(e -> {
+
+                //db1:keys=598143,expires=0,avg_ttl=0
+
+                String[] split = e.split(":");
+                String db = split[0].substring(2);
+
+                Keyspace build = Keyspace.builder().db(Integer.valueOf(db)).build();
+                Arrays.stream(split[1].split(",")).forEach(e1->{
+                    String[] split1 = e1.split("=");
+                    switch (split1[0]) {
+                        case "keys":
+                            build.setKeys(Long.valueOf(split1[1]));
+                            break;
+                        case "expires":
+                            build.setExpires(Long.valueOf(split1[1]));
+                            break;
+                        case "avg_ttl":
+                            build.setAvgTtl(Long.valueOf(split1[1]));
+                            break;
+                    }
+                });
+                return build;
+            }).collect(Collectors.toMap(Keyspace::getDb, Function.identity()));
         }
     }
 

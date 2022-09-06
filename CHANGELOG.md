@@ -10,6 +10,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- 优化db加载
 
 ## [beta-0.9.0] - 2022-09-18
 

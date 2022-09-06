@@ -53,7 +53,7 @@ public class ConsoleFileType implements FileType {
     @Override
     public @NonNls
     @Nullable
-    String getCharset(@NotNull VirtualFile file, @NotNull byte[] content) {
+    String getCharset(@NotNull VirtualFile file, byte @NotNull [] content) {
         return null;
     }
 }

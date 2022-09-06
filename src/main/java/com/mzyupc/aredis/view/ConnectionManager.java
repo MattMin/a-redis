@@ -30,6 +30,7 @@ import com.mzyupc.aredis.view.editor.KeyValueDisplayVirtualFile;
 import com.mzyupc.aredis.view.render.ConnectionTreeCellRenderer;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import com.mzyupc.aredis.vo.DbInfo;
+import com.mzyupc.aredis.vo.Keyspace;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.jetbrains.annotations.Nullable;
@@ -138,7 +139,6 @@ public class ConnectionManager {
      */
     public Tree createConnectionTree(ARedisToolWindow parent, JPanel connectionPanel) {
         Tree connectionTree = new Tree();
-        // TODO 2022/4/16 开启链接的时候 因为读DB下的key数量导致整个软件卡住
         connectionTreeLoadingDecorator = new LoadingDecorator(new JBScrollPane(connectionTree), parent, 0);
         connectionPanel.add(connectionTreeLoadingDecorator.getComponent(), BorderLayout.CENTER);
 //        connectionPanel.add(new JBScrollPane(connectionTree), BorderLayout.CENTER);
@@ -198,13 +198,13 @@ public class ConnectionManager {
                         ReadAction.nonBlocking(() -> {
                             try {
                                 String connectionId = connectionInfo.getId();
-                                KeyValueDisplayVirtualFile keyValueDisplayVirtualFile = new KeyValueDisplayVirtualFile(connectionInfo.getName() + "-DB" + dbInfo.getIndex(),
-                                        project,
-                                        connectionInfo,
-                                        dbInfo,
-                                        connectionRedisMap.get(connectionId),
-                                        connectionManager);
                                 ApplicationManager.getApplication().invokeLater(() -> {
+                                    KeyValueDisplayVirtualFile keyValueDisplayVirtualFile = new KeyValueDisplayVirtualFile(connectionInfo.getName() + "-DB" + dbInfo.getIndex(),
+                                            project,
+                                            connectionInfo,
+                                            dbInfo,
+                                            connectionRedisMap.get(connectionId),
+                                            connectionManager);
                                     KeyValueDisplayFileSystem.getInstance(project).openEditor(keyValueDisplayVirtualFile);
                                     addEditorToMap(connectionId, keyValueDisplayVirtualFile);
                                 });
@@ -361,16 +361,14 @@ public class ConnectionManager {
 
         RedisPoolManager redisPoolManager = connectionRedisMap.get(connection.getId());
         int dbCount = redisPoolManager.getDbCount();
+        Map<Integer, Keyspace> integerKeyspaceMap = redisPoolManager.infoKeyspace();
         propertyUtil.setDbCount(connection.getId(), dbCount);
 
         // 移除原有节点
         connectionNode.removeAllChildren();
         // 添加新节点
         for (int i = 0; i < dbCount; i++) {
-            Long keyCount = redisPoolManager.dbSize(i);
-            if (keyCount == null) {
-                return;
-            }
+            Long keyCount = Optional.ofNullable(integerKeyspaceMap.get(i)).map(Keyspace::getKeys).orElse(0L);
             DbInfo dbInfo = DbInfo.builder()
                     .index(i)
                     .keyCount(keyCount)
