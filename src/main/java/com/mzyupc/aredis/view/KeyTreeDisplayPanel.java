@@ -546,6 +546,11 @@ public class KeyTreeDisplayPanel extends JPanel {
 
     public void doDeleteKeys() {
         TreePath[] selectionPaths = keyTree.getSelectionPaths();
+        if (null == selectionPaths) {
+            ErrorDialog.show("Please select a key");
+            return;
+        }
+
         // 根节点
         if (selectionPaths != null && selectionPaths.length == 1 && selectionPaths[0].getPathCount() == 1) {
             return;
