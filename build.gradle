@@ -47,10 +47,9 @@ patchPluginXml {
       
       beta-0.9.0<br>
       <ul>
-          <li>使用 `PasswordSafe` 保存密码</li>
-          <li>升级 Jedis 版本到 4.2.3</li>
-          <li>优化 `RedisPoolManager` 代码</li>
-          <li>更新 readme.md</li>
+          <li>Use `PasswordSafe` to save your password</li>
+          <li>Upgrade Jedis version to 4.2.3</li>
+          <li>Configuration of Username is supported in Connection Settings Dialog</li>
       </ul>
       
       beta-0.8.0</br>
