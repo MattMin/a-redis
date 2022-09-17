@@ -546,13 +546,10 @@ public class KeyTreeDisplayPanel extends JPanel {
 
     public void doDeleteKeys() {
         TreePath[] selectionPaths = keyTree.getSelectionPaths();
-        if (null == selectionPaths) {
-            ErrorDialog.show("Please select a key");
-            return;
-        }
 
-        // 根节点
-        if (selectionPaths != null && selectionPaths.length == 1 && selectionPaths[0].getPathCount() == 1) {
+        // 没有选中key或者选中的是根节点
+        if (null == selectionPaths || selectionPaths.length == 1 && selectionPaths[0].getPathCount() == 1) {
+            ErrorDialog.show("Please select a key");
             return;
         }
 
@@ -563,18 +560,16 @@ public class KeyTreeDisplayPanel extends JPanel {
                 "Are you sure you want to delete this key?",
                 actionEvent -> {
                     // 删除选中的key, 如果选中的是上层
-                    if (selectionPaths != null) {
-                        for (TreePath selectionPath : selectionPaths) {
-                            if (selectionPath.getPathCount() > 1) {
-                                DefaultMutableTreeNode selectNode = (DefaultMutableTreeNode) selectionPath.getLastPathComponent();
-                                List<String> keys = new ArrayList<>();
-                                findDeleteKeys(selectNode, keys, valueDisplayPanel);
-                                if (CollectionUtils.isNotEmpty(keys)) {
-                                    try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
-                                        if (jedis != null) {
-                                            jedis.del(keys.toArray(new String[]{}));
-                                            dbInfo.setKeyCount(dbInfo.getKeyCount() - keys.size());
-                                        }
+                    for (TreePath selectionPath : selectionPaths) {
+                        if (selectionPath.getPathCount() > 1) {
+                            DefaultMutableTreeNode selectNode = (DefaultMutableTreeNode) selectionPath.getLastPathComponent();
+                            List<String> keys = new ArrayList<>();
+                            findDeleteKeys(selectNode, keys, valueDisplayPanel);
+                            if (CollectionUtils.isNotEmpty(keys)) {
+                                try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                                    if (jedis != null) {
+                                        jedis.del(keys.toArray(new String[]{}));
+                                        dbInfo.setKeyCount(dbInfo.getKeyCount() - keys.size());
                                     }
                                 }
                             }
