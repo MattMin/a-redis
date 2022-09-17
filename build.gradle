@@ -40,47 +40,67 @@ patchPluginXml {
     sinceBuild = '221.5921.22'
     untilBuild = provider { null }
     changeNotes = """
+      <div>Due to the change in password persistence in beta-0.9.0, the password will be erased after upgrading, so you need to backup your password before upgrading from beta-0.8.0 and earlier to beta-0.9.0 and later.</div>
+      <br>
+      <div>由于 beta-0.9.0 版本修改了密码的持久化方式, 升级后密码会被清除, 所以从 beta-0.8.0 及其之前的版本升级到 beta-0.9.0 及其之后版本之前需要备份密码</div>
+      <br>
+      
+      beta-0.9.0<br>
+      <ul>
+          <li>使用 `PasswordSafe` 保存密码</li>
+          <li>升级 Jedis 版本到 4.2.3</li>
+          <li>优化 `RedisPoolManager` 代码</li>
+          <li>更新 readme.md</li>
+      </ul>
+      
       beta-0.8.0</br>
       <ul>
-      <li>update: update deprecated API</li>
-      <li>fix: background display issues when using third party themes</li>
-      <li>fix: freezing the UI while loading</li>
+          <li>update: update deprecated API</li>
+          <li>fix: background display issues when using third party themes</li>
+          <li>fix: freezing the UI while loading</li>
       </ul>
+      
       beta-0.7.0</br>
       <ul>
-      <li>update: the Dialog's OK/Cancel buttons are arranged in a different order depending on the operating system.</li>
+          <li>update: the Dialog's OK/Cancel buttons are arranged in a different order depending on the operating system.</li>
       </ul>
+      
       beta-0.6.0</br>
       <ul>
-      <li>new: redis connection right-click menu adds "Info" function</li>
-      <li>new: the connection can be set to global in the connection PropertyUtilsettings popup</li>
-      <li>update: fix redis console line height</li>
-      <li>update: use jackson to serialize json</li>
+          <li>new: redis connection right-click menu adds "Info" function</li>
+          <li>new: the connection can be set to global in the connection PropertyUtilsettings popup</li>
+          <li>update: fix redis console line height</li>
+          <li>update: use jackson to serialize json</li>
       </ul>
+      
       beta-0.5.0</br>
       <ul>
-      <li>new: redis console(The 'RESTORE' command and blocking commands such as 'SUBSCRIBE' are not supported)</li>
-      <li>fix: reload connection bug</li>
-      <li>update: query the number of DBs without using the 'CONFIG GET' command</li>
-      <li>update: replace Label with Jlabel</li>
+          <li>new: redis console(The 'RESTORE' command and blocking commands such as 'SUBSCRIBE' are not supported)</li>
+          <li>fix: reload connection bug</li>
+          <li>update: query the number of DBs without using the 'CONFIG GET' command</li>
+          <li>update: replace Label with Jlabel</li>
       </ul>
+      
       beta-0.3.4</br>
       <ul>
-      <li>update: add plugin description</li>
+          <li>update: add plugin description</li>
       </ul>
+      
       beta-0.3</br>
       <ul>
-      <li>update: value格式化</li>
+          <li>update: value格式化</li>
       </ul>
+      
       beta-0.2</br>
       <ul>
-      <li>fix: 不同项目会出现相同的connection</li>
-      <li>update: 支持最早版本到201.8743.12</li>
-      <li>update: Key分页Page Size的计算</li>
+          <li>fix: 不同项目会出现相同的connection</li>
+          <li>update: 支持最早版本到201.8743.12</li>
+          <li>update: Key分页Page Size的计算</li>
       </ul>
+      
       beta-0.1</br>
       <ul>
-      <li>first version</li>
+          <li>first version</li>
       </ul>
       
       """
