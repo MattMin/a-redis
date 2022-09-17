@@ -29,9 +29,9 @@ import org.apache.batik.ext.swing.DoubleDocument;
 import org.apache.commons.lang.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import redis.clients.jedis.Jedis;
-import redis.clients.jedis.ScanParams;
-import redis.clients.jedis.ScanResult;
-import redis.clients.jedis.Tuple;
+import redis.clients.jedis.params.ScanParams;
+import redis.clients.jedis.resps.ScanResult;
+import redis.clients.jedis.resps.Tuple;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -53,7 +53,7 @@ import java.util.Map;
 import static com.intellij.openapi.ui.DialogWrapper.OK_EXIT_CODE;
 import static com.mzyupc.aredis.view.textfield.EditorTextFieldManager.createEditorTextField;
 import static com.mzyupc.aredis.view.textfield.EditorTextFieldManager.formatValue;
-import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
+import static redis.clients.jedis.params.ScanParams.SCAN_POINTER_START;
 
 /**
  * @author mzyupc@163.com

@@ -372,8 +372,8 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                     if (connection.getGlobal() != globalCheckBox.isSelected()) {
                         // 更改了配置级别
                         connection.setGlobal(globalCheckBox.isSelected());
-                        propertyUtil.saveConnection(connection);
                     }
+                    propertyUtil.saveConnection(connection);
                     // 更新redisPoolMgr
                     RedisPoolManager redisPoolManager = new RedisPoolManager(connection);
                     connectionManager.getConnectionRedisMap().put(connection.getId(), redisPoolManager);

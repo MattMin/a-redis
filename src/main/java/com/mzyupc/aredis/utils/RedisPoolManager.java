@@ -10,6 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import redis.clients.jedis.*;
 import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.exceptions.JedisException;
+import redis.clients.jedis.params.ScanParams;
+import redis.clients.jedis.resps.ScanResult;
 import redis.clients.jedis.util.Pool;
 
 import javax.annotation.Nullable;
@@ -127,7 +129,7 @@ public class RedisPoolManager implements Disposable {
                 return Lists.newArrayList();
             }
 
-            Client client = jedis.getClient();
+            Connection client = jedis.getClient();
 //            processArgs(cmd, args);
             client.sendCommand(cmd, args);
             try {

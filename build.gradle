@@ -4,7 +4,7 @@ plugins {
 }
 
 group 'com.mzyupc'
-version 'beta-0.8.0'
+version 'beta-0.9.0'
 
 sourceCompatibility = JavaVersion.VERSION_11
 targetCompatibility = JavaVersion.VERSION_11
@@ -18,7 +18,7 @@ dependencies {
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
 
     // jedis
-    implementation (group: 'redis.clients', name: 'jedis', version: '3.7.0') {
+    implementation (group: 'redis.clients', name: 'jedis', version: '4.2.3') {
         exclude group: "org.slf4j"
     }
 

@@ -1,19 +1,23 @@
 package com.mzyupc.aredis.vo;
 
 import com.google.common.base.Objects;
-import lombok.*;
+import com.intellij.util.xmlb.annotations.Transient;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.util.Map;
 
 /**
  * @author mzyupc@163.com
  */
-@Getter
 @Setter
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
 public class ConnectionInfo {
+
 
     private String id;
 
@@ -25,6 +29,7 @@ public class ConnectionInfo {
 
     private String user;
 
+    @Transient
     private String password;
 
     /**
@@ -57,5 +62,38 @@ public class ConnectionInfo {
     @Override
     public int hashCode() {
         return Objects.hashCode(id);
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getUrl() {
+        return url;
+    }
+
+    public String getPort() {
+        return port;
+    }
+
+    public String getUser() {
+        return user;
+    }
+
+    @Transient
+    public String getPassword() {
+        return password;
+    }
+
+    public Map<Integer, String> getGroupSymbols() {
+        return groupSymbols;
+    }
+
+    public Boolean getGlobal() {
+        return global;
     }
 }

@@ -7,7 +7,6 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## TODO
 - Support for TLS
-- use PasswordSafe to save sensitive connection infos
 
 ## [Unreleased]
 
@@ -15,6 +14,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - 更新 readme.md
 - 优化 `RedisPoolManager` 代码
 - 删除不用的代码
+- 升级 Jedis 版本到 4.2.3
+- 使用 `PasswordSafe` 保存密码
 
 ### Added
 - `Connection Settings` 中支持配置 `Username`
