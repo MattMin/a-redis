@@ -10,6 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import redis.clients.jedis.*;
 import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.exceptions.JedisException;
+import redis.clients.jedis.params.ScanParams;
+import redis.clients.jedis.resps.ScanResult;
 import redis.clients.jedis.util.Pool;
 
 import javax.annotation.Nullable;
@@ -26,26 +28,27 @@ import java.util.stream.Collectors;
 @Slf4j
 public class RedisPoolManager implements Disposable {
 
-    private static final JedisPoolConfig jedisPoolConfig;
+    private static final JedisPoolConfig JEDIS_POOL_CONFIG;
 
     static {
-        jedisPoolConfig = new JedisPoolConfig();
+        JEDIS_POOL_CONFIG = new JedisPoolConfig();
         //连接耗尽时是否阻塞, false报异常,ture阻塞直到超时, 默认true
-        jedisPoolConfig.setBlockWhenExhausted(false);
+        JEDIS_POOL_CONFIG.setBlockWhenExhausted(false);
         //最大空闲连接数, 默认8个
-        jedisPoolConfig.setMaxIdle(10);
+        JEDIS_POOL_CONFIG.setMaxIdle(10);
         //最小空闲连接数, 默认0
-        jedisPoolConfig.setMinIdle(0);
+        JEDIS_POOL_CONFIG.setMinIdle(0);
         //最大连接数, 默认8个
-        jedisPoolConfig.setMaxTotal(100);
+        JEDIS_POOL_CONFIG.setMaxTotal(100);
         //对象空闲多久后逐出, 当空闲时间>该值 且 空闲连接>最大空闲数 时直接逐出,不再根据MinEvictableIdleTimeMillis判断  (默认逐出策略)
-        jedisPoolConfig.setSoftMinEvictableIdleTime(Duration.ofSeconds(60));
+        JEDIS_POOL_CONFIG.setSoftMinEvictableIdleTime(Duration.ofSeconds(60));
         //检查链接是否有效
-        jedisPoolConfig.setTestOnBorrow(true);
+        JEDIS_POOL_CONFIG.setTestOnBorrow(true);
     }
 
     private final String host;
     private final Integer port;
+    private final String user;
     private final String password;
     private final Integer db;
     private JedisPool pool = null;
@@ -53,12 +56,13 @@ public class RedisPoolManager implements Disposable {
     public RedisPoolManager(ConnectionInfo connectionInfo) {
         this.host = connectionInfo.getUrl();
         this.port = Integer.parseInt(connectionInfo.getPort());
+        this.user = connectionInfo.getUser();
         this.password = connectionInfo.getPassword();
         this.db = Protocol.DEFAULT_DATABASE;
     }
 
-    public static TestConnectionResult getTestConnectionResult(String host, Integer port, String password) {
-        try (Pool<Jedis> pool = new JedisPool(jedisPoolConfig, host, port, Protocol.DEFAULT_TIMEOUT, password);
+    public static TestConnectionResult getTestConnectionResult(String host, Integer port, String user, String password) {
+        try (Pool<Jedis> pool = new JedisPool(JEDIS_POOL_CONFIG, host, port, Protocol.DEFAULT_TIMEOUT, user, password);
              Jedis jedis = pool.getResource()) {
             String pong = jedis.ping();
             if ("PONG".equalsIgnoreCase(pong)) {
@@ -125,7 +129,7 @@ public class RedisPoolManager implements Disposable {
                 return Lists.newArrayList();
             }
 
-            Client client = jedis.getClient();
+            Connection client = jedis.getClient();
 //            processArgs(cmd, args);
             client.sendCommand(cmd, args);
             try {
@@ -171,23 +175,6 @@ public class RedisPoolManager implements Disposable {
         }
     }
 
-    /**
-     * 如果是restore命令, 需要处理传入参数
-     * @param cmd
-     * @param args
-     */
-    private void processArgs(Protocol.Command cmd, String[] args) {
-        if (cmd == Protocol.Command.RESTORE) {
-            for (int i = 0; i < args.length; i++) {
-                String arg = args[i];
-                if (arg.startsWith("\\x")) {
-                    byte[] processedArg = getRestoreBytes(arg);
-                    args[i] = new String(processedArg);
-                }
-            }
-        }
-    }
-
     private String getPrintableString(byte[] bytes) {
         StringBuilder sb = new StringBuilder();
         for (byte b : bytes) {
@@ -201,36 +188,9 @@ public class RedisPoolManager implements Disposable {
         return sb.toString();
     }
 
-    /**
-     * todo 将restore命令字符串参数解析为byte[]
-     * @param dump
-     * @return
-     */
-    private byte[] getRestoreBytes(String dump) {
-        List<Byte> result = com.google.common.collect.Lists.newArrayList();
-
-        while (dump.length() >= 1) {
-            if (dump.startsWith("\\x")) {
-                result.add((byte)(0xff & Byte.parseByte(dump.substring(2, 4), 16)));
-                dump = dump.substring(4);
-            } else {
-                result.add((byte)dump.charAt(0));
-                if (dump.length() == 1) {
-                    break;
-                }
-                dump = dump.substring(1);
-            }
-        }
-        byte[] bytes = new byte[result.size()];
-        for (int i = 0; i < result.size(); i++) {
-            bytes[i] = result.get(i);
-        }
-        return bytes;
-    }
-
     private void initPool() {
         try {
-            pool = new JedisPool(jedisPoolConfig, host, port, Protocol.DEFAULT_TIMEOUT, password);
+            pool = new JedisPool(JEDIS_POOL_CONFIG, host, port, Protocol.DEFAULT_TIMEOUT, user, password);
         } catch (Exception e) {
             log.error("初始化redis pool失败", e);
             ErrorDialog.show("Failed to initialize the Redis pool." + "\n" + e.getMessage());

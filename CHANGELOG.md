@@ -8,6 +8,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## TODO
 - Support for TLS
 
+## [Unreleased]
+
+### Changed
+- 更新 readme.md
+- 优化 `RedisPoolManager` 代码
+- 删除不用的代码
+- 升级 Jedis 版本到 4.2.3
+- 使用 `PasswordSafe` 保存密码
+
+### Added
+- `Connection Settings` 中支持配置 `Username`
+- 一些边界判断 @yizhishi
+
+
 ## [beta-0.8.0] - 2022-06-25
 
 ### Fixed
@@ -58,7 +72,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - query the number of DBs without using the 'CONFIG GET' command
 - replace Label with Jlabel
 
-[Unreleased]: https://github.com/MattMin/a-redis/compare/beta-0.7.0...HEAD
+[Unreleased]: https://github.com/MattMin/a-redis/compare/beta-0.8.0...dev-beta-0.9.0
 
 [beta-0.8.0]: https://github.com/MattMin/a-redis/releases/tag/beta-0.8.0
 

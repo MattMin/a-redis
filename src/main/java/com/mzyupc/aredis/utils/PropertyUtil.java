@@ -1,6 +1,10 @@
 package com.mzyupc.aredis.utils;
 
 import com.google.common.collect.Lists;
+import com.intellij.credentialStore.CredentialAttributes;
+import com.intellij.credentialStore.CredentialAttributesKt;
+import com.intellij.credentialStore.Credentials;
+import com.intellij.ide.passwordSafe.PasswordSafe;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.project.Project;
 import com.mzyupc.aredis.service.ConnectionsService;
@@ -105,6 +109,15 @@ public class PropertyUtil {
             connection.setGlobal(false);
             result.add(connection);
         }
+
+        for (ConnectionInfo connection : result) {
+            // connectionInfo 如果有 password 则将 connection 中存储的 password 删除, 使用 PasswordSafe 存储 password
+            if (StringUtils.isEmpty(connection.getPassword())) {
+                String password = retrievePassword(connection.getId());
+                connection.setPassword(password);
+            }
+        }
+
         return result;
     }
 
@@ -122,13 +135,17 @@ public class PropertyUtil {
         String connectionInfoId = connectionInfo.getId();
         if (StringUtils.isEmpty(connectionInfoId)) {
             connectionInfoId = UUID.randomUUID().toString();
+            connectionInfo.setId(connectionInfoId);
         }
-
-        connectionInfo.setId(connectionInfoId);
 
         // Brainless deletion
         globalConnectionsService.getConnections().remove(connectionInfo);
         connectionsService.getConnections().remove(connectionInfo);
+
+        // 保存密码
+        savePassword(connectionInfoId, connectionInfo.getPassword());
+
+        // 保存 connection
         if (Boolean.TRUE.equals(connectionInfo.getGlobal())) {
             globalConnectionsService.getConnections().add(connectionInfo);
         } else {
@@ -169,6 +186,7 @@ public class PropertyUtil {
     public void removeConnection(ConnectionInfo connectionInfo, RedisPoolManager redisPoolManager) {
         globalConnectionsService.getConnections().remove(connectionInfo);
         connectionsService.getConnections().remove(connectionInfo);
+        savePassword(connectionInfo.getId(), null);
     }
 
     /**
@@ -185,7 +203,8 @@ public class PropertyUtil {
         final Map<String, ConnectionInfo> collect = getConnections().stream()
                 .collect(Collectors.toMap(ConnectionInfo::getId, Function.identity()));
 
-        return collect.get(id);
+        ConnectionInfo connectionInfo = collect.get(id);
+        return connectionInfo;
     }
 
     public boolean getReloadAfterAddingTheKey() {
@@ -223,4 +242,34 @@ public class PropertyUtil {
     private String getGroupSymbolKey(DbInfo dbInfo) {
         return dbInfo.getConnectionId() + ":" + dbInfo.getIndex();
     }
+
+    private CredentialAttributes createCredentialAttributes(String connectionId) {
+        return new CredentialAttributes(
+                CredentialAttributesKt.generateServiceName("RedisHelper", connectionId)
+        );
+    }
+
+    /**
+     * 获取密码
+     *
+     * @return 密码, 如果是 "" 则返回 null
+     */
+    private String retrievePassword(String connectionId) {
+        CredentialAttributes credentialAttributes = createCredentialAttributes(connectionId);
+        String password = PasswordSafe.getInstance().getPassword(credentialAttributes);
+        return StringUtils.isEmpty(password) ? null : password;
+    }
+
+    /**
+     * 保存密码, 如果 password 是 null 或者 "", 则表示移除 password
+     */
+    private void savePassword(String connectionId, String password) {
+        CredentialAttributes credentialAttributes = createCredentialAttributes(connectionId);
+        Credentials credentials = null;
+        if (StringUtils.isNotEmpty(password)) {
+            credentials = new Credentials(connectionId, password);
+        }
+        PasswordSafe.getInstance().set(credentialAttributes, credentials);
+    }
+
 }
