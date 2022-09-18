@@ -8,7 +8,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## TODO
 - Support for TLS
 
-## [Unreleased]
+## [beta-0.9.0] - 2022-09-18
 
 ### Changed
 - 更新 readme.md
@@ -72,7 +72,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - query the number of DBs without using the 'CONFIG GET' command
 - replace Label with Jlabel
 
-[Unreleased]: https://github.com/MattMin/a-redis/compare/beta-0.8.0...dev-beta-0.9.0
+[Unreleased]: https://github.com/MattMin/a-redis/compare/beta-0.9.0...dev-1.0
+
+[beta-0.9.0]: https://github.com/MattMin/a-redis/releases/tag/beta-0.9.0
 
 [beta-0.8.0]: https://github.com/MattMin/a-redis/releases/tag/beta-0.8.0
 
