@@ -229,8 +229,8 @@ public class RedisPoolManager implements Disposable {
             }
 
             int count = 1;
-            int min = 1;
-            int max = 1;
+            int min = 0;
+            int max = 0;
             while (true) {
                 try {
                     jedis.select(count - 1);
