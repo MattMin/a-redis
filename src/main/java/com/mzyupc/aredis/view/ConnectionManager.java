@@ -3,6 +3,7 @@ package com.mzyupc.aredis.view;
 import com.google.common.collect.Sets;
 import com.intellij.ide.CommonActionsManager;
 import com.intellij.ide.TreeExpander;
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
@@ -53,7 +54,7 @@ import static com.mzyupc.aredis.utils.JTreeUtil.expandTree;
 /**
  * @author mzyupc@163.com
  */
-public class ConnectionManager {
+public class ConnectionManager implements Disposable {
     /**
      * connectionId-redisPoolManager
      */
@@ -139,7 +140,7 @@ public class ConnectionManager {
      */
     public Tree createConnectionTree(ARedisToolWindow parent, JPanel connectionPanel) {
         Tree connectionTree = new Tree();
-        connectionTreeLoadingDecorator = new LoadingDecorator(new JBScrollPane(connectionTree), parent, 0);
+        connectionTreeLoadingDecorator = new LoadingDecorator(new JBScrollPane(connectionTree), project, 0);
         connectionPanel.add(connectionTreeLoadingDecorator.getComponent(), BorderLayout.CENTER);
 //        connectionPanel.add(new JBScrollPane(connectionTree), BorderLayout.CENTER);
 
@@ -679,6 +680,7 @@ public class ConnectionManager {
         return menu;
     }
 
+    @Override
     public void dispose() {
         for (RedisPoolManager redisPoolManager : connectionRedisMap.values()) {
             if (redisPoolManager != null) {

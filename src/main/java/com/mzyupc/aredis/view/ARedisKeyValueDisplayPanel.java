@@ -206,7 +206,7 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
         valueDisplayScrollPanel.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
         valueDisplayScrollPanel.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
 
-        LoadingDecorator loadingDecorator = new LoadingDecorator(valueDisplayScrollPanel, this, 0);
+        LoadingDecorator loadingDecorator = new LoadingDecorator(valueDisplayScrollPanel, project, 0);
         splitterContainer.setSecondComponent(loadingDecorator.getComponent());
         valueDisplayPanel.init(project, this, keyTreeDisplayPanel, key, redisPoolManager, dbInfo, loadingDecorator);
     }

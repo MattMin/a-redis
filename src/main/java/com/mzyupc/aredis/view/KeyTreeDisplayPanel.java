@@ -142,7 +142,7 @@ public class KeyTreeDisplayPanel extends JPanel {
             }
         });
         JBScrollPane keyTreeScrollPane = new JBScrollPane(keyTree);
-        keyDisplayLoadingDecorator = new LoadingDecorator(keyTreeScrollPane, parent, 0);
+        keyDisplayLoadingDecorator = new LoadingDecorator(keyTreeScrollPane, project, 0);
 
         // toolbar
         final CommonActionsManager actionManager = CommonActionsManager.getInstance();
