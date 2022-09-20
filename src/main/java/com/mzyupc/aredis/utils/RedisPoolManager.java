@@ -9,6 +9,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import redis.clients.jedis.*;
+import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
@@ -227,14 +228,24 @@ public class RedisPoolManager implements Disposable {
                 return 0;
             }
 
-            int count = 0;
-            List<String> databases = jedis.configGet("databases");
-            if (databases.size() == 2) {
-                count = Integer.parseInt(databases.get(1));
+            int count = 1;
+            int min = 1;
+            int max = 1;
+            while (true) {
+                try {
+                    jedis.select(count - 1);
+                    min = count;
+                    count = count * 2;
+                } catch (JedisDataException jedisDataException) {
+                    max = count;
+                    count = min + (max - min) / 2;
+                }
+                if (max - 1 == min) {
+                    // reset
+                    jedis.select(Protocol.DEFAULT_DATABASE);
+                    return min;
+                }
             }
-            // reset
-            jedis.select(Protocol.DEFAULT_DATABASE);
-            return count;
         } catch (NullPointerException e) {
             log.warn("", e);
             return 0;
