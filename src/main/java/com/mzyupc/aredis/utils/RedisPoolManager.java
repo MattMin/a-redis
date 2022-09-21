@@ -235,10 +235,13 @@ public class RedisPoolManager implements Disposable {
                 try {
                     jedis.select(count - 1);
                     min = count;
-                    count = count * 2;
                 } catch (JedisDataException jedisDataException) {
                     max = count;
+                }
+                if (max != 0) {
                     count = min + (max - min) / 2;
+                } else {
+                    count = min * 2;
                 }
                 if (max - 1 == min) {
                     // reset
