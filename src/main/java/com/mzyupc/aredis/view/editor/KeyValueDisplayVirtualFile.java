@@ -93,7 +93,7 @@ public class KeyValueDisplayVirtualFile extends VirtualFile {
     }
 
     @Override
-    public byte[] contentsToByteArray() throws IOException {
+    public byte @NotNull [] contentsToByteArray() throws IOException {
         return new byte[0];
     }
 

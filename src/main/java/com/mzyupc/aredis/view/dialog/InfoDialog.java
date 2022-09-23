@@ -115,7 +115,7 @@ public class InfoDialog extends DialogWrapper {
      */
     @NotNull
     @Override
-    protected Action[] createActions() {
+    protected Action @NotNull [] createActions() {
         CustomOKAction okAction = new CustomOKAction();
         RefreshAction refreshAction = new RefreshAction();
         // 设置默认的焦点按钮

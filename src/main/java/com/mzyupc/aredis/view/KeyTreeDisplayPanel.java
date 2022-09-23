@@ -90,12 +90,7 @@ public class KeyTreeDisplayPanel extends JPanel {
         this.parent = parent;
         pageIndexScanPointerMap.put(pageIndex, SCAN_POINTER_START);
 
-        allKeys = redisPoolManager.scan(SCAN_POINTER_START, parent.getKeyFilter(), pageSize, dbInfo.getIndex());
-
-        // exception occurred
-        if (allKeys == null) {
-            throw new RuntimeException("exception occurred");
-        }
+        allKeys = Collections.emptyList();
 
         keyTree = new Tree();
         // 搜索功能
@@ -147,7 +142,7 @@ public class KeyTreeDisplayPanel extends JPanel {
             }
         });
         JBScrollPane keyTreeScrollPane = new JBScrollPane(keyTree);
-        keyDisplayLoadingDecorator = new LoadingDecorator(keyTreeScrollPane, parent, 0);
+        keyDisplayLoadingDecorator = new LoadingDecorator(keyTreeScrollPane, project, 0);
 
         // toolbar
         final CommonActionsManager actionManager = CommonActionsManager.getInstance();
