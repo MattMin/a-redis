@@ -13,6 +13,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 - 优化db加载
 
+### Added
+- Plugin logo
+
 ## [beta-0.9.0] - 2022-09-18
 
 ### Changed
