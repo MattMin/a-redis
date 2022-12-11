@@ -301,6 +301,13 @@ public class KeyTreeDisplayPanel extends JPanel {
 
     /**
      * 渲染keyTree
+     * <p>
+     * TODO
+     * <p>
+     * 渲染keyTree时判断dbSize，
+     * <p>
+     * - 如果大于10万则使用 Cursor 分页，需要记录前一页的Cursor和后一页的Cursor，缺点是不能按照key整体排序，有点是快
+     * - 如果小于10万，使用现在的方式分页，即先查出所有key再分页
      */
     @SneakyThrows
     public void renderKeyTree(String keyFilter, String groupSymbol) {
