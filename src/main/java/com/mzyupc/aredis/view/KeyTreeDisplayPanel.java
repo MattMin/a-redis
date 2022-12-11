@@ -2,7 +2,11 @@ package com.mzyupc.aredis.view;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.CommonActionsManager;
-import com.intellij.openapi.actionSystem.*;
+import com.intellij.openapi.actionSystem.ActionManager;
+import com.intellij.openapi.actionSystem.ActionPlaces;
+import com.intellij.openapi.actionSystem.ActionPopupMenu;
+import com.intellij.openapi.actionSystem.ActionToolbar;
+import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.LoadingDecorator;
@@ -35,14 +39,23 @@ import redis.clients.jedis.Jedis;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-import javax.swing.tree.*;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.MutableTreeNode;
+import javax.swing.tree.TreeNode;
+import javax.swing.tree.TreePath;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.List;
-import java.util.*;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -326,9 +339,11 @@ public class KeyTreeDisplayPanel extends JPanel {
                     }
                 }
 
-                updateKeyTree(groupSymbol);
-                updatePageLabel();
-                keyDisplayPanel.updateUI();
+                EventQueue.invokeLater(() -> {
+                    updateKeyTree(groupSymbol);
+                    updatePageLabel();
+                    keyDisplayPanel.updateUI();
+                });
             } finally {
                 keyDisplayLoadingDecorator.stopLoading();
             }
