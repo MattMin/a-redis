@@ -8,6 +8,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## TODO
 - 单个DB百万级数据卡顿问题
 - Support for TLS
+- flush db 添加更复杂的验证方式
 
 ## [Unreleased]
 
