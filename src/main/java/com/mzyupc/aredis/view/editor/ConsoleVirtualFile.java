@@ -30,7 +30,7 @@ public class ConsoleVirtualFile extends VirtualFile {
 
     @Override
     public @NotNull FileType getFileType() {
-        return new KeyValueDisplayFileType();
+        return new ConsoleFileType();
     }
 
     public ConsoleVirtualFile(String name, Project project, ConnectionInfo connectionInfo, RedisPoolManager redisPoolManager) {
@@ -49,7 +49,7 @@ public class ConsoleVirtualFile extends VirtualFile {
 
     @Override
     public @NotNull VirtualFileSystem getFileSystem() {
-        return KeyValueDisplayFileSystem.getInstance(project);
+        return ConsoleFileSystem.getInstance(project);
     }
 
     @Override
