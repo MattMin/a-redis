@@ -8,7 +8,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## TODO
 - 单个DB百万级数据卡顿问题
 - Support for TLS
-- flush db 添加更复杂的验证方式
+- Flush db 添加更复杂的验证方式
+- 限制一下发现db数量 https://github.com/MattMin/a-redis/issues/40
+- 自动识别 json/xml/html 格式 https://github.com/MattMin/a-redis/issues/41
+- Support redis cluster connection https://github.com/MattMin/a-redis/issues/42
 
 ## [Unreleased]
 
