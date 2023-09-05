@@ -75,9 +75,10 @@ public class RedisPoolManager implements Disposable {
                     .msg(pong)
                     .build();
         } catch (Exception e) {
+            String errorMsg = Objects.requireNonNullElse(e.getCause(), e).getMessage();
             return TestConnectionResult.builder()
                     .success(false)
-                    .msg(e.getCause().getMessage())
+                    .msg(errorMsg)
                     .build();
         }
     }
@@ -181,7 +182,7 @@ public class RedisPoolManager implements Disposable {
             if (b > 31 && b < 127) {
                 sb.append((char)b);
             } else {
-                sb.append(String.format("\\x%02x", (int)b & 0xff));
+                sb.append(String.format("\\x%02x", b & 0xff));
             }
         }
         return sb.toString();
@@ -296,6 +297,8 @@ public class RedisPoolManager implements Disposable {
                             break;
                         case "avg_ttl":
                             build.setAvgTtl(Long.valueOf(split1[1]));
+                            break;
+                        default:
                             break;
                     }
                 });
