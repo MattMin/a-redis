@@ -380,6 +380,10 @@ public class ConnectionManager implements Disposable {
 
         RedisPoolManager redisPoolManager = connectionRedisMap.get(connection.getId());
         int dbCount = redisPoolManager.getDbCount();
+        if (dbCount == 0) {
+            // return when exception
+            return;
+        }
         Map<Integer, Keyspace> integerKeyspaceMap = redisPoolManager.infoKeyspace();
         propertyUtil.setDbCount(connection.getId(), dbCount);
 
