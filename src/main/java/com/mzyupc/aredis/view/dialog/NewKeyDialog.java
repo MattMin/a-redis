@@ -8,10 +8,10 @@ import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
 import com.mzyupc.aredis.enums.RedisValueTypeEnum;
 import com.mzyupc.aredis.enums.ValueFormatEnum;
+import com.mzyupc.aredis.utils.DoubleDocument;
 import com.mzyupc.aredis.utils.PropertyUtil;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.batik.ext.swing.DoubleDocument;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

@@ -34,7 +34,7 @@ public class ARedisToolWindow implements Disposable {
         connectionManager.initConnections(connectionTree);
 
         // connectionTree搜索功能
-        new TreeSpeedSearch(connectionTree, new Convertor<TreePath, String>() {
+        TreeSpeedSearch.installOn(connectionTree, true, new Convertor<TreePath, String>() {
             @Override
             public String convert(final TreePath treePath) {
                 DefaultMutableTreeNode node = (DefaultMutableTreeNode) treePath.getLastPathComponent();
@@ -43,7 +43,7 @@ public class ARedisToolWindow implements Disposable {
                 }
                 return "";
             }
-        }, true);
+        });
     }
 
     public JPanel getContent() {

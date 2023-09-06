@@ -107,7 +107,7 @@ public class KeyTreeDisplayPanel extends JPanel {
 
         keyTree = new Tree();
         // 搜索功能
-        new TreeSpeedSearch(keyTree, new Convertor<TreePath, String>() {
+        TreeSpeedSearch.installOn(keyTree, true, new Convertor<TreePath, String>() {
             @Override
             public String convert(final TreePath treePath) {
                 DefaultMutableTreeNode node = (DefaultMutableTreeNode) treePath.getLastPathComponent();
@@ -116,7 +116,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                 }
                 return "";
             }
-        }, true);
+        });
 
         // 渲染器
         keyTree.setCellRenderer(new KeyTreeCellRenderer());

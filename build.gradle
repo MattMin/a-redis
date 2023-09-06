@@ -1,13 +1,13 @@
 plugins {
     id 'java'
-    id "org.jetbrains.intellij" version "1.10.1"
+    id "org.jetbrains.intellij" version "1.15.0"
 }
 
 group 'com.mzyupc'
 version '1.0.0'
 
-sourceCompatibility = JavaVersion.VERSION_11
-targetCompatibility = JavaVersion.VERSION_11
+sourceCompatibility = JavaVersion.VERSION_17
+targetCompatibility = JavaVersion.VERSION_17
 
 repositories {
     mavenCentral()
@@ -32,12 +32,12 @@ dependencies {
 // See https://github.com/JetBrains/gradle-intellij-plugin/
 // 调试插件的 IDEA 版本
 intellij {
-    version = '2022.3'
+    version = '2023.2'
 }
 
 patchPluginXml {
-    // 声明插件适用的版本 221.5921.22(2022.1.3)
-    sinceBuild = '221.5921.22'
+    // 声明插件适用的版本 232.5150.116
+    sinceBuild = '232.5150.116'
     untilBuild = provider { null }
     changeNotes = """
       <div>Due to the change in password persistence in beta-0.9.0, the password will be erased after upgrading, so you need to backup your password before upgrading from beta-0.8.0 and earlier to beta-0.9.0 and later.</div>
