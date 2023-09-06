@@ -2,6 +2,7 @@ package com.mzyupc.aredis.view.dialog;
 
 import com.intellij.openapi.fileTypes.PlainTextLanguage;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.ui.EditorTextField;
 import com.intellij.ui.components.JBCheckBox;
@@ -16,12 +17,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ItemEvent;
-import java.awt.event.ItemListener;
 import java.util.function.Consumer;
 
 import static com.mzyupc.aredis.view.textfield.EditorTextFieldManager.createEditorTextField;
@@ -104,12 +102,9 @@ public class NewKeyDialog extends DialogWrapper {
         keyAndTypePanel.add(typePanel, BorderLayout.SOUTH);
 
         JBCheckBox reloadCheckBox = new JBCheckBox("Reload after adding the key", reloadSelected);
-        reloadCheckBox.addChangeListener(new ChangeListener() {
-            @Override
-            public void stateChanged(ChangeEvent e) {
-                reloadSelected = reloadCheckBox.isSelected();
-                propertyUtil.setReloadAfterAddingTheKey(reloadSelected);
-            }
+        reloadCheckBox.addChangeListener(e -> {
+            reloadSelected = reloadCheckBox.isSelected();
+            propertyUtil.setReloadAfterAddingTheKey(reloadSelected);
         });
         JPanel reloadPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         reloadPanel.add(reloadCheckBox);
@@ -155,23 +150,20 @@ public class NewKeyDialog extends DialogWrapper {
         JBLabel typeLabel = new JBLabel("Type:");
         typeLabel.setPreferredSize(new Dimension(50, 25));
 
-        JComboBox<RedisValueTypeEnum> redisValueTypeEnumJComboBox = new JComboBox<>(RedisValueTypeEnum.values());
+        JComboBox<RedisValueTypeEnum> redisValueTypeEnumComboBox = new ComboBox<>(RedisValueTypeEnum.values());
 
-        redisValueTypeEnumJComboBox.addItemListener(new ItemListener() {
-            @Override
-            public void itemStateChanged(ItemEvent e) {
-                if (ItemEvent.SELECTED == e.getStateChange()) {
-                    selectedType = (RedisValueTypeEnum) e.getItem();
-                    cardLayout.show(valuePanel, selectedType.name());
-                }
+        redisValueTypeEnumComboBox.addItemListener(e -> {
+            if (ItemEvent.SELECTED == e.getStateChange()) {
+                selectedType = (RedisValueTypeEnum) e.getItem();
+                cardLayout.show(valuePanel, selectedType.name());
             }
         });
-        redisValueTypeEnumJComboBox.setSelectedIndex(0);
+        redisValueTypeEnumComboBox.setSelectedIndex(0);
         selectedType = RedisValueTypeEnum.String;
 
         JPanel typePanel = new JPanel(new BorderLayout());
         typePanel.add(typeLabel, BorderLayout.WEST);
-        typePanel.add(redisValueTypeEnumJComboBox, BorderLayout.CENTER);
+        typePanel.add(redisValueTypeEnumComboBox, BorderLayout.CENTER);
         return typePanel;
     }
 
@@ -225,69 +217,54 @@ public class NewKeyDialog extends DialogWrapper {
     @NotNull
     private JPanel createSimpleValuePanel(RedisValueTypeEnum typeEnum) {
         JPanel stringTypePanel = new JPanel(new BorderLayout());
-        JComboBox<ValueFormatEnum> newKeyValueFormatEnumJComboBox = new JComboBox<>(ValueFormatEnum.values());
+        JComboBox<ValueFormatEnum> newKeyValueFormatEnumComboBox = new ComboBox<>(ValueFormatEnum.values());
         switch (typeEnum) {
             case String:
                 stringValueTextArea = createEditorTextField(project, PlainTextLanguage.INSTANCE, "");
-                newKeyValueFormatEnumJComboBox.addItemListener(new ItemListener() {
-                    @Override
-                    public void itemStateChanged(ItemEvent e) {
-                        if (ItemEvent.SELECTED == e.getStateChange()) {
-                            ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();
-                            stringValueTextArea = formatValue(project, stringTypePanel, formatEnum, stringValueTextArea);
-                        }
+                newKeyValueFormatEnumComboBox.addItemListener(e -> {
+                    if (ItemEvent.SELECTED == e.getStateChange()) {
+                        ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();
+                        stringValueTextArea = formatValue(project, stringTypePanel, formatEnum, stringValueTextArea);
                     }
                 });
                 stringTypePanel.add(stringValueTextArea, BorderLayout.CENTER);
                 break;
             case List:
                 listValueTextArea = createEditorTextField(project, PlainTextLanguage.INSTANCE, "");
-                newKeyValueFormatEnumJComboBox.addItemListener(new ItemListener() {
-                    @Override
-                    public void itemStateChanged(ItemEvent e) {
-                        if (ItemEvent.SELECTED == e.getStateChange()) {
-                            ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();
-                            listValueTextArea = formatValue(project, stringTypePanel, formatEnum, listValueTextArea);
-                        }
+                newKeyValueFormatEnumComboBox.addItemListener(e -> {
+                    if (ItemEvent.SELECTED == e.getStateChange()) {
+                        ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();
+                        listValueTextArea = formatValue(project, stringTypePanel, formatEnum, listValueTextArea);
                     }
                 });
                 stringTypePanel.add(listValueTextArea, BorderLayout.CENTER);
                 break;
             case Set:
                 setValueTextArea = createEditorTextField(project, PlainTextLanguage.INSTANCE, "");
-                newKeyValueFormatEnumJComboBox.addItemListener(new ItemListener() {
-                    @Override
-                    public void itemStateChanged(ItemEvent e) {
-                        if (ItemEvent.SELECTED == e.getStateChange()) {
-                            ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();
-                            setValueTextArea = formatValue(project, stringTypePanel, formatEnum, setValueTextArea);
-                        }
+                newKeyValueFormatEnumComboBox.addItemListener(e -> {
+                    if (ItemEvent.SELECTED == e.getStateChange()) {
+                        ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();
+                        setValueTextArea = formatValue(project, stringTypePanel, formatEnum, setValueTextArea);
                     }
                 });
                 stringTypePanel.add(setValueTextArea, BorderLayout.CENTER);
                 break;
             case Zset:
                 zsetValueTextArea = createEditorTextField(project, PlainTextLanguage.INSTANCE, "");
-                newKeyValueFormatEnumJComboBox.addItemListener(new ItemListener() {
-                    @Override
-                    public void itemStateChanged(ItemEvent e) {
-                        if (ItemEvent.SELECTED == e.getStateChange()) {
-                            ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();
-                            zsetValueTextArea = formatValue(project, stringTypePanel, formatEnum, zsetValueTextArea);
-                        }
+                newKeyValueFormatEnumComboBox.addItemListener(e -> {
+                    if (ItemEvent.SELECTED == e.getStateChange()) {
+                        ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();
+                        zsetValueTextArea = formatValue(project, stringTypePanel, formatEnum, zsetValueTextArea);
                     }
                 });
                 stringTypePanel.add(zsetValueTextArea, BorderLayout.CENTER);
                 break;
             default:
                 hashValueTextArea = createEditorTextField(project, PlainTextLanguage.INSTANCE, "");
-                newKeyValueFormatEnumJComboBox.addItemListener(new ItemListener() {
-                    @Override
-                    public void itemStateChanged(ItemEvent e) {
-                        if (ItemEvent.SELECTED == e.getStateChange()) {
-                            ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();
-                            hashValueTextArea = formatValue(project, stringTypePanel, formatEnum, hashValueTextArea);
-                        }
+                newKeyValueFormatEnumComboBox.addItemListener(e -> {
+                    if (ItemEvent.SELECTED == e.getStateChange()) {
+                        ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();
+                        hashValueTextArea = formatValue(project, stringTypePanel, formatEnum, hashValueTextArea);
                     }
                 });
                 stringTypePanel.add(hashValueTextArea, BorderLayout.CENTER);
@@ -296,7 +273,7 @@ public class NewKeyDialog extends DialogWrapper {
 
         JPanel viewAsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         viewAsPanel.add(new JBLabel("View as:"));
-        viewAsPanel.add(newKeyValueFormatEnumJComboBox);
+        viewAsPanel.add(newKeyValueFormatEnumComboBox);
 
         JPanel valueLabelPanel = new JPanel(new BorderLayout());
         valueLabelPanel.add(new JBLabel("Value:"), BorderLayout.WEST);

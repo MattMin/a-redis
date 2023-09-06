@@ -2,6 +2,7 @@ package com.mzyupc.aredis.view.dialog;
 
 import com.intellij.openapi.fileTypes.PlainTextLanguage;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.ui.EditorTextField;
 import com.intellij.ui.components.JBLabel;
@@ -124,7 +125,7 @@ public class AddRowDialog extends DialogWrapper {
     private JPanel createSimpleValuePanel() {
         valueTextArea = createEditorTextField(project, PlainTextLanguage.INSTANCE, "");
         JPanel stringTypePanel = new JPanel(new BorderLayout());
-        JComboBox<ValueFormatEnum> newKeyValueFormatEnumJComboBox = new JComboBox<>(ValueFormatEnum.values());
+        JComboBox<ValueFormatEnum> newKeyValueFormatEnumJComboBox = new ComboBox<>(ValueFormatEnum.values());
         newKeyValueFormatEnumJComboBox.addItemListener(e -> {
             if (ItemEvent.SELECTED == e.getStateChange()) {
                 ValueFormatEnum formatEnum = (ValueFormatEnum) e.getItem();

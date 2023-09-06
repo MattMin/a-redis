@@ -16,7 +16,7 @@ import org.jetbrains.annotations.NotNull;
 public class ARedisToolWindowFactory implements ToolWindowFactory {
     @Override
     public void createToolWindowContent(@NotNull Project project, @NotNull ToolWindow toolWindow) {
-        ARedisToolWindow aRedisToolWindow = new ARedisToolWindow(project, toolWindow);
+        ARedisToolWindow aRedisToolWindow = new ARedisToolWindow(project);
         ContentFactory contentFactory = ApplicationManager.getApplication().getService(ContentFactory.class);
         Content content = contentFactory.createContent(aRedisToolWindow.getContent(), "", false);
         toolWindow.getContentManager().addContent(content);

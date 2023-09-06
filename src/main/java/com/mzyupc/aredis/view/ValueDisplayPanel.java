@@ -5,6 +5,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileTypes.PlainTextLanguage;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.LoadingDecorator;
 import com.intellij.openapi.ui.Splitter;
 import com.intellij.ui.EditorTextField;
@@ -436,7 +437,7 @@ public class ValueDisplayPanel extends JPanel {
         JPanel viewAsAndSavePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         viewAsAndSavePanel.add(new JLabel("View as:"));
         JPanel valuePreviewAndFunctionPanel = new JPanel(new BorderLayout());
-        JComboBox<ValueFormatEnum> valueFormatComboBox = new JComboBox<>(ValueFormatEnum.values());
+        JComboBox<ValueFormatEnum> valueFormatComboBox = new ComboBox<>(ValueFormatEnum.values());
         // View as 功能
         valueFormatComboBox.addItemListener(new ItemListener() {
             @Override
