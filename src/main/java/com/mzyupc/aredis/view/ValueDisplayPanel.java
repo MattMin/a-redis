@@ -900,7 +900,7 @@ public class ValueDisplayPanel extends JPanel {
                                     ErrorDialog.show(String.format("\"%s\" already exists!", newKey));
                                 } else {
                                     key = newKey;
-                                    keyTreeDisplayPanel.renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
+                                    keyTreeDisplayPanel.renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol(), null);
                                 }
                             } catch (Exception exception) {
                                 ErrorDialog.show(exception.getMessage());

@@ -52,7 +52,6 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
@@ -97,14 +96,23 @@ public class KeyTreeDisplayPanel extends JPanel {
 
     private Map<Integer, String> pageIndexScanPointerMap = new HashMap<>();
 
-    public KeyTreeDisplayPanel(Project project, ARedisKeyValueDisplayPanel parent, JBSplitter splitterContainer, DbInfo dbInfo, RedisPoolManager redisPoolManager, Consumer<KeyInfo> doubleClickKeyAction) {
+    public KeyTreeDisplayPanel(Project project,
+                               ARedisKeyValueDisplayPanel parent,
+                               JBSplitter splitterContainer,
+                               DbInfo dbInfo,
+                               RedisPoolManager redisPoolManager,
+                               Consumer<KeyInfo> doubleClickKeyAction) {
         this.project = project;
         this.dbInfo = dbInfo;
         this.redisPoolManager = redisPoolManager;
         this.parent = parent;
         pageIndexScanPointerMap.put(pageIndex, SCAN_POINTER_START);
 
-        allKeys = Collections.emptyList();
+        allKeys = redisPoolManager.scan(SCAN_POINTER_START, parent.getKeyFilter(), pageSize, dbInfo.getIndex());
+        // exception occurred
+        if (allKeys == null) {
+            throw new RuntimeException("exception occurred");
+        }
 
         keyTree = new Tree();
         // 搜索功能
@@ -189,6 +197,8 @@ public class KeyTreeDisplayPanel extends JPanel {
         keyDisplayPanel.add(keyPagingPanel, BorderLayout.SOUTH);
 
         splitterContainer.setFirstComponent(keyDisplayPanel);
+
+        renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol(), allKeys);
     }
 
     private static void updateTree(DefaultMutableTreeNode parentTargetNode, DefaultMutableTreeNode originalChildNode, String[] explodedKey, KeyInfo key) {
@@ -269,8 +279,8 @@ public class KeyTreeDisplayPanel extends JPanel {
                     return;
                 }
 
+                renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol(), null);
                 updatePageDataOnPrevButtonClicked();
-                renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
                 nextPageButton.setEnabled(true);
 
                 if (pageIndex <= 1) {
@@ -289,8 +299,8 @@ public class KeyTreeDisplayPanel extends JPanel {
                     return;
                 }
 
+                renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol(), null);
                 updatePageDataOnNextButtonClicked();
-                renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
                 prevPageButton.setEnabled(true);
                 if (pageIndex >= getPageCount()) {
                     nextPageButton.setEnabled(false);
@@ -311,7 +321,7 @@ public class KeyTreeDisplayPanel extends JPanel {
      * - 如果小于10万，使用现在的方式分页，即先查出所有key再分页
      */
     @SneakyThrows
-    public void renderKeyTree(String keyFilter, String groupSymbol) {
+    public void renderKeyTree(String keyFilter, String groupSymbol, List<String> keys) {
         keyDisplayLoadingDecorator.startLoading(false);
         ReadAction.nonBlocking(() -> {
             try {
@@ -321,12 +331,16 @@ public class KeyTreeDisplayPanel extends JPanel {
                 }
                 dbInfo.setKeyCount(dbSize);
                 flatRootNode = new DefaultMutableTreeNode(dbInfo);
-                // redis 查询前pageSize个key
-                allKeys = redisPoolManager.scan(SCAN_POINTER_START, keyFilter, pageSize, dbInfo.getIndex());
 
-                // exception occurred
-                if (allKeys == null) {
-                    return null;
+                // redis 查询前pageSize个key
+                if (keys == null) {
+                    allKeys = redisPoolManager.scan(SCAN_POINTER_START, keyFilter, pageSize, dbInfo.getIndex());
+                    // exception occurred
+                    if (allKeys == null) {
+                        return null;
+                    }
+                } else {
+                    allKeys = keys;
                 }
 
                 if (CollectionUtils.isNotEmpty(allKeys)) {
@@ -410,7 +424,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                     }
                 }
                 resetPageIndex();
-                renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
+                renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol(), null);
             }).show();
         });
         return clearAction;
@@ -447,7 +461,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                                 if (newKeyDialog.isReloadSelected()) {
                                     // 重新渲染keyTree
                                     resetPageIndex();
-                                    renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
+                                    renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol(), null);
                                 }
                             }
                             break;
@@ -468,7 +482,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                                 if (newKeyDialog.isReloadSelected()) {
                                     // 重新渲染keyTree
                                     resetPageIndex();
-                                    renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
+                                    renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol(), null);
                                 }
                             }
                             break;
@@ -489,7 +503,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                                 if (newKeyDialog.isReloadSelected()) {
                                     // 重新渲染keyTree
                                     resetPageIndex();
-                                    renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
+                                    renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol(), null);
                                 }
                             }
                             break;
@@ -512,7 +526,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                                 if (newKeyDialog.isReloadSelected()) {
                                     // 重新渲染keyTree
                                     resetPageIndex();
-                                    renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
+                                    renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol(), null);
                                 }
                             }
                             break;
@@ -531,7 +545,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                                 if (newKeyDialog.isReloadSelected()) {
                                     // 重新渲染keyTree
                                     resetPageIndex();
-                                    renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
+                                    renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol(), null);
                                 }
                             }
                     }
@@ -627,13 +641,13 @@ public class KeyTreeDisplayPanel extends JPanel {
     private RefreshAction createRefreshAction() {
         RefreshAction refreshAction = new RefreshAction();
         refreshAction.setAction(e -> {
-            renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
+            renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol(), null);
         });
         return refreshAction;
     }
 
     private long getPageCount() {
-        int total = allKeys.size();
+        long total = dbInfo.getKeyCount();
         long result = total / pageSize;
         long mod = total % pageSize;
         return mod > 0 ? result + 1 : result;

@@ -103,7 +103,6 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
                     dbInfo,
                     redisPoolManager,
                     this::renderValueDisplayPanel);
-            keyTreeDisplayPanel.renderKeyTree(this.getKeyFilter(), this.getGroupSymbol());
         } catch (RuntimeException e) {
             if ("exception occurred".equals(e.getMessage())) {
                 return;
@@ -141,7 +140,7 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
                         searchTextField.addCurrentTextToHistory();
                     }
                     keyTreeDisplayPanel.resetPageIndex();
-                    keyTreeDisplayPanel.renderKeyTree(getKeyFilter(), getGroupSymbol());
+                    keyTreeDisplayPanel.renderKeyTree(getKeyFilter(), getGroupSymbol(), null);
                 }
             }
         });
