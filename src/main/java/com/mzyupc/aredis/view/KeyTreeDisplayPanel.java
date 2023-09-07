@@ -25,6 +25,7 @@ import com.mzyupc.aredis.utils.RedisPoolManager;
 import com.mzyupc.aredis.utils.ThreadPoolManager;
 import com.mzyupc.aredis.view.dialog.ConfirmDialog;
 import com.mzyupc.aredis.view.dialog.ErrorDialog;
+import com.mzyupc.aredis.view.dialog.FlushDbConfirmDialog;
 import com.mzyupc.aredis.view.dialog.NewKeyDialog;
 import com.mzyupc.aredis.view.render.KeyTreeCellRenderer;
 import com.mzyupc.aredis.vo.DbInfo;
@@ -402,20 +403,15 @@ public class KeyTreeDisplayPanel extends JPanel {
     private ClearAction createClearAction() {
         ClearAction clearAction = new ClearAction();
         clearAction.setAction(e -> {
-            ConfirmDialog confirmDialog = new ConfirmDialog(
-                    project,
-                    "Confirm",
-                    "Are you sure you want to delete all the keys of the currently selected DB?",
-                    actionEvent -> {
-                        try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
-                            if (jedis != null) {
-                                jedis.flushDB();
-                            }
-                        }
-                        resetPageIndex();
-                        renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
-                    });
-            confirmDialog.show();
+            new FlushDbConfirmDialog(project, actionEvent -> {
+                try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                    if (jedis != null) {
+                        jedis.flushDB();
+                    }
+                }
+                resetPageIndex();
+                renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
+            }).show();
         });
         return clearAction;
     }
