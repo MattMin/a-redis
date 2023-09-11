@@ -18,7 +18,6 @@
             <li>Convenient management of Redis connections</li>
             <li>Display DB and number of keys</li>
             <li>Filtering and grouping of keys</li>
-            <li>Support paging to display keys and value</li>
             <li>Support adding, modifying and deleting keys and value</li>
             <li>Support displaying String, List, Set, ZSet, Hash data formats</li>
             <li>The value can be formatted as JSON, XML, HTML for display</li>

@@ -45,6 +45,17 @@ patchPluginXml {
       <div>由于 beta-0.9.0 版本修改了密码的持久化方式, 升级后密码会被清除, 所以从 beta-0.8.0 及其之前的版本升级到 beta-0.9.0 及其之后版本之前需要备份密码</div>
       <br>
 
+      1.0.0<br>
+      <ul>
+          <li>Solved the issue of slow DB opening with a million data entries</li>
+          <li>Resolved the "EventQueue.isDispatchThread()=false" issue</li>
+          <li>Fixed the NPE issue with "Test Connection"</li>
+          <li>Added a complex confirmation method when flushing the DB</li>
+          <li>Updated deprecated API calls</li>
+          <li>Utilized Java 17</li>
+          <li>Added a logo</li>
+      </ul>
+
       beta-0.9.0<br>
       <ul>
           <li>Use `PasswordSafe` to save your password</li>

@@ -7,8 +7,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+
+## [1.0.0] - 2023-09-11
+
+### Fixed
+- 百万数据量 DB 打开很慢的问题
+- 解决 "EventQueue.isDispatchThread()=false" 的问题
+- "Test Connection" 的 NPE 问题
+
 ### Changed
-- 优化db加载
+- Flush DB 时添加复杂的确认方式
+- 更新过期的 API 调用
+- 使用 Java 17
 
 ### Added
 - Plugin logo
@@ -78,6 +88,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - replace Label with Jlabel
 
 [Unreleased]: https://github.com/MattMin/a-redis/compare/beta-0.9.0...dev-1.0
+
+[1.0.0]: https://github.com/MattMin/a-redis/releases/tag/1.0.0
 
 [beta-0.9.0]: https://github.com/MattMin/a-redis/releases/tag/beta-0.9.0
 
