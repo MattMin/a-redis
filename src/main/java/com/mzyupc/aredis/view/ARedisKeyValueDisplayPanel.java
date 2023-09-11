@@ -139,7 +139,6 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
                     } else {
                         searchTextField.addCurrentTextToHistory();
                     }
-                    keyTreeDisplayPanel.resetPageIndex();
                     keyTreeDisplayPanel.renderKeyTree(getKeyFilter(), getGroupSymbol(), null);
                 }
             }

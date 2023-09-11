@@ -350,32 +350,27 @@ public class RedisPoolManager implements Disposable {
     }
 
     /**
-     * 模糊匹配满足条件的key
+     * 模糊匹配满足条件的key, 用于查询 Key Tree 中的数据
      *
-     * @param count   每次扫描多少条记录，值越大消耗的时间越短，但会影响redis性能。建议设为一千到一万
+     * @param limit   结果集最大数量
      * @param pattern key的正则表达式
      * @return 匹配的key集合
      * @since Redis 2.8
      * @since 使用scan 替代keys keys如果数据量过大，会直接使redis崩溃
      */
-    public List<String> scan(String cursor, String pattern, int count, int db) {
-        List<String> list = new ArrayList<>();
+    public List<String> scanKeys(String cursor, String pattern, int limit, int db) {
         try (Jedis jedis = getJedis(db)) {
             if (jedis == null) {
                 return null;
             }
             ScanParams scanParams = new ScanParams();
-            scanParams.count(count);
+            scanParams.count(limit);
             scanParams.match(pattern);
-            do {
-                ScanResult<String> scanResult = jedis.scan(cursor, scanParams);
-                list.addAll(scanResult.getResult());
-                cursor = scanResult.getCursor();
-            } while (!"0".equals(cursor));
+            ScanResult<String> scanResult = jedis.scan(cursor, scanParams);
+            return scanResult.getResult();
         } catch (Exception e) {
             throw new IllegalArgumentException(e);
         }
-        return list;
     }
 
     public Long lpush(String key, String[] values, int db) {
