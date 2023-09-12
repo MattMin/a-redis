@@ -54,6 +54,7 @@ patchPluginXml {
           <li>Updated deprecated API calls</li>
           <li>Utilized Java 17</li>
           <li>Added a logo</li>
+          <li>Removed pagination for keys</li>
       </ul>
 
       beta-0.9.0<br>

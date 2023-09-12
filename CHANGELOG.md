@@ -22,6 +22,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 - Plugin logo
+- 
+### Removed
+- key 的分页展示
 
 ## [beta-0.9.0] - 2022-09-18
 
