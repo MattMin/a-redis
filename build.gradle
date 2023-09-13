@@ -54,7 +54,7 @@ patchPluginXml {
           <li>Updated deprecated API calls</li>
           <li>Utilized Java 17</li>
           <li>Added a logo</li>
-          <li>Removed pagination for keys</li>
+          <li>Removed key pagination, now showing up to 20,000 keys. Use the 'Filter' feature if the desired key is not found in the results.</li>
       </ul>
 
       beta-0.9.0<br>
