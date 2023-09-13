@@ -125,7 +125,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         testResult.setFocusable(false);
         testResult.setAlignmentX(SwingConstants.LEFT);
 
-        LoadingDecorator loadingDecorator = new LoadingDecorator(testResult, this, 0);
+        LoadingDecorator loadingDecorator = new LoadingDecorator(testResult, project, 0);
         // 测试连接按钮
         JButton testButton = new JButton("Test Connection");
         testButton.addActionListener(new ActionListener() {

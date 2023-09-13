@@ -2,7 +2,6 @@ package com.mzyupc.aredis.view;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.ui.TreeSpeedSearch;
 import com.intellij.ui.treeStructure.Tree;
 import com.intellij.util.containers.Convertor;
@@ -28,13 +27,13 @@ public class ARedisToolWindow implements Disposable {
 
     private ConnectionManager connectionManager;
 
-    public ARedisToolWindow(Project project, ToolWindow toolWindow) {
+    public ARedisToolWindow(Project project) {
         this.project = project;
         this.propertyUtil = PropertyUtil.getInstance(project);
         connectionManager.initConnections(connectionTree);
 
         // connectionTree搜索功能
-        new TreeSpeedSearch(connectionTree, new Convertor<TreePath, String>() {
+        TreeSpeedSearch.installOn(connectionTree, true, new Convertor<TreePath, String>() {
             @Override
             public String convert(final TreePath treePath) {
                 DefaultMutableTreeNode node = (DefaultMutableTreeNode) treePath.getLastPathComponent();
@@ -43,7 +42,7 @@ public class ARedisToolWindow implements Disposable {
                 }
                 return "";
             }
-        }, true);
+        });
     }
 
     public JPanel getContent() {

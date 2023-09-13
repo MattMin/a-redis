@@ -5,8 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## TODO
-- Support for TLS
+## [Unreleased]
+
+
+## [1.0.0] - 2023-09-13
+
+### Fixed
+- 百万数据量 DB 打开很慢的问题
+- 解决 "EventQueue.isDispatchThread()=false" 的问题
+- "Test Connection" 的 NPE 问题
+
+### Changed
+- Flush DB 时添加复杂的确认方式
+- 更新过期的 API 调用
+- 使用 Java 17
+
+### Added
+- Plugin logo
+
+### Removed
+- key 的分页展示
 
 ## [beta-0.9.0] - 2022-09-18
 
@@ -73,6 +91,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - replace Label with Jlabel
 
 [Unreleased]: https://github.com/MattMin/a-redis/compare/beta-0.9.0...dev-1.0
+
+[1.0.0]: https://github.com/MattMin/a-redis/releases/tag/1.0.0
 
 [beta-0.9.0]: https://github.com/MattMin/a-redis/releases/tag/beta-0.9.0
 

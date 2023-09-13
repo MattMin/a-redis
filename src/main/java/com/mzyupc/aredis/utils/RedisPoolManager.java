@@ -4,22 +4,30 @@ import com.google.common.collect.Lists;
 import com.intellij.openapi.Disposable;
 import com.mzyupc.aredis.view.dialog.ErrorDialog;
 import com.mzyupc.aredis.vo.ConnectionInfo;
+import com.mzyupc.aredis.vo.Keyspace;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import redis.clients.jedis.*;
+import org.jetbrains.annotations.Nullable;
+import redis.clients.jedis.Connection;
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.JedisPoolConfig;
+import redis.clients.jedis.Protocol;
 import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
 import redis.clients.jedis.util.Pool;
 
-import javax.annotation.Nullable;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -76,9 +84,10 @@ public class RedisPoolManager implements Disposable {
                     .msg(pong)
                     .build();
         } catch (Exception e) {
+            String errorMsg = Objects.requireNonNullElse(e.getCause(), e).getMessage();
             return TestConnectionResult.builder()
                     .success(false)
-                    .msg(e.getCause().getMessage())
+                    .msg(errorMsg)
                     .build();
         }
     }
@@ -182,7 +191,7 @@ public class RedisPoolManager implements Disposable {
             if (b > 31 && b < 127) {
                 sb.append((char)b);
             } else {
-                sb.append(String.format("\\x%02x", (int)b & 0xff));
+                sb.append(String.format("\\x%02x", b & 0xff));
             }
         }
         return sb.toString();
@@ -229,14 +238,25 @@ public class RedisPoolManager implements Disposable {
                 return 0;
             }
 
-            int count = 0;
-            while(true) {
+            int count = 1;
+            int min = 0;
+            int max = 0;
+            while (true) {
                 try {
-                    jedis.select(count++);
+                    jedis.select(count - 1);
+                    min = count;
                 } catch (JedisDataException jedisDataException) {
+                    max = count;
+                }
+                if (max != 0) {
+                    count = min + (max - min) / 2;
+                } else {
+                    count = min * 2;
+                }
+                if (max - 1 == min) {
                     // reset
                     jedis.select(Protocol.DEFAULT_DATABASE);
-                    return count - 1;
+                    return min;
                 }
             }
         } catch (NullPointerException e) {
@@ -258,6 +278,41 @@ public class RedisPoolManager implements Disposable {
                 return null;
             }
             return jedis.dbSize();
+        }
+    }
+
+    public Map<Integer, Keyspace> infoKeyspace() {
+        try (Jedis jedis = getJedis(db)) {
+            if (jedis == null) {
+                return null;
+            }
+            String keyspace = jedis.info("keyspace");
+            return keyspace.lines().filter(e -> !e.startsWith("#")).map(e -> {
+
+                //db1:keys=598143,expires=0,avg_ttl=0
+
+                String[] split = e.split(":");
+                String db = split[0].substring(2);
+
+                Keyspace build = Keyspace.builder().db(Integer.valueOf(db)).build();
+                Arrays.stream(split[1].split(",")).forEach(e1->{
+                    String[] split1 = e1.split("=");
+                    switch (split1[0]) {
+                        case "keys":
+                            build.setKeys(Long.valueOf(split1[1]));
+                            break;
+                        case "expires":
+                            build.setExpires(Long.valueOf(split1[1]));
+                            break;
+                        case "avg_ttl":
+                            build.setAvgTtl(Long.valueOf(split1[1]));
+                            break;
+                        default:
+                            break;
+                    }
+                });
+                return build;
+            }).collect(Collectors.toMap(Keyspace::getDb, Function.identity()));
         }
     }
 
@@ -295,32 +350,27 @@ public class RedisPoolManager implements Disposable {
     }
 
     /**
-     * 模糊匹配满足条件的key
+     * 模糊匹配满足条件的key, 用于查询 Key Tree 中的数据
      *
-     * @param count   每次扫描多少条记录，值越大消耗的时间越短，但会影响redis性能。建议设为一千到一万
+     * @param limit   结果集最大数量
      * @param pattern key的正则表达式
      * @return 匹配的key集合
      * @since Redis 2.8
      * @since 使用scan 替代keys keys如果数据量过大，会直接使redis崩溃
      */
-    public List<String> scan(String cursor, String pattern, int count, int db) {
-        List<String> list = new ArrayList<>();
+    public List<String> scanKeys(String cursor, String pattern, int limit, int db) {
         try (Jedis jedis = getJedis(db)) {
             if (jedis == null) {
                 return null;
             }
             ScanParams scanParams = new ScanParams();
-            scanParams.count(count);
+            scanParams.count(limit);
             scanParams.match(pattern);
-            do {
-                ScanResult<String> scanResult = jedis.scan(cursor, scanParams);
-                list.addAll(scanResult.getResult());
-                cursor = scanResult.getCursor();
-            } while (!"0".equals(cursor));
+            ScanResult<String> scanResult = jedis.scan(cursor, scanParams);
+            return scanResult.getResult();
         } catch (Exception e) {
             throw new IllegalArgumentException(e);
         }
-        return list;
     }
 
     public Long lpush(String key, String[] values, int db) {

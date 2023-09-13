@@ -23,7 +23,7 @@
   - view the number of keys in DB and DB
 
 ### 2. Key management
-  - filter(paging)
+  - filter
   - group
   - reload
   - add(String, List, Set, ZSet, Hash)
