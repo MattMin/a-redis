@@ -8,7 +8,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 
-## [1.0.0] - 2023-09-11
+## [1.0.0] - 2023-09-13
 
 ### Fixed
 - 百万数据量 DB 打开很慢的问题
@@ -22,7 +22,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 - Plugin logo
-- 
+
 ### Removed
 - key 的分页展示
 
