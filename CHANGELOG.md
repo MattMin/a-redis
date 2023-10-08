@@ -92,7 +92,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - query the number of DBs without using the 'CONFIG GET' command
 - replace Label with Jlabel
 
-[Unreleased]: https://github.com/MattMin/a-redis/compare/beta-0.9.0...dev-1.0
+[Unreleased]: https://github.com/MattMin/a-redis/compare/dev-1.0.0...dev-1.1.0
 
 [1.0.0]: https://github.com/MattMin/a-redis/releases/tag/1.0.0
 
