@@ -7,6 +7,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- 更新过期的 API 调用
 
 ## [1.0.0] - 2023-09-13
 

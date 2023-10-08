@@ -9,7 +9,7 @@ import com.intellij.ui.table.JBTable;
 import com.mzyupc.aredis.utils.RedisPoolManager;
 import lombok.Getter;
 import lombok.Setter;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import redis.clients.jedis.Jedis;
