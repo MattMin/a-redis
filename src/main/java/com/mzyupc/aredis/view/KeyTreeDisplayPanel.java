@@ -1,6 +1,5 @@
 package com.mzyupc.aredis.view;
 
-import com.intellij.icons.AllIcons;
 import com.intellij.ide.CommonActionsManager;
 import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.ActionPlaces;
@@ -16,6 +15,7 @@ import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.treeStructure.Tree;
 import com.intellij.util.containers.Convertor;
+import com.intellij.util.ui.JBUI;
 import com.mzyupc.aredis.action.AddAction;
 import com.mzyupc.aredis.action.ClearAction;
 import com.mzyupc.aredis.action.DeleteAction;
@@ -25,6 +25,7 @@ import com.mzyupc.aredis.utils.RedisPoolManager;
 import com.mzyupc.aredis.utils.ThreadPoolManager;
 import com.mzyupc.aredis.view.dialog.ConfirmDialog;
 import com.mzyupc.aredis.view.dialog.ErrorDialog;
+import com.mzyupc.aredis.view.dialog.FlushDbConfirmDialog;
 import com.mzyupc.aredis.view.dialog.NewKeyDialog;
 import com.mzyupc.aredis.view.render.KeyTreeCellRenderer;
 import com.mzyupc.aredis.vo.DbInfo;
@@ -38,26 +39,19 @@ import org.jetbrains.annotations.NotNull;
 import redis.clients.jedis.Jedis;
 
 import javax.swing.*;
-import javax.swing.border.EmptyBorder;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.MutableTreeNode;
 import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 import static com.intellij.openapi.ui.DialogWrapper.OK_EXIT_CODE;
 import static com.mzyupc.aredis.utils.JTreeUtil.getTreeExpander;
@@ -70,7 +64,6 @@ import static redis.clients.jedis.params.ScanParams.SCAN_POINTER_START;
  */
 @Getter
 public class KeyTreeDisplayPanel extends JPanel {
-    private static final int DEFAULT_PAGE_SIZE = 10000;
 
     private final Tree keyTree;
     private final LoadingDecorator keyDisplayLoadingDecorator;
@@ -81,7 +74,7 @@ public class KeyTreeDisplayPanel extends JPanel {
     /**
      * 每次查询KEY的数量
      */
-    private final int pageSize = DEFAULT_PAGE_SIZE;
+    private static final int DEFAULT_PAGE_SIZE = 20000;
     private DefaultTreeModel treeModel;
     private JPanel keyDisplayPanel;
     /**
@@ -89,25 +82,28 @@ public class KeyTreeDisplayPanel extends JPanel {
      */
     private DefaultMutableTreeNode flatRootNode;
     private JBLabel pageSizeLabel;
-    private JBLabel pageLabel;
-    private int pageIndex = 1;
-    private List<String> allKeys;
-    private List<String> currentPageKeys = new ArrayList<>();
+    private List<String> keys;
 
-    private Map<Integer, String> pageIndexScanPointerMap = new HashMap<>();
-
-    public KeyTreeDisplayPanel(Project project, ARedisKeyValueDisplayPanel parent, JBSplitter splitterContainer, DbInfo dbInfo, RedisPoolManager redisPoolManager, Consumer<KeyInfo> doubleClickKeyAction) {
+    public KeyTreeDisplayPanel(Project project,
+                               ARedisKeyValueDisplayPanel parent,
+                               JBSplitter splitterContainer,
+                               DbInfo dbInfo,
+                               RedisPoolManager redisPoolManager,
+                               Consumer<KeyInfo> doubleClickKeyAction) {
         this.project = project;
         this.dbInfo = dbInfo;
         this.redisPoolManager = redisPoolManager;
         this.parent = parent;
-        pageIndexScanPointerMap.put(pageIndex, SCAN_POINTER_START);
 
-        allKeys = Collections.emptyList();
+        keys = redisPoolManager.scanKeys(SCAN_POINTER_START, parent.getKeyFilter(), DEFAULT_PAGE_SIZE, dbInfo.getIndex());
+        // exception occurred
+        if (keys == null) {
+            throw new RuntimeException("exception occurred");
+        }
 
         keyTree = new Tree();
         // 搜索功能
-        new TreeSpeedSearch(keyTree, new Convertor<TreePath, String>() {
+        TreeSpeedSearch.installOn(keyTree, true, new Convertor<TreePath, String>() {
             @Override
             public String convert(final TreePath treePath) {
                 DefaultMutableTreeNode node = (DefaultMutableTreeNode) treePath.getLastPathComponent();
@@ -116,7 +112,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                 }
                 return "";
             }
-        }, true);
+        });
 
         // 渲染器
         keyTree.setCellRenderer(new KeyTreeCellRenderer());
@@ -177,7 +173,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                 .createActionToolbar(ActionPlaces.TOOLBAR, actions, true);
 
         // key分页panel
-        JPanel keyPagingPanel = createPagingPanel(parent);
+        JPanel keyPagingPanel = createPagingPanel();
 
         // key展示区域 包括key工具栏区域, key树状图区域, key分页区
         keyDisplayPanel = new JPanel(new BorderLayout());
@@ -188,6 +184,8 @@ public class KeyTreeDisplayPanel extends JPanel {
         keyDisplayPanel.add(keyPagingPanel, BorderLayout.SOUTH);
 
         splitterContainer.setFirstComponent(keyDisplayPanel);
+
+        renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol(), keys);
     }
 
     private static void updateTree(DefaultMutableTreeNode parentTargetNode, DefaultMutableTreeNode originalChildNode, String[] explodedKey, KeyInfo key) {
@@ -217,8 +215,8 @@ public class KeyTreeDisplayPanel extends JPanel {
             Object keyObj = currentChild.getUserObject();
             String nodeKey;
             // 中间节点
-            if (keyObj instanceof FragmentedKey) {
-                nodeKey = ((FragmentedKey) keyObj).getFragmentedKey();
+            if (keyObj instanceof FragmentedKey fragmentedKey) {
+                nodeKey = fragmentedKey.getFragmentedKey();
                 if (keyFragment.equals(nodeKey)) {
                     return currentChild;
                 }
@@ -237,80 +235,21 @@ public class KeyTreeDisplayPanel extends JPanel {
 
     /**
      * key分页panel
-     *
-     * @param parent
-     * @return
      */
     @NotNull
-    private JPanel createPagingPanel(ARedisKeyValueDisplayPanel parent) {
+    private JPanel createPagingPanel() {
         JPanel keyPagingPanel = new JPanel(new BorderLayout());
-
-        pageSizeLabel = new JBLabel("Page Size: " + currentPageKeys.size());
-        pageSizeLabel.setBorder(new EmptyBorder(0, 5, 0, 0));
+        pageSizeLabel = new JBLabel("Displayed key count: " + keys.size());
+        pageSizeLabel.setBorder(JBUI.Borders.emptyLeft(5));
         keyPagingPanel.add(pageSizeLabel, BorderLayout.NORTH);
-        JPanel pagePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        pageLabel = new JBLabel(String.format("Page %s of %s", pageIndex, getPageCount()));
-        pagePanel.add(pageLabel);
-
-        JButton prevPageButton = new JButton(AllIcons.Actions.Play_back);
-        JButton nextPageButton = new JButton(AllIcons.Actions.Play_forward);
-        pagePanel.add(prevPageButton);
-        pagePanel.add(nextPageButton);
-        keyPagingPanel.add(pagePanel, BorderLayout.SOUTH);
-
-        if (pageIndex <= 1) {
-            prevPageButton.setEnabled(false);
-        }
-        prevPageButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                if (pageIndex <= 1) {
-                    return;
-                }
-
-                updatePageDataOnPrevButtonClicked();
-                renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
-                nextPageButton.setEnabled(true);
-
-                if (pageIndex <= 1) {
-                    prevPageButton.setEnabled(false);
-                }
-            }
-        });
-
-        if (pageIndex >= getPageCount()) {
-            nextPageButton.setEnabled(false);
-        }
-        nextPageButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                if (pageIndex >= getPageCount()) {
-                    return;
-                }
-
-                updatePageDataOnNextButtonClicked();
-                renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
-                prevPageButton.setEnabled(true);
-                if (pageIndex >= getPageCount()) {
-                    nextPageButton.setEnabled(false);
-                }
-            }
-        });
         return keyPagingPanel;
     }
 
     /**
      * 渲染keyTree
-     * <p>
-     * TODO
-     * <p>
-     * 渲染keyTree时判断dbSize，
-     * <p>
-     * - 如果大于10万则使用 Cursor 分页，需要记录前一页的Cursor和后一页的Cursor，缺点是不能按照key整体排序，有点是快
-     * - 如果小于10万，使用现在的方式分页，即先查出所有key再分页
      */
     @SneakyThrows
-    public void renderKeyTree(String keyFilter, String groupSymbol) {
+    public void renderKeyTree(String keyFilter, String groupSymbol, List<String> preparedKeys) {
         keyDisplayLoadingDecorator.startLoading(false);
         ReadAction.nonBlocking(() -> {
             try {
@@ -320,29 +259,25 @@ public class KeyTreeDisplayPanel extends JPanel {
                 }
                 dbInfo.setKeyCount(dbSize);
                 flatRootNode = new DefaultMutableTreeNode(dbInfo);
-                // redis 查询前pageSize个key
-                allKeys = redisPoolManager.scan(SCAN_POINTER_START, keyFilter, pageSize, dbInfo.getIndex());
 
-                // exception occurred
-                if (allKeys == null) {
-                    return null;
+                // redis 查询前pageSize个key
+                if (preparedKeys == null) {
+                    keys = redisPoolManager.scanKeys(SCAN_POINTER_START, keyFilter, DEFAULT_PAGE_SIZE, dbInfo.getIndex());
+                    // exception occurred
+                    if (keys == null) {
+                        return null;
+                    }
+                } else {
+                    keys = preparedKeys;
                 }
 
-                if (CollectionUtils.isNotEmpty(allKeys)) {
-                    allKeys = allKeys.stream().sorted().collect(Collectors.toList());
-
-                    int size = allKeys.size();
-                    int start = (pageIndex - 1) * pageSize;
-                    int end = Math.min(start + pageSize, size);
-                    currentPageKeys = allKeys.subList(start, end);
-                    if (!CollectionUtils.isEmpty(currentPageKeys)) {
-                        for (String key : currentPageKeys) {
-                            DefaultMutableTreeNode keyNode = new DefaultMutableTreeNode(KeyInfo.builder()
-                                    .key(key)
-                                    .del(false)
-                                    .build());
-                            flatRootNode.add(keyNode);
-                        }
+                if (CollectionUtils.isNotEmpty(keys)) {
+                    for (String key : keys) {
+                        DefaultMutableTreeNode keyNode = new DefaultMutableTreeNode(KeyInfo.builder()
+                                .key(key)
+                                .del(false)
+                                .build());
+                        flatRootNode.add(keyNode);
                     }
                 }
 
@@ -402,20 +337,14 @@ public class KeyTreeDisplayPanel extends JPanel {
     private ClearAction createClearAction() {
         ClearAction clearAction = new ClearAction();
         clearAction.setAction(e -> {
-            ConfirmDialog confirmDialog = new ConfirmDialog(
-                    project,
-                    "Confirm",
-                    "Are you sure you want to delete all the keys of the currently selected DB?",
-                    actionEvent -> {
-                        try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
-                            if (jedis != null) {
-                                jedis.flushDB();
-                            }
-                        }
-                        resetPageIndex();
-                        renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
-                    });
-            confirmDialog.show();
+            new FlushDbConfirmDialog(project, actionEvent -> {
+                try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
+                    if (jedis != null) {
+                        jedis.flushDB();
+                    }
+                }
+                renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol(), null);
+            }).show();
         });
         return clearAction;
     }
@@ -450,8 +379,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                                 newKeyDialog.close(OK_EXIT_CODE);
                                 if (newKeyDialog.isReloadSelected()) {
                                     // 重新渲染keyTree
-                                    resetPageIndex();
-                                    renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
+                                    renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol(), null);
                                 }
                             }
                             break;
@@ -471,8 +399,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                                 newKeyDialog.close(OK_EXIT_CODE);
                                 if (newKeyDialog.isReloadSelected()) {
                                     // 重新渲染keyTree
-                                    resetPageIndex();
-                                    renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
+                                    renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol(), null);
                                 }
                             }
                             break;
@@ -492,8 +419,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                                 newKeyDialog.close(OK_EXIT_CODE);
                                 if (newKeyDialog.isReloadSelected()) {
                                     // 重新渲染keyTree
-                                    resetPageIndex();
-                                    renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
+                                    renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol(), null);
                                 }
                             }
                             break;
@@ -515,8 +441,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                                 newKeyDialog.close(OK_EXIT_CODE);
                                 if (newKeyDialog.isReloadSelected()) {
                                     // 重新渲染keyTree
-                                    resetPageIndex();
-                                    renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
+                                    renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol(), null);
                                 }
                             }
                             break;
@@ -534,8 +459,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                                 newKeyDialog.close(OK_EXIT_CODE);
                                 if (newKeyDialog.isReloadSelected()) {
                                     // 重新渲染keyTree
-                                    resetPageIndex();
-                                    renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
+                                    renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol(), null);
                                 }
                             }
                     }
@@ -631,33 +555,13 @@ public class KeyTreeDisplayPanel extends JPanel {
     private RefreshAction createRefreshAction() {
         RefreshAction refreshAction = new RefreshAction();
         refreshAction.setAction(e -> {
-            renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
+            renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol(), null);
         });
         return refreshAction;
     }
 
-    private long getPageCount() {
-        int total = allKeys.size();
-        long result = total / pageSize;
-        long mod = total % pageSize;
-        return mod > 0 ? result + 1 : result;
-    }
-
-    private synchronized void updatePageDataOnPrevButtonClicked() {
-        pageIndex--;
-    }
-
-    private synchronized void updatePageDataOnNextButtonClicked() {
-        pageIndex++;
-    }
-
-    public void resetPageIndex() {
-        pageIndex = 1;
-    }
-
     private void updatePageLabel() {
-        pageLabel.setText(String.format("Page %s of %s", pageIndex, getPageCount()));
-        pageSizeLabel.setText("Page Size: " + currentPageKeys.size());
+        pageSizeLabel.setText("Displayed key count: " + keys.size());
     }
 
     /**

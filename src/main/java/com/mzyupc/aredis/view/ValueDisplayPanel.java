@@ -5,6 +5,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileTypes.PlainTextLanguage;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.LoadingDecorator;
 import com.intellij.openapi.ui.Splitter;
 import com.intellij.ui.EditorTextField;
@@ -17,6 +18,7 @@ import com.intellij.ui.table.JBTable;
 import com.mzyupc.aredis.enums.RedisValueTypeEnum;
 import com.mzyupc.aredis.enums.ValueFormatEnum;
 import com.mzyupc.aredis.layout.VFlowLayout;
+import com.mzyupc.aredis.utils.DoubleDocument;
 import com.mzyupc.aredis.utils.RedisPoolManager;
 import com.mzyupc.aredis.utils.ThreadPoolManager;
 import com.mzyupc.aredis.view.dialog.AddRowDialog;
@@ -25,7 +27,6 @@ import com.mzyupc.aredis.view.dialog.ErrorDialog;
 import com.mzyupc.aredis.vo.DbInfo;
 import com.mzyupc.aredis.vo.KeyInfo;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.batik.ext.swing.DoubleDocument;
 import org.apache.commons.lang.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import redis.clients.jedis.Jedis;
@@ -43,7 +44,12 @@ import javax.swing.table.TableColumn;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
 import java.awt.*;
-import java.awt.event.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -431,7 +437,7 @@ public class ValueDisplayPanel extends JPanel {
         JPanel viewAsAndSavePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         viewAsAndSavePanel.add(new JLabel("View as:"));
         JPanel valuePreviewAndFunctionPanel = new JPanel(new BorderLayout());
-        JComboBox<ValueFormatEnum> valueFormatComboBox = new JComboBox<>(ValueFormatEnum.values());
+        JComboBox<ValueFormatEnum> valueFormatComboBox = new ComboBox<>(ValueFormatEnum.values());
         // View as 功能
         valueFormatComboBox.addItemListener(new ItemListener() {
             @Override
@@ -894,7 +900,7 @@ public class ValueDisplayPanel extends JPanel {
                                     ErrorDialog.show(String.format("\"%s\" already exists!", newKey));
                                 } else {
                                     key = newKey;
-                                    keyTreeDisplayPanel.renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol());
+                                    keyTreeDisplayPanel.renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol(), null);
                                 }
                             } catch (Exception exception) {
                                 ErrorDialog.show(exception.getMessage());
