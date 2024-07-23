@@ -20,7 +20,7 @@
   - console (The 'RESTORE' command and blocking commands such as 'SUBSCRIBE' are not supported)
   - info (Various information and statistical values about the Redis server)
   - close
-  - view the number of keys in DB and DB
+  - view the number of keys in DB
 
 ### 2. Key management
   - filter
