@@ -1,14 +1,10 @@
 package com.mzyupc.aredis.view.textfield;
 
 import com.intellij.ide.DataManager;
-import com.intellij.json.JsonLanguage;
 import com.intellij.lang.Language;
 import com.intellij.lang.html.HTMLLanguage;
 import com.intellij.lang.xml.XMLLanguage;
-import com.intellij.openapi.actionSystem.ActionManager;
-import com.intellij.openapi.actionSystem.ActionPlaces;
-import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.actionSystem.Presentation;
+import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.editor.EditorSettings;
 import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.fileTypes.PlainTextLanguage;
@@ -64,7 +60,7 @@ public class EditorTextFieldManager {
                 valueTextArea = createEditorTextField(project, XMLLanguage.INSTANCE, oldTextFiled.getText());
                 break;
             case JSON:
-                valueTextArea = createEditorTextField(project, JsonLanguage.INSTANCE, oldTextFiled.getText());
+                valueTextArea = createEditorTextField(project, Language.findLanguageByID("JSON"), oldTextFiled.getText());
                 break;
             case PLAIN:
                 valueTextArea = createEditorTextField(project, PlainTextLanguage.INSTANCE, oldTextFiled.getText());
@@ -80,12 +76,13 @@ public class EditorTextFieldManager {
         ActionManager am = ActionManager.getInstance();
         am.getAction("ReformatCode").actionPerformed(
                 new AnActionEvent(
-                        null,
                         DataManager.getInstance().getDataContext(valueTextArea),
-                        ActionPlaces.UNKNOWN,
                         new Presentation(),
-                        ActionManager.getInstance(),
-                        0
+                        ActionPlaces.UNKNOWN,
+                        ActionUiKind.NONE,
+                        null,
+                        0,
+                        ActionManager.getInstance()
                 )
         );
         return valueTextArea;
