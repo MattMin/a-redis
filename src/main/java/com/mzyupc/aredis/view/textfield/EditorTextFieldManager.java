@@ -1,10 +1,9 @@
 package com.mzyupc.aredis.view.textfield;
 
-import com.intellij.ide.DataManager;
 import com.intellij.lang.Language;
 import com.intellij.lang.html.HTMLLanguage;
 import com.intellij.lang.xml.XMLLanguage;
-import com.intellij.openapi.actionSystem.*;
+import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.editor.EditorSettings;
 import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.fileTypes.PlainTextLanguage;
@@ -47,7 +46,8 @@ public class EditorTextFieldManager {
 
     /**
      * 更新value展示的数据格式
-     *  @param parent
+     *
+     * @param parent
      * @param formatEnum
      */
     public static EditorTextField formatValue(Project project, JComponent parent, ValueFormatEnum formatEnum, EditorTextField oldTextFiled) {
@@ -74,16 +74,11 @@ public class EditorTextFieldManager {
 
         // 触发 ReformatCode
         ActionManager am = ActionManager.getInstance();
-        am.getAction("ReformatCode").actionPerformed(
-                new AnActionEvent(
-                        DataManager.getInstance().getDataContext(valueTextArea),
-                        new Presentation(),
-                        ActionPlaces.UNKNOWN,
-                        ActionUiKind.NONE,
-                        null,
-                        0,
-                        ActionManager.getInstance()
-                )
+        am.tryToExecute(am.getAction("ReformatCode"),
+                null,
+                valueTextArea,
+                null,
+                true
         );
         return valueTextArea;
     }
