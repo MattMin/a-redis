@@ -11,6 +11,7 @@ targetCompatibility = JavaVersion.VERSION_17
 
 repositories {
     mavenCentral()
+    maven { url 'https://plugins.gradle.org/m2/' }
 }
 
 dependencies {
@@ -32,7 +33,7 @@ dependencies {
 // See https://github.com/JetBrains/gradle-intellij-plugin/
 // 调试插件的 IDEA 版本
 intellij {
-    version = '2023.2'
+    version = '2024.3'
 }
 
 patchPluginXml {
