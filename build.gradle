@@ -45,8 +45,8 @@ dependencies {
 }
 
 patchPluginXml {
-    // 声明插件适用的版本 2024.1.7
-    sinceBuild = '2024.1.7'
+    // 声明插件适用的版本 241.19416.15 (2024.1.7)
+    sinceBuild = '241.19416.15'
     untilBuild = provider { null }
     changeNotes = """
       <div>Due to the change in password persistence in beta-0.9.0, the password will be erased after upgrading, so you need to backup your password before upgrading from beta-0.8.0 and earlier to beta-0.9.0 and later.</div>
