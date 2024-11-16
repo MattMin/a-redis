@@ -34,7 +34,7 @@ import com.mzyupc.aredis.vo.KeyInfo;
 import lombok.Getter;
 import lombok.SneakyThrows;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import redis.clients.jedis.Jedis;
 

@@ -14,7 +14,7 @@ import com.mzyupc.aredis.utils.RedisPoolManager;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import com.mzyupc.aredis.vo.DbInfo;
 import com.mzyupc.aredis.vo.KeyInfo;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;

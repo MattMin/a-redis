@@ -17,7 +17,7 @@ import com.mzyupc.aredis.utils.RedisPoolManager;
 import com.mzyupc.aredis.utils.ThreadPoolManager;
 import com.mzyupc.aredis.view.ConnectionManager;
 import com.mzyupc.aredis.vo.ConnectionInfo;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;

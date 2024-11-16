@@ -8,6 +8,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 
+## [1.1.0] - 2024-11-16
+### Changed
+- 更新过期的 API 调用, 适配 2024.3
+
 ## [1.0.0] - 2023-09-13
 
 ### Fixed
@@ -90,7 +94,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - query the number of DBs without using the 'CONFIG GET' command
 - replace Label with Jlabel
 
-[Unreleased]: https://github.com/MattMin/a-redis/compare/beta-0.9.0...dev-1.0
+[Unreleased]: https://github.com/MattMin/a-redis/compare/dev-1.0.0...dev-1.1.0
+
+[1.1.0]: https://github.com/MattMin/a-redis/releases/tag/1.1.0
 
 [1.0.0]: https://github.com/MattMin/a-redis/releases/tag/1.0.0
 

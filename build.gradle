@@ -1,19 +1,34 @@
 plugins {
     id 'java'
-    id "org.jetbrains.intellij" version "1.15.0"
+    id "org.jetbrains.intellij.platform" version "2.1.0"
 }
 
 group 'com.mzyupc'
-version '1.0.0'
+version '1.1.0'
 
 sourceCompatibility = JavaVersion.VERSION_17
 targetCompatibility = JavaVersion.VERSION_17
 
 repositories {
     mavenCentral()
+    maven { url 'https://plugins.gradle.org/m2/' }
+    intellijPlatform {
+        defaultRepositories()
+      }
 }
 
 dependencies {
+    // 调试插件的 IDEA 版本
+    intellijPlatform {
+        intellijIdeaCommunity("2024.3")
+
+        bundledPlugin("com.intellij.java")
+
+        pluginVerifier()
+        zipSigner()
+        instrumentationTools()
+    }
+
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
 
@@ -29,12 +44,6 @@ dependencies {
     testAnnotationProcessor 'org.projectlombok:lombok:1.18.22'
 }
 
-// See https://github.com/JetBrains/gradle-intellij-plugin/
-// 调试插件的 IDEA 版本
-intellij {
-    version = '2023.2'
-}
-
 patchPluginXml {
     // 声明插件适用的版本 232.5150.116
     sinceBuild = '232.5150.116'
@@ -44,6 +53,11 @@ patchPluginXml {
       <br>
       <div>由于 beta-0.9.0 版本修改了密码的持久化方式, 升级后密码会被清除, 所以从 beta-0.8.0 及其之前的版本升级到 beta-0.9.0 及其之后版本之前需要备份密码</div>
       <br>
+
+      1.1.0<br>
+      <ul>
+          <li>Compatible with version 2024.3</li>
+      </ul>
 
       1.0.0<br>
       <ul>
