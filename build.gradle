@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id "org.jetbrains.intellij" version "1.17.4"
+    id "org.jetbrains.intellij.platform" version "2.1.0"
 }
 
 group 'com.mzyupc'
@@ -12,9 +12,23 @@ targetCompatibility = JavaVersion.VERSION_17
 repositories {
     mavenCentral()
     maven { url 'https://plugins.gradle.org/m2/' }
+    intellijPlatform {
+        defaultRepositories()
+      }
 }
 
 dependencies {
+    // 调试插件的 IDEA 版本
+    intellijPlatform {
+        intellijIdeaCommunity("2024.3")
+
+        bundledPlugin("com.intellij.java")
+
+        pluginVerifier()
+        zipSigner()
+        instrumentationTools()
+    }
+
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
 
@@ -28,12 +42,6 @@ dependencies {
     annotationProcessor 'org.projectlombok:lombok:1.18.22'
     testCompileOnly 'org.projectlombok:lombok:1.18.22'
     testAnnotationProcessor 'org.projectlombok:lombok:1.18.22'
-}
-
-// See https://github.com/JetBrains/gradle-intellij-plugin/
-// 调试插件的 IDEA 版本
-intellij {
-    version = '2024.3'
 }
 
 patchPluginXml {
