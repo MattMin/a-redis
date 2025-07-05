@@ -118,7 +118,29 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
      */
     private JPanel createSearchBox() {
         searchTextField = new SearchTextField();
+        // 搜索框内容默认值
         searchTextField.setText(DEFAULT_FILTER);
+        // 设置搜索框的宽度
+        searchTextField.setPreferredSize(new Dimension(300, searchTextField.getPreferredSize().height));
+        // 创建文档监听器
+        javax.swing.event.DocumentListener documentListener = new javax.swing.event.DocumentListener() {
+            @Override
+            public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                adjustWidth();
+            }
+
+            @Override
+            public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                adjustWidth();
+            }
+
+            @Override
+            public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                adjustWidth();
+            }
+        };
+        searchTextField.addDocumentListener(documentListener);
+
         searchTextField.addKeyboardListener(new KeyListener() {
             @Override
             public void keyTyped(KeyEvent e) {
@@ -148,6 +170,28 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
         searchBoxPanel.add(new JLabel("Filter:"));
         searchBoxPanel.add(searchTextField);
         return searchBoxPanel;
+    }
+
+    // 作为类成员方法
+    private void adjustWidth() {
+        if (searchTextField == null) return;
+
+        JTextField textField = searchTextField.getTextEditor();
+        FontMetrics fontMetrics = textField.getFontMetrics(textField.getFont());
+        String text = searchTextField.getText();
+
+        // 添加一些额外空间
+        int width = fontMetrics.stringWidth(text) + 100;
+        // 设置最小宽度
+        width = Math.max(width, 300);
+        // 设置最大宽度
+        width = Math.min(width, 1000);
+
+        // 设置新的首选大小
+        searchTextField.setPreferredSize(new Dimension(width, searchTextField.getPreferredSize().height));
+
+        // 重新验证布局
+        searchTextField.revalidate();
     }
 
     /**
