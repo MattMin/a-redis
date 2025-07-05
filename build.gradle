@@ -33,7 +33,7 @@ dependencies {
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
 
     // jedis
-    implementation (group: 'redis.clients', name: 'jedis', version: '4.2.3') {
+    implementation (group: 'redis.clients', name: 'jedis', version: '5.2.0') {
         exclude group: "org.slf4j"
     }
 
