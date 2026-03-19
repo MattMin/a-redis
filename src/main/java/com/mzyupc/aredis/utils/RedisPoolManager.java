@@ -9,11 +9,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Nullable;
-import redis.clients.jedis.Connection;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.JedisPoolConfig;
-import redis.clients.jedis.Protocol;
+import redis.clients.jedis.*;
 import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.jedis.params.ScanParams;
@@ -21,12 +17,7 @@ import redis.clients.jedis.resps.ScanResult;
 import redis.clients.jedis.util.Pool;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -49,7 +40,7 @@ public class RedisPoolManager implements Disposable {
         //最大连接数, 默认8个
         JEDIS_POOL_CONFIG.setMaxTotal(100);
         //对象空闲多久后逐出, 当空闲时间>该值 且 空闲连接>最大空闲数 时直接逐出,不再根据MinEvictableIdleTimeMillis判断  (默认逐出策略)
-        JEDIS_POOL_CONFIG.setSoftMinEvictableIdleTime(Duration.ofSeconds(60));
+        JEDIS_POOL_CONFIG.setSoftMinEvictableIdleDuration(Duration.ofSeconds(60));
         //检查链接是否有效
         JEDIS_POOL_CONFIG.setTestOnBorrow(true);
     }
