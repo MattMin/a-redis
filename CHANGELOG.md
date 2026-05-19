@@ -8,6 +8,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 
+## [1.2.0]
+
+### Changed
+- 优化 Filter 搜索体验: 直接输入关键字即可搜索, 无需手动输入 `*`, 查询时会自动补全前后通配符
+- Filter 搜索支持停止输入一小段时间后自动触发, 同时忽略前后空格
+- 优化 Filter 输入框宽度, 会根据当前输入内容自动扩展
+- 升级 Jedis 到 `5.2.0`
+- 升级 IntelliJ Platform Gradle Plugin 和 Gradle Wrapper, 适配最新构建工具链
+
+
 ## [1.1.0] - 2024-11-16
 ### Changed
 - 更新过期的 API 调用, 适配 2024.3
@@ -94,7 +104,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - query the number of DBs without using the 'CONFIG GET' command
 - replace Label with Jlabel
 
-[Unreleased]: https://github.com/MattMin/a-redis/compare/dev-1.0.0...dev-1.1.0
+[Unreleased]: https://github.com/MattMin/a-redis/compare/dev-1.1.0...dev-1.2.0
+
+[1.2.0]: https://github.com/MattMin/a-redis/releases/tag/1.2.0
 
 [1.1.0]: https://github.com/MattMin/a-redis/releases/tag/1.1.0
 
