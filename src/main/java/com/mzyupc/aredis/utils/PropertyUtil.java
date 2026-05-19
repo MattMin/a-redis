@@ -14,12 +14,7 @@ import com.mzyupc.aredis.vo.DbInfo;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -37,6 +32,16 @@ public class PropertyUtil {
     private static final String RELOAD_AFTER_ADDING_THE_KEY = "reloadAfterAddingTheKey";
 
     private static final String DB_COUNT_KEY = "dbCount:";
+
+    private static final String SECRET_REDIS_PASSWORD = "redis.password";
+
+    private static final String SECRET_TUNNEL_PASSWORD = "tunnel.password";
+
+    private static final String SECRET_TUNNEL_PASSPHRASE = "tunnel.passphrase";
+
+    private static final String SECRET_SSL_TRUSTSTORE_PASSWORD = "ssl.truststore.password";
+
+    private static final String SECRET_SSL_KEYSTORE_PASSWORD = "ssl.keystore.password";
 
     private PropertiesComponent properties;
 
@@ -118,9 +123,16 @@ public class PropertyUtil {
         for (ConnectionInfo connection : result) {
             // connectionInfo 如果有 password 则将 connection 中存储的 password 删除, 使用 PasswordSafe 存储 password
             if (StringUtils.isEmpty(connection.getPassword())) {
-                String password = retrievePassword(connection.getId());
+                String password = retrieveSecret(connection.getId(), SECRET_REDIS_PASSWORD);
+                if (StringUtils.isEmpty(password)) {
+                    password = retrievePassword(connection.getId());
+                }
                 connection.setPassword(password);
             }
+            connection.setTunnelPassword(retrieveSecret(connection.getId(), SECRET_TUNNEL_PASSWORD));
+            connection.setTunnelPassphrase(retrieveSecret(connection.getId(), SECRET_TUNNEL_PASSPHRASE));
+            connection.setSslTruststorePassword(retrieveSecret(connection.getId(), SECRET_SSL_TRUSTSTORE_PASSWORD));
+            connection.setSslKeystorePassword(retrieveSecret(connection.getId(), SECRET_SSL_KEYSTORE_PASSWORD));
         }
 
         return result;
@@ -148,7 +160,12 @@ public class PropertyUtil {
         connectionsService.getConnections().remove(connectionInfo);
 
         // 保存密码
+        saveSecret(connectionInfoId, SECRET_REDIS_PASSWORD, connectionInfo.getPassword());
         savePassword(connectionInfoId, connectionInfo.getPassword());
+        saveSecret(connectionInfoId, SECRET_TUNNEL_PASSWORD, connectionInfo.getTunnelPassword());
+        saveSecret(connectionInfoId, SECRET_TUNNEL_PASSPHRASE, connectionInfo.getTunnelPassphrase());
+        saveSecret(connectionInfoId, SECRET_SSL_TRUSTSTORE_PASSWORD, connectionInfo.getSslTruststorePassword());
+        saveSecret(connectionInfoId, SECRET_SSL_KEYSTORE_PASSWORD, connectionInfo.getSslKeystorePassword());
 
         // 保存 connection
         if (Boolean.TRUE.equals(connectionInfo.getGlobal())) {
@@ -192,6 +209,11 @@ public class PropertyUtil {
         globalConnectionsService.getConnections().remove(connectionInfo);
         connectionsService.getConnections().remove(connectionInfo);
         savePassword(connectionInfo.getId(), null);
+        saveSecret(connectionInfo.getId(), SECRET_REDIS_PASSWORD, null);
+        saveSecret(connectionInfo.getId(), SECRET_TUNNEL_PASSWORD, null);
+        saveSecret(connectionInfo.getId(), SECRET_TUNNEL_PASSPHRASE, null);
+        saveSecret(connectionInfo.getId(), SECRET_SSL_TRUSTSTORE_PASSWORD, null);
+        saveSecret(connectionInfo.getId(), SECRET_SSL_KEYSTORE_PASSWORD, null);
     }
 
     /**
@@ -254,6 +276,12 @@ public class PropertyUtil {
         );
     }
 
+    private CredentialAttributes createCredentialAttributes(String connectionId, String secretKey) {
+        return new CredentialAttributes(
+                CredentialAttributesKt.generateServiceName("RedisHelper", connectionId + ":" + secretKey)
+        );
+    }
+
     /**
      * 获取密码
      *
@@ -261,6 +289,12 @@ public class PropertyUtil {
      */
     private String retrievePassword(String connectionId) {
         CredentialAttributes credentialAttributes = createCredentialAttributes(connectionId);
+        String password = PasswordSafe.getInstance().getPassword(credentialAttributes);
+        return StringUtils.isEmpty(password) ? null : password;
+    }
+
+    private String retrieveSecret(String connectionId, String secretKey) {
+        CredentialAttributes credentialAttributes = createCredentialAttributes(connectionId, secretKey);
         String password = PasswordSafe.getInstance().getPassword(credentialAttributes);
         return StringUtils.isEmpty(password) ? null : password;
     }
@@ -273,6 +307,15 @@ public class PropertyUtil {
         Credentials credentials = null;
         if (StringUtils.isNotEmpty(password)) {
             credentials = new Credentials(connectionId, password);
+        }
+        PasswordSafe.getInstance().set(credentialAttributes, credentials);
+    }
+
+    private void saveSecret(String connectionId, String secretKey, String secretValue) {
+        CredentialAttributes credentialAttributes = createCredentialAttributes(connectionId, secretKey);
+        Credentials credentials = null;
+        if (StringUtils.isNotEmpty(secretValue)) {
+            credentials = new Credentials(connectionId + ":" + secretKey, secretValue);
         }
         PasswordSafe.getInstance().set(credentialAttributes, credentials);
     }

@@ -45,8 +45,8 @@ import javax.swing.tree.TreePath;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.util.List;
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.CopyOnWriteArraySet;
 
 import static com.mzyupc.aredis.message.ARedisStateChangeListener.AREDIS_STATE_CHANGE_TOPIC;
@@ -123,15 +123,9 @@ public class ConnectionManager implements Disposable {
      * 初始化连接
      */
     public void initConnections(Tree connectionTree) {
-        List<ConnectionInfo> connections = propertyUtil.getConnections();
-        for (ConnectionInfo connection : connections) {
-            if (connection != null && StringUtils.isNotEmpty(connection.getId())) {
-                addConnectionToList(connectionTreeModel, connection);
-            }
-        }
-
         connectionTree.setModel(connectionTreeModel);
         connectionTree.setRootVisible(false);
+        loadConnectionsAsync();
     }
 
     /**
@@ -337,19 +331,36 @@ public class ConnectionManager implements Disposable {
     }
 
     public void reloadConnections() {
-        // remove
-        DefaultMutableTreeNode root = (DefaultMutableTreeNode) connectionTreeModel.getRoot();
-        root.removeAllChildren();
-        connectionTreeModel.reload();
+        loadConnectionsAsync();
+    }
 
-        // add
-        List<ConnectionInfo> connections = propertyUtil.getConnections();
-        for (ConnectionInfo connection : connections) {
-            if (connection != null && StringUtils.isNotEmpty(connection.getId())) {
-                addConnectionToList(connectionTreeModel, connection);
-            }
+    private void loadConnectionsAsync() {
+        if (connectionTreeLoadingDecorator != null) {
+            connectionTreeLoadingDecorator.startLoading(false);
         }
 
+        ReadAction.nonBlocking(propertyUtil::getConnections)
+                .submit(ThreadPoolManager.getExecutor())
+                .onSuccess(connections -> ApplicationManager.getApplication().invokeLater(() -> {
+                    DefaultMutableTreeNode root = (DefaultMutableTreeNode) connectionTreeModel.getRoot();
+                    root.removeAllChildren();
+
+                    for (ConnectionInfo connection : connections) {
+                        if (connection != null && StringUtils.isNotEmpty(connection.getId())) {
+                            addConnectionToList(connectionTreeModel, connection);
+                        }
+                    }
+                    connectionTreeModel.reload();
+
+                    if (connectionTreeLoadingDecorator != null) {
+                        connectionTreeLoadingDecorator.stopLoading();
+                    }
+                }))
+                .onError(throwable -> ApplicationManager.getApplication().invokeLater(() -> {
+                    if (connectionTreeLoadingDecorator != null) {
+                        connectionTreeLoadingDecorator.stopLoading();
+                    }
+                }));
     }
 
     /**
@@ -439,7 +450,22 @@ public class ConnectionManager implements Disposable {
                 .name(connectionInfo.getName() + "_copy")
                 .url(connectionInfo.getUrl())
                 .port(connectionInfo.getPort())
+                .user(connectionInfo.getUser())
                 .password(connectionInfo.getPassword())
+                .sshTunnel(connectionInfo.getSshTunnel())
+                .tunnelHost(connectionInfo.getTunnelHost())
+                .tunnelPort(connectionInfo.getTunnelPort())
+                .tunnelUser(connectionInfo.getTunnelUser())
+                .tunnelPassword(connectionInfo.getTunnelPassword())
+                .tunnelPrivateKeyPath(connectionInfo.getTunnelPrivateKeyPath())
+                .tunnelPassphrase(connectionInfo.getTunnelPassphrase())
+                .sslTls(connectionInfo.getSslTls())
+                .sslTrustAllCertificates(connectionInfo.getSslTrustAllCertificates())
+                .sslVerifyHostname(connectionInfo.getSslVerifyHostname())
+                .sslTruststorePath(connectionInfo.getSslTruststorePath())
+                .sslTruststorePassword(connectionInfo.getSslTruststorePassword())
+                .sslKeystorePath(connectionInfo.getSslKeystorePath())
+                .sslKeystorePassword(connectionInfo.getSslKeystorePassword())
                 .global(connectionInfo.getGlobal())
                 .build();
         addConnectionToList((DefaultTreeModel) connectionTree.getModel(), newConnectionInfo);

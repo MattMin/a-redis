@@ -2,20 +2,30 @@ package com.mzyupc.aredis.utils;
 
 import com.google.common.collect.Lists;
 import com.intellij.openapi.Disposable;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
 import com.mzyupc.aredis.view.dialog.ErrorDialog;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import com.mzyupc.aredis.vo.Keyspace;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 import redis.clients.jedis.*;
 import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
-import redis.clients.jedis.util.Pool;
 
+import javax.net.ssl.*;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.security.KeyStore;
+import java.security.SecureRandom;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.*;
 import java.util.function.Function;
@@ -26,6 +36,8 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 public class RedisPoolManager implements Disposable {
+
+    private static final String LOCALHOST = "127.0.0.1";
 
     private static final JedisPoolConfig JEDIS_POOL_CONFIG;
 
@@ -45,24 +57,36 @@ public class RedisPoolManager implements Disposable {
         JEDIS_POOL_CONFIG.setTestOnBorrow(true);
     }
 
-    private final String host;
-    private final Integer port;
-    private final String user;
-    private final String password;
+    private final ConnectionInfo connectionInfo;
     private final Integer db;
     private JedisPool pool = null;
+    private Session tunnelSession = null;
+    private Integer tunnelLocalPort = null;
 
     public RedisPoolManager(ConnectionInfo connectionInfo) {
-        this.host = connectionInfo.getUrl();
-        this.port = Integer.parseInt(connectionInfo.getPort());
-        this.user = connectionInfo.getUser();
-        this.password = connectionInfo.getPassword();
+        this.connectionInfo = connectionInfo;
         this.db = Protocol.DEFAULT_DATABASE;
     }
 
     public static TestConnectionResult getTestConnectionResult(String host, Integer port, String user, String password) {
-        try (Pool<Jedis> pool = new JedisPool(JEDIS_POOL_CONFIG, host, port, Protocol.DEFAULT_TIMEOUT, user, password);
-             Jedis jedis = pool.getResource()) {
+        ConnectionInfo connectionInfo = ConnectionInfo.builder()
+                .url(host)
+                .port(String.valueOf(port))
+                .user(user)
+                .password(password)
+                .build();
+        return getTestConnectionResult(connectionInfo);
+    }
+
+    public static TestConnectionResult getTestConnectionResult(ConnectionInfo connectionInfo) {
+        RedisPoolManager redisPoolManager = new RedisPoolManager(connectionInfo);
+        try (Jedis jedis = redisPoolManager.getJedis(Protocol.DEFAULT_DATABASE)) {
+            if (jedis == null) {
+                return TestConnectionResult.builder()
+                        .success(false)
+                        .msg("Failed to get Redis connection")
+                        .build();
+            }
             String pong = jedis.ping();
             if ("PONG".equalsIgnoreCase(pong)) {
                 return TestConnectionResult.builder()
@@ -80,6 +104,8 @@ public class RedisPoolManager implements Disposable {
                     .success(false)
                     .msg(errorMsg)
                     .build();
+        } finally {
+            redisPoolManager.invalidate();
         }
     }
 
@@ -100,6 +126,11 @@ public class RedisPoolManager implements Disposable {
             this.pool.close();
             this.pool = null;
         }
+        if (tunnelSession != null) {
+            tunnelSession.disconnect();
+            tunnelSession = null;
+        }
+        tunnelLocalPort = null;
     }
 
     private synchronized JedisPool getJedisPool() {
@@ -112,6 +143,173 @@ public class RedisPoolManager implements Disposable {
     @Override
     public void dispose() {
         this.invalidate();
+    }
+
+    private synchronized ConnectionEndpoint getConnectionEndpoint() throws Exception {
+        if (!Boolean.TRUE.equals(connectionInfo.getSshTunnel())) {
+            return new ConnectionEndpoint(connectionInfo.getUrl(), Integer.parseInt(connectionInfo.getPort()));
+        }
+        if (tunnelSession != null && tunnelSession.isConnected() && tunnelLocalPort != null) {
+            return new ConnectionEndpoint(LOCALHOST, tunnelLocalPort);
+        }
+
+        JSch jsch = new JSch();
+        if (StringUtils.isNotBlank(connectionInfo.getTunnelPrivateKeyPath())) {
+            if (StringUtils.isNotEmpty(connectionInfo.getTunnelPassphrase())) {
+                jsch.addIdentity(connectionInfo.getTunnelPrivateKeyPath(), connectionInfo.getTunnelPassphrase());
+            } else {
+                jsch.addIdentity(connectionInfo.getTunnelPrivateKeyPath());
+            }
+        }
+
+        Session session = jsch.getSession(
+                connectionInfo.getTunnelUser(),
+                connectionInfo.getTunnelHost(),
+                Integer.parseInt(StringUtils.defaultIfBlank(connectionInfo.getTunnelPort(), "22"))
+        );
+        if (StringUtils.isNotEmpty(connectionInfo.getTunnelPassword())) {
+            session.setPassword(connectionInfo.getTunnelPassword());
+        }
+        Properties config = new Properties();
+        config.put("StrictHostKeyChecking", "no");
+        session.setConfig(config);
+        session.connect(Protocol.DEFAULT_TIMEOUT);
+        int localPort = session.setPortForwardingL(
+                0,
+                connectionInfo.getUrl(),
+                Integer.parseInt(connectionInfo.getPort())
+        );
+        tunnelSession = session;
+        tunnelLocalPort = localPort;
+        return new ConnectionEndpoint(LOCALHOST, localPort);
+    }
+
+    private DefaultJedisClientConfig createClientConfig(int db) throws Exception {
+        DefaultJedisClientConfig.Builder builder = DefaultJedisClientConfig.builder()
+                .database(db)
+                .timeoutMillis(Protocol.DEFAULT_TIMEOUT);
+
+        if (StringUtils.isNotEmpty(connectionInfo.getUser())) {
+            builder.user(connectionInfo.getUser());
+        }
+        if (StringUtils.isNotEmpty(connectionInfo.getPassword())) {
+            builder.password(connectionInfo.getPassword());
+        }
+
+        if (Boolean.TRUE.equals(connectionInfo.getSslTls())) {
+            builder.ssl(true);
+            SslConfiguration sslConfiguration = createSslConfiguration();
+            if (sslConfiguration.getSslSocketFactory() != null) {
+                builder.sslSocketFactory(sslConfiguration.getSslSocketFactory());
+            }
+            if (sslConfiguration.getHostnameVerifier() != null) {
+                builder.hostnameVerifier(sslConfiguration.getHostnameVerifier());
+            }
+        }
+        return builder.build();
+    }
+
+    private SslConfiguration createSslConfiguration() throws Exception {
+        HostnameVerifier hostnameVerifier = Boolean.FALSE.equals(connectionInfo.getSslVerifyHostname())
+                ? (hostname, session) -> true
+                : HttpsURLConnection.getDefaultHostnameVerifier();
+
+        boolean customSslContext = Boolean.TRUE.equals(connectionInfo.getSslTrustAllCertificates())
+                || StringUtils.isNotBlank(connectionInfo.getSslTruststorePath())
+                || StringUtils.isNotBlank(connectionInfo.getSslKeystorePath());
+        if (!customSslContext) {
+            return new SslConfiguration(null, hostnameVerifier);
+        }
+
+        SSLContext sslContext = SSLContext.getInstance("TLS");
+        sslContext.init(loadKeyManagers(), loadTrustManagers(), new SecureRandom());
+        return new SslConfiguration(sslContext.getSocketFactory(), hostnameVerifier);
+    }
+
+    private KeyManager[] loadKeyManagers() throws Exception {
+        if (StringUtils.isBlank(connectionInfo.getSslKeystorePath())) {
+            return null;
+        }
+
+        KeyStore keyStore = loadStandardKeyStore(
+                connectionInfo.getSslKeystorePath(),
+                connectionInfo.getSslKeystorePassword()
+        );
+        KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        keyManagerFactory.init(keyStore, toPasswordChars(connectionInfo.getSslKeystorePassword()));
+        return keyManagerFactory.getKeyManagers();
+    }
+
+    private TrustManager[] loadTrustManagers() throws Exception {
+        if (Boolean.TRUE.equals(connectionInfo.getSslTrustAllCertificates())) {
+            return new TrustManager[]{new X509TrustManager() {
+                @Override
+                public void checkClientTrusted(X509Certificate[] chain, String authType) {
+                }
+
+                @Override
+                public void checkServerTrusted(X509Certificate[] chain, String authType) {
+                }
+
+                @Override
+                public X509Certificate[] getAcceptedIssuers() {
+                    return new X509Certificate[0];
+                }
+            }};
+        }
+        if (StringUtils.isBlank(connectionInfo.getSslTruststorePath())) {
+            return null;
+        }
+
+        KeyStore trustStore = loadTrustStore(
+                connectionInfo.getSslTruststorePath(),
+                connectionInfo.getSslTruststorePassword()
+        );
+        TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        trustManagerFactory.init(trustStore);
+        return trustManagerFactory.getTrustManagers();
+    }
+
+    private KeyStore loadTrustStore(String path, String password) throws Exception {
+        if (isCertificateFile(path)) {
+            KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+            keyStore.load(null, null);
+            CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+            try (InputStream inputStream = new FileInputStream(path)) {
+                Collection<? extends Certificate> certificates = certificateFactory.generateCertificates(inputStream);
+                int index = 0;
+                for (Certificate certificate : certificates) {
+                    keyStore.setCertificateEntry("cert-" + index++, certificate);
+                }
+            }
+            return keyStore;
+        }
+        return loadStandardKeyStore(path, password);
+    }
+
+    private KeyStore loadStandardKeyStore(String path, String password) throws Exception {
+        KeyStore keyStore = KeyStore.getInstance(getKeyStoreType(path));
+        try (InputStream inputStream = new FileInputStream(path)) {
+            keyStore.load(inputStream, toPasswordChars(password));
+        }
+        return keyStore;
+    }
+
+    private String getKeyStoreType(String path) {
+        String lowerCasePath = StringUtils.lowerCase(path);
+        if (StringUtils.endsWithAny(lowerCasePath, ".p12", ".pfx")) {
+            return "PKCS12";
+        }
+        return KeyStore.getDefaultType();
+    }
+
+    private boolean isCertificateFile(String path) {
+        String lowerCasePath = StringUtils.lowerCase(path);
+        return StringUtils.endsWithAny(lowerCasePath, ".crt", ".cer", ".pem");
+    }
+
+    private char[] toPasswordChars(String password) {
+        return StringUtils.isEmpty(password) ? null : password.toCharArray();
     }
 
     /**
@@ -190,8 +388,14 @@ public class RedisPoolManager implements Disposable {
 
     private void initPool() {
         try {
-            pool = new JedisPool(JEDIS_POOL_CONFIG, host, port, Protocol.DEFAULT_TIMEOUT, user, password);
+            ConnectionEndpoint endpoint = getConnectionEndpoint();
+            pool = new JedisPool(
+                    JEDIS_POOL_CONFIG,
+                    new HostAndPort(endpoint.getHost(), endpoint.getPort()),
+                    createClientConfig(Protocol.DEFAULT_DATABASE)
+            );
         } catch (Exception e) {
+            invalidate();
             log.error("初始化redis pool失败", e);
             ErrorDialog.show("Failed to initialize the Redis pool." + "\n" + e.getMessage());
         }
@@ -205,7 +409,11 @@ public class RedisPoolManager implements Disposable {
     @Nullable
     public Jedis getJedis(int db) {
         try {
-            Jedis resource = getJedisPool().getResource();
+            JedisPool jedisPool = getJedisPool();
+            if (jedisPool == null) {
+                return null;
+            }
+            Jedis resource = jedisPool.getResource();
             if (db != Protocol.DEFAULT_DATABASE) {
                 resource.select(db);
             }
@@ -402,5 +610,27 @@ public class RedisPoolManager implements Disposable {
     public static class TestConnectionResult {
         private boolean success;
         private String msg;
+    }
+
+    @Getter
+    private static class ConnectionEndpoint {
+        private final String host;
+        private final int port;
+
+        private ConnectionEndpoint(String host, int port) {
+            this.host = host;
+            this.port = port;
+        }
+    }
+
+    @Getter
+    private static class SslConfiguration {
+        private final SSLSocketFactory sslSocketFactory;
+        private final HostnameVerifier hostnameVerifier;
+
+        private SslConfiguration(SSLSocketFactory sslSocketFactory, HostnameVerifier hostnameVerifier) {
+            this.sslSocketFactory = sslSocketFactory;
+            this.hostnameVerifier = hostnameVerifier;
+        }
     }
 }
