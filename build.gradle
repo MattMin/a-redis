@@ -50,6 +50,15 @@ patchPluginXml {
       <div>由于 beta-0.9.0 版本修改了密码的持久化方式, 升级后密码会被清除, 所以从 beta-0.8.0 及其之前的版本升级到 beta-0.9.0 及其之后版本之前需要备份密码</div>
       <br>
 
+      1.2.0<br>
+      <ul>
+          <li>Improved the Filter search experience: you can now type a keyword directly and wildcards are added automatically.</li>
+          <li>Filter search now runs automatically after a short pause in typing and ignores leading/trailing spaces.</li>
+          <li>Optimized the Filter input width so it expands with the current text.</li>
+          <li>Upgraded Jedis to version 5.2.0.</li>
+          <li>Upgraded the IntelliJ Platform Gradle Plugin and Gradle wrapper for the latest build tooling.</li>
+      </ul>
+
       1.1.0<br>
       <ul>
           <li>Compatible with version 2024.3</li>
