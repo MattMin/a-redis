@@ -30,6 +30,7 @@ import java.awt.event.KeyListener;
 public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
     public static final String DEFAULT_FILTER = "*";
     public static final String DEFAULT_GROUP_SYMBOL = ":";
+    private static final int SEARCH_DELAY_MILLIS = 400;
     private final DbInfo dbInfo;
     private final RedisPoolManager redisPoolManager;
     /**
@@ -50,6 +51,9 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
     private String keyFilter = DEFAULT_FILTER;
 
     private SearchTextField searchTextField;
+    private Timer searchTimer;
+    private String lastRenderedSearchKeyword = StringUtils.EMPTY;
+    private String lastHistoryKeyword = StringUtils.EMPTY;
 
     private KeyTreeDisplayPanel keyTreeDisplayPanel;
 
@@ -118,7 +122,32 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
      */
     private JPanel createSearchBox() {
         searchTextField = new SearchTextField();
-        searchTextField.setText(DEFAULT_FILTER);
+        // 搜索框默认展示为空，实际查询时由后端补全通配符
+        searchTextField.setText(StringUtils.EMPTY);
+        searchTextField.setToolTipText("Type a key keyword to search. Wildcards are added automatically.");
+        // 设置搜索框的宽度
+        searchTextField.setPreferredSize(new Dimension(300, searchTextField.getPreferredSize().height));
+        searchTimer = new Timer(SEARCH_DELAY_MILLIS, e -> triggerKeySearch(false));
+        searchTimer.setRepeats(false);
+        // 创建文档监听器
+        javax.swing.event.DocumentListener documentListener = new javax.swing.event.DocumentListener() {
+            @Override
+            public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                handleSearchTextChanged();
+            }
+
+            @Override
+            public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                handleSearchTextChanged();
+            }
+
+            @Override
+            public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                handleSearchTextChanged();
+            }
+        };
+        searchTextField.addDocumentListener(documentListener);
+
         searchTextField.addKeyboardListener(new KeyListener() {
             @Override
             public void keyTyped(KeyEvent e) {
@@ -130,16 +159,11 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
 
             @Override
             public void keyReleased(KeyEvent e) {
-                keyFilter = searchTextField.getText();
                 if (e.getKeyCode() == KeyEvent.VK_ENTER) {
-                    // 根据输入的filter, 重新渲染keyTree
-                    if (StringUtils.isEmpty(keyFilter)) {
-                        keyFilter = DEFAULT_FILTER;
-                        searchTextField.setText(keyFilter);
-                    } else {
-                        searchTextField.addCurrentTextToHistory();
+                    if (searchTimer != null && searchTimer.isRunning()) {
+                        searchTimer.stop();
                     }
-                    keyTreeDisplayPanel.renderKeyTree(getKeyFilter(), getGroupSymbol(), null);
+                    triggerKeySearch(true);
                 }
             }
         });
@@ -148,6 +172,64 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
         searchBoxPanel.add(new JLabel("Filter:"));
         searchBoxPanel.add(searchTextField);
         return searchBoxPanel;
+    }
+
+    // 作为类成员方法
+    private void adjustWidth() {
+        if (searchTextField == null) return;
+
+        JTextField textField = searchTextField.getTextEditor();
+        FontMetrics fontMetrics = textField.getFontMetrics(textField.getFont());
+        String text = searchTextField.getText();
+
+        // 添加一些额外空间
+        int width = fontMetrics.stringWidth(text) + 100;
+        // 设置最小宽度
+        width = Math.max(width, 300);
+        // 设置最大宽度
+        width = Math.min(width, 1000);
+
+        // 设置新的首选大小
+        searchTextField.setPreferredSize(new Dimension(width, searchTextField.getPreferredSize().height));
+
+        // 重新验证布局
+        searchTextField.revalidate();
+    }
+
+    private void handleSearchTextChanged() {
+        adjustWidth();
+        keyFilter = buildKeyFilter(StringUtils.trimToEmpty(searchTextField.getText()));
+        if (searchTimer != null) {
+            searchTimer.restart();
+        }
+    }
+
+    private void triggerKeySearch(boolean addToHistory) {
+        if (searchTextField == null) {
+            return;
+        }
+
+        String searchKeyword = StringUtils.trimToEmpty(searchTextField.getText());
+        keyFilter = buildKeyFilter(searchKeyword);
+
+        if (addToHistory && StringUtils.isNotEmpty(searchKeyword) && !StringUtils.equals(lastHistoryKeyword, searchKeyword)) {
+            searchTextField.addCurrentTextToHistory();
+            lastHistoryKeyword = searchKeyword;
+        }
+
+        if (keyTreeDisplayPanel == null || StringUtils.equals(lastRenderedSearchKeyword, searchKeyword)) {
+            return;
+        }
+
+        lastRenderedSearchKeyword = searchKeyword;
+        keyTreeDisplayPanel.renderKeyTree(getKeyFilter(), getGroupSymbol(), null);
+    }
+
+    private String buildKeyFilter(String searchKeyword) {
+        if (StringUtils.isBlank(searchKeyword)) {
+            return DEFAULT_FILTER;
+        }
+        return DEFAULT_FILTER + searchKeyword + DEFAULT_FILTER;
     }
 
     /**
