@@ -3,12 +3,12 @@ plugins {
     id "org.jetbrains.intellij.platform" version "2.13.1"
 }
 
-group 'com.mzyupc'
-version '1.2.0'
+group = 'com.mzyupc'
+version = '1.2.0'
 
 repositories {
     mavenCentral()
-    maven { url 'https://plugins.gradle.org/m2/' }
+    maven { url = 'https://plugins.gradle.org/m2/' }
     intellijPlatform {
         defaultRepositories()
       }
@@ -29,7 +29,7 @@ dependencies {
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
 
     // jedis
-    implementation (group: 'redis.clients', name: 'jedis', version: '5.2.0') {
+    implementation ("redis.clients:jedis:5.2.0") {
         exclude group: "org.slf4j"
     }
 
@@ -45,11 +45,6 @@ patchPluginXml {
     sinceBuild = '241.19416.15'
     untilBuild = provider { null }
     changeNotes = """
-      <div>Due to the change in password persistence in beta-0.9.0, the password will be erased after upgrading, so you need to backup your password before upgrading from beta-0.8.0 and earlier to beta-0.9.0 and later.</div>
-      <br>
-      <div>由于 beta-0.9.0 版本修改了密码的持久化方式, 升级后密码会被清除, 所以从 beta-0.8.0 及其之前的版本升级到 beta-0.9.0 及其之后版本之前需要备份密码</div>
-      <br>
-
       1.2.0<br>
       <ul>
           <li>Improved the Filter search experience: you can now type a keyword directly and wildcards are added automatically.</li>
@@ -140,6 +135,8 @@ test {
 }
 
 intellijPlatform {
+    buildSearchableOptions = false
+
     pluginVerification {
         ides {
             recommended()
