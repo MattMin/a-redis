@@ -118,8 +118,9 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
      */
     private JPanel createSearchBox() {
         searchTextField = new SearchTextField();
-        // 搜索框内容默认值
-        searchTextField.setText(DEFAULT_FILTER);
+        // 搜索框默认展示为空，实际查询时由后端补全通配符
+        searchTextField.setText(StringUtils.EMPTY);
+        searchTextField.setToolTipText("输入 key 关键字即可，搜索时会自动进行模糊匹配");
         // 设置搜索框的宽度
         searchTextField.setPreferredSize(new Dimension(300, searchTextField.getPreferredSize().height));
         // 创建文档监听器
@@ -152,13 +153,11 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
 
             @Override
             public void keyReleased(KeyEvent e) {
-                keyFilter = searchTextField.getText();
+                String searchKeyword = StringUtils.trimToEmpty(searchTextField.getText());
+                keyFilter = buildKeyFilter(searchKeyword);
                 if (e.getKeyCode() == KeyEvent.VK_ENTER) {
                     // 根据输入的filter, 重新渲染keyTree
-                    if (StringUtils.isEmpty(keyFilter)) {
-                        keyFilter = DEFAULT_FILTER;
-                        searchTextField.setText(keyFilter);
-                    } else {
+                    if (StringUtils.isNotEmpty(searchKeyword)) {
                         searchTextField.addCurrentTextToHistory();
                     }
                     keyTreeDisplayPanel.renderKeyTree(getKeyFilter(), getGroupSymbol(), null);
@@ -192,6 +191,13 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
 
         // 重新验证布局
         searchTextField.revalidate();
+    }
+
+    private String buildKeyFilter(String searchKeyword) {
+        if (StringUtils.isBlank(searchKeyword)) {
+            return DEFAULT_FILTER;
+        }
+        return DEFAULT_FILTER + searchKeyword + DEFAULT_FILTER;
     }
 
     /**
