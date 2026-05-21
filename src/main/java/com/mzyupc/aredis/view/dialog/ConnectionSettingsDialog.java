@@ -2,6 +2,7 @@ package com.mzyupc.aredis.view.dialog;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.project.Project;
@@ -219,7 +220,8 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         testResultTextPane.setEditable(false);
         testResultTextPane.setFocusable(false);
         testResultTextPane.setAlignmentX(SwingConstants.LEFT);
-        testResultTextPane.setVisible(false);
+        testResultTextPane.setVisible(true);
+        testResultTextPane.setText(" ");
         testResultLoadingDecorator = new LoadingDecorator(testResultTextPane, this, 0);
 
         JPanel generalConfigPanel = new JPanel();
@@ -446,9 +448,13 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
     private JPanel createTestResultPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(JBUI.Borders.emptyBottom(4));
-        testResultTextPane.setPreferredSize(new Dimension(0, 40));
-        testResultTextPane.setText(" ");
-        panel.add(testResultLoadingDecorator.getComponent(), BorderLayout.CENTER);
+        Dimension resultAreaSize = new Dimension(0, 40);
+        testResultTextPane.setPreferredSize(resultAreaSize);
+        testResultTextPane.setMinimumSize(resultAreaSize);
+        JComponent loadingComponent = testResultLoadingDecorator.getComponent();
+        loadingComponent.setPreferredSize(resultAreaSize);
+        loadingComponent.setMinimumSize(resultAreaSize);
+        panel.add(loadingComponent, BorderLayout.CENTER);
         return panel;
     }
 
@@ -689,7 +695,6 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                 return;
             }
 
-            testResultTextPane.setVisible(true);
             testResultTextPane.setText("Testing connection...");
             testResultTextPane.setForeground(JBColor.GRAY);
             centerPanel.revalidate();
@@ -714,7 +719,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                         testResultLoadingDecorator.stopLoading();
                         centerPanel.revalidate();
                         centerPanel.repaint();
-                    });
+                    }, ModalityState.stateForComponent(centerPanel));
                 } catch (Throwable throwable) {
                     ApplicationManager.getApplication().invokeLater(() -> {
                         String message = throwable.getCause() == null ? throwable.getMessage() : throwable.getCause().getMessage();
@@ -723,7 +728,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                         testResultLoadingDecorator.stopLoading();
                         centerPanel.revalidate();
                         centerPanel.repaint();
-                    });
+                    }, ModalityState.stateForComponent(centerPanel));
                 }
             });
         }

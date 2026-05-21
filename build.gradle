@@ -17,7 +17,7 @@ repositories {
 dependencies {
     // 调试插件的 IDEA 版本
     intellijPlatform {
-        intellijIdeaCommunity("2024.3")
+        intellijIdea("2026.1.2")
 
         bundledPlugin("com.intellij.java")
 
@@ -36,10 +36,10 @@ dependencies {
     implementation 'com.github.mwiede:jsch:0.2.21'
 
     // lombok
-    compileOnly 'org.projectlombok:lombok:1.18.22'
-    annotationProcessor 'org.projectlombok:lombok:1.18.22'
-    testCompileOnly 'org.projectlombok:lombok:1.18.22'
-    testAnnotationProcessor 'org.projectlombok:lombok:1.18.22'
+    compileOnly 'org.projectlombok:lombok:1.18.46'
+    annotationProcessor 'org.projectlombok:lombok:1.18.46'
+    testCompileOnly 'org.projectlombok:lombok:1.18.46'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.46'
 }
 
 patchPluginXml {

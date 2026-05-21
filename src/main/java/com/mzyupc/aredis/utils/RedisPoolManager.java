@@ -59,13 +59,19 @@ public class RedisPoolManager implements Disposable {
 
     private final ConnectionInfo connectionInfo;
     private final Integer db;
+    private final boolean suppressErrorDialog;
     private JedisPool pool = null;
     private Session tunnelSession = null;
     private Integer tunnelLocalPort = null;
 
     public RedisPoolManager(ConnectionInfo connectionInfo) {
+        this(connectionInfo, false);
+    }
+
+    private RedisPoolManager(ConnectionInfo connectionInfo, boolean suppressErrorDialog) {
         this.connectionInfo = connectionInfo;
         this.db = Protocol.DEFAULT_DATABASE;
+        this.suppressErrorDialog = suppressErrorDialog;
     }
 
     public static TestConnectionResult getTestConnectionResult(String host, Integer port, String user, String password) {
@@ -79,7 +85,7 @@ public class RedisPoolManager implements Disposable {
     }
 
     public static TestConnectionResult getTestConnectionResult(ConnectionInfo connectionInfo) {
-        RedisPoolManager redisPoolManager = new RedisPoolManager(connectionInfo);
+        RedisPoolManager redisPoolManager = new RedisPoolManager(connectionInfo, true);
         try (Jedis jedis = redisPoolManager.getJedis(Protocol.DEFAULT_DATABASE)) {
             if (jedis == null) {
                 return TestConnectionResult.builder()
@@ -397,7 +403,9 @@ public class RedisPoolManager implements Disposable {
         } catch (Exception e) {
             invalidate();
             log.error("初始化redis pool失败", e);
-            ErrorDialog.show("Failed to initialize the Redis pool." + "\n" + e.getMessage());
+            if (!suppressErrorDialog) {
+                ErrorDialog.show("Failed to initialize the Redis pool." + "\n" + e.getMessage());
+            }
         }
     }
 
@@ -421,7 +429,9 @@ public class RedisPoolManager implements Disposable {
         } catch (Exception e) {
             log.warn("Failed to get resource from the pool", e);
             String message = Objects.requireNonNullElse(e.getCause(), e).getMessage();
-            ErrorDialog.show(message);
+            if (!suppressErrorDialog) {
+                ErrorDialog.show(message);
+            }
         }
         return null;
     }
