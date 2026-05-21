@@ -339,9 +339,10 @@ public class ConnectionManager implements Disposable {
             connectionTreeLoadingDecorator.startLoading(false);
         }
 
-        ReadAction.nonBlocking(propertyUtil::getConnections)
-                .submit(ThreadPoolManager.getExecutor())
-                .onSuccess(connections -> ApplicationManager.getApplication().invokeLater(() -> {
+        ThreadPoolManager.execute(() -> {
+            try {
+                List<ConnectionInfo> connections = propertyUtil.getConnections();
+                ApplicationManager.getApplication().invokeLater(() -> {
                     DefaultMutableTreeNode root = (DefaultMutableTreeNode) connectionTreeModel.getRoot();
                     root.removeAllChildren();
 
@@ -355,12 +356,15 @@ public class ConnectionManager implements Disposable {
                     if (connectionTreeLoadingDecorator != null) {
                         connectionTreeLoadingDecorator.stopLoading();
                     }
-                }))
-                .onError(throwable -> ApplicationManager.getApplication().invokeLater(() -> {
+                });
+            } catch (Throwable throwable) {
+                ApplicationManager.getApplication().invokeLater(() -> {
                     if (connectionTreeLoadingDecorator != null) {
                         connectionTreeLoadingDecorator.stopLoading();
                     }
-                }));
+                });
+            }
+        });
     }
 
     /**

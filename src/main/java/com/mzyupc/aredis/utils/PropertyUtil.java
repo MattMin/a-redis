@@ -6,6 +6,7 @@ import com.intellij.credentialStore.CredentialAttributesKt;
 import com.intellij.credentialStore.Credentials;
 import com.intellij.ide.passwordSafe.PasswordSafe;
 import com.intellij.ide.util.PropertiesComponent;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.mzyupc.aredis.service.ConnectionsService;
 import com.mzyupc.aredis.service.GlobalConnectionsService;
@@ -15,8 +16,6 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static com.mzyupc.aredis.view.ARedisKeyValueDisplayPanel.DEFAULT_GROUP_SYMBOL;
 
@@ -104,35 +103,17 @@ public class PropertyUtil {
     }
 
     public List<ConnectionInfo> getConnections() {
-        final List<ConnectionInfo> globalConnections = globalConnectionsService.getConnections();
-        final List<ConnectionInfo> connections = connectionsService.getConnections();
-        if (connections.isEmpty() && globalConnections.isEmpty()) {
+        final List<ConnectionInfo> result = getStoredConnections();
+        if (result.isEmpty()) {
             return Lists.newArrayList();
         }
 
-        List<ConnectionInfo> result = new ArrayList<>(globalConnections.size() + connections.size());
-        for (ConnectionInfo connection : globalConnections) {
-            connection.setGlobal(true);
-            result.add(connection);
-        }
-        for (ConnectionInfo connection : connections) {
-            connection.setGlobal(false);
-            result.add(connection);
+        if (ApplicationManager.getApplication().isDispatchThread()) {
+            return result;
         }
 
         for (ConnectionInfo connection : result) {
-            // connectionInfo 如果有 password 则将 connection 中存储的 password 删除, 使用 PasswordSafe 存储 password
-            if (StringUtils.isEmpty(connection.getPassword())) {
-                String password = retrieveSecret(connection.getId(), SECRET_REDIS_PASSWORD);
-                if (StringUtils.isEmpty(password)) {
-                    password = retrievePassword(connection.getId());
-                }
-                connection.setPassword(password);
-            }
-            connection.setTunnelPassword(retrieveSecret(connection.getId(), SECRET_TUNNEL_PASSWORD));
-            connection.setTunnelPassphrase(retrieveSecret(connection.getId(), SECRET_TUNNEL_PASSPHRASE));
-            connection.setSslTruststorePassword(retrieveSecret(connection.getId(), SECRET_SSL_TRUSTSTORE_PASSWORD));
-            connection.setSslKeystorePassword(retrieveSecret(connection.getId(), SECRET_SSL_KEYSTORE_PASSWORD));
+            populateSecrets(connection);
         }
 
         return result;
@@ -227,10 +208,13 @@ public class PropertyUtil {
             return null;
         }
 
-        final Map<String, ConnectionInfo> collect = getConnections().stream()
-                .collect(Collectors.toMap(ConnectionInfo::getId, Function.identity()));
-
-        ConnectionInfo connectionInfo = collect.get(id);
+        ConnectionInfo connectionInfo = findStoredConnection(id);
+        if (connectionInfo == null) {
+            return null;
+        }
+        if (!ApplicationManager.getApplication().isDispatchThread()) {
+            populateSecrets(connectionInfo);
+        }
         return connectionInfo;
     }
 
@@ -243,7 +227,10 @@ public class PropertyUtil {
     }
 
     public void saveGroupSymbol(DbInfo dbInfo, String groupSymbol) {
-        final ConnectionInfo connection = getConnection(dbInfo.getConnectionId());
+        final ConnectionInfo connection = findStoredConnection(dbInfo.getConnectionId());
+        if (connection == null) {
+            return;
+        }
         Map<Integer, String> groupSymbols = connection.getGroupSymbols();
         if (groupSymbols == null) {
             groupSymbols = new HashMap<>();
@@ -253,7 +240,8 @@ public class PropertyUtil {
     }
 
     public String getGroupSymbol(DbInfo dbInfo) {
-        return Optional.ofNullable(getConnection(dbInfo.getConnectionId()).getGroupSymbols())
+        return Optional.ofNullable(findStoredConnection(dbInfo.getConnectionId()))
+                .map(ConnectionInfo::getGroupSymbols)
                 .map(e -> e.getOrDefault(dbInfo.getIndex(), DEFAULT_GROUP_SYMBOL))
                 .orElse(DEFAULT_GROUP_SYMBOL);
     }
@@ -268,6 +256,60 @@ public class PropertyUtil {
 
     private String getGroupSymbolKey(DbInfo dbInfo) {
         return dbInfo.getConnectionId() + ":" + dbInfo.getIndex();
+    }
+
+    private List<ConnectionInfo> getStoredConnections() {
+        final List<ConnectionInfo> globalConnections = globalConnectionsService.getConnections();
+        final List<ConnectionInfo> connections = connectionsService.getConnections();
+        if (connections.isEmpty() && globalConnections.isEmpty()) {
+            return Lists.newArrayList();
+        }
+
+        List<ConnectionInfo> result = new ArrayList<>(globalConnections.size() + connections.size());
+        for (ConnectionInfo connection : globalConnections) {
+            connection.setGlobal(true);
+            result.add(connection);
+        }
+        for (ConnectionInfo connection : connections) {
+            connection.setGlobal(false);
+            result.add(connection);
+        }
+        return result;
+    }
+
+    private ConnectionInfo findStoredConnection(String id) {
+        for (ConnectionInfo connection : getStoredConnections()) {
+            if (StringUtils.equals(connection.getId(), id)) {
+                return connection;
+            }
+        }
+        return null;
+    }
+
+    private void populateSecrets(ConnectionInfo connection) {
+        if (connection == null) {
+            return;
+        }
+
+        if (StringUtils.isEmpty(connection.getPassword())) {
+            String password = retrieveSecret(connection.getId(), SECRET_REDIS_PASSWORD);
+            if (StringUtils.isEmpty(password)) {
+                password = retrievePassword(connection.getId());
+            }
+            connection.setPassword(password);
+        }
+        if (StringUtils.isEmpty(connection.getTunnelPassword())) {
+            connection.setTunnelPassword(retrieveSecret(connection.getId(), SECRET_TUNNEL_PASSWORD));
+        }
+        if (StringUtils.isEmpty(connection.getTunnelPassphrase())) {
+            connection.setTunnelPassphrase(retrieveSecret(connection.getId(), SECRET_TUNNEL_PASSPHRASE));
+        }
+        if (StringUtils.isEmpty(connection.getSslTruststorePassword())) {
+            connection.setSslTruststorePassword(retrieveSecret(connection.getId(), SECRET_SSL_TRUSTSTORE_PASSWORD));
+        }
+        if (StringUtils.isEmpty(connection.getSslKeystorePassword())) {
+            connection.setSslKeystorePassword(retrieveSecret(connection.getId(), SECRET_SSL_KEYSTORE_PASSWORD));
+        }
     }
 
     private CredentialAttributes createCredentialAttributes(String connectionId) {
