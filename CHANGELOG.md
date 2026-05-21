@@ -9,7 +9,6 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### TODO
 - Test Connection 正常连接时无反馈
-- 连接配置弹框 UI 优化 
 
 ### Added
 - SSH 隧道功能, 支持通过 SSH 连接到 Redis 服务器, 包括密码认证和密钥认证两种方式

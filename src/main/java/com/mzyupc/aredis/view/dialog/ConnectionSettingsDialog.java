@@ -2,7 +2,6 @@ package com.mzyupc.aredis.view.dialog;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.project.Project;
@@ -11,6 +10,7 @@ import com.intellij.openapi.ui.LoadingDecorator;
 import com.intellij.openapi.ui.TextFieldWithBrowseButton;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.openapi.util.Comparing;
+import com.intellij.openapi.util.IconLoader;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.NumberDocument;
 import com.intellij.ui.components.JBTabbedPane;
@@ -24,7 +24,6 @@ import com.mzyupc.aredis.vo.ConnectionInfo;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.concurrency.CancellablePromise;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
@@ -42,8 +41,10 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
 
     private static final int LABEL_WIDTH = 150;
     private static final int RIGHT_SPACER_WIDTH = 170;
-    private static final int PORT_LABEL_WIDTH = 36;
-    private static final int PORT_FIELD_WIDTH = 36;
+    private static final int PORT_SEPARATOR_WIDTH = 12;
+    private static final int PORT_FIELD_WIDTH = 52;
+    private static final Icon PASSWORD_VISIBLE_ICON = IconLoader.getIcon("/icons/password-visible.svg", ConnectionSettingsDialog.class);
+    private static final Icon PASSWORD_HIDDEN_ICON = IconLoader.getIcon("/icons/password-hidden.svg", ConnectionSettingsDialog.class);
 
     JTextField nameTextField;
     JTextField hostField;
@@ -131,17 +132,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
 
         passwordField = new JPasswordField(newConnection ? null : connection.getPassword());
         passwordField.setToolTipText("Redis-server authentication password (Optional)");
-
-        JCheckBox showPasswordCheckBox = new JCheckBox("Show Password");
-        showPasswordCheckBox.setBorder(JBUI.Borders.emptyRight(10));
-        showPasswordCheckBox.setPreferredSize(new Dimension(RIGHT_SPACER_WIDTH, 24));
-        showPasswordCheckBox.addItemListener(e -> {
-            if (e.getStateChange() == ItemEvent.SELECTED) {
-                passwordField.setEchoChar((char) 0);
-            } else {
-                passwordField.setEchoChar('*');
-            }
-        });
+        JComponent passwordFieldComponent = createPasswordFieldComponent(passwordField);
 
         globalCheckBox = new JCheckBox("As Global");
         globalCheckBox.setSelected(!newConnection && Boolean.TRUE.equals(connection.getGlobal()));
@@ -168,6 +159,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
 
         tunnelPasswordField = new JPasswordField(newConnection ? null : connection.getTunnelPassword());
         tunnelPasswordField.setToolTipText("SSH tunnel password");
+        JComponent tunnelPasswordFieldComponent = createPasswordFieldComponent(tunnelPasswordField);
 
         tunnelPrivateKeyField = createBrowseField(
                 newConnection ? null : connection.getTunnelPrivateKeyPath(),
@@ -177,6 +169,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
 
         tunnelPassphraseField = new JPasswordField(newConnection ? null : connection.getTunnelPassphrase());
         tunnelPassphraseField.setToolTipText("SSH private key passphrase (Optional)");
+        JComponent tunnelPassphraseFieldComponent = createPasswordFieldComponent(tunnelPassphraseField);
 
         tunnelPasswordAuthRadio = new JRadioButton("Password");
         tunnelPrivateKeyAuthRadio = new JRadioButton("Private Key");
@@ -208,6 +201,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
 
         sslTruststorePasswordField = new JPasswordField(newConnection ? null : connection.getSslTruststorePassword());
         sslTruststorePasswordField.setToolTipText("Truststore password (Optional for PEM/CRT)");
+        JComponent sslTruststorePasswordFieldComponent = createPasswordFieldComponent(sslTruststorePasswordField);
 
         sslKeystoreField = createBrowseField(
                 newConnection ? null : connection.getSslKeystorePath(),
@@ -217,6 +211,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
 
         sslKeystorePasswordField = new JPasswordField(newConnection ? null : connection.getSslKeystorePassword());
         sslKeystorePasswordField.setToolTipText("Client key password (Optional)");
+        JComponent sslKeystorePasswordFieldComponent = createPasswordFieldComponent(sslKeystorePasswordField);
 
         testResultTextPane = new JTextPane();
         testResultTextPane.setMargin(JBUI.emptyInsets());
@@ -231,17 +226,17 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         generalConfigPanel.setLayout(new BoxLayout(generalConfigPanel, BoxLayout.Y_AXIS));
         generalConfigPanel.add(createFieldRow("Connection Name:", nameTextField, globalCheckBox));
         generalConfigPanel.add(createHostPortRow());
-        generalConfigPanel.add(createFieldRow("Password:", passwordField, showPasswordCheckBox));
+        generalConfigPanel.add(createFieldRow("Password:", passwordFieldComponent, createRightSpacer()));
         generalConfigPanel.add(createFieldRow("Username:", userNameTextField, createRightSpacer()));
 
         sshTunnelConfigPanel = new JPanel();
         sshTunnelConfigPanel.setLayout(new BoxLayout(sshTunnelConfigPanel, BoxLayout.Y_AXIS));
-        sshTunnelConfigPanel.add(createHostPortRow("SSH Host:", tunnelHostField, "SSH Port:", tunnelPortField));
+        sshTunnelConfigPanel.add(createHostPortRow("SSH Host:", tunnelHostField, tunnelPortField));
         sshTunnelConfigPanel.add(createFieldRow("SSH Username:", tunnelUserField, createRightSpacer()));
         sshTunnelConfigPanel.add(createTunnelAuthTypeRow());
-        tunnelPasswordRowPanel = createFieldRow("SSH Password:", tunnelPasswordField, createRightSpacer());
+        tunnelPasswordRowPanel = createFieldRow("SSH Password:", tunnelPasswordFieldComponent, createRightSpacer());
         tunnelPrivateKeyRowPanel = createFieldRow("Private Key File:", tunnelPrivateKeyField, createRightSpacer());
-        tunnelPassphraseRowPanel = createFieldRow("Private Key Password:", tunnelPassphraseField, createRightSpacer());
+        tunnelPassphraseRowPanel = createFieldRow("Private Key Password:", tunnelPassphraseFieldComponent, createRightSpacer());
         sshTunnelConfigPanel.add(tunnelPasswordRowPanel);
         sshTunnelConfigPanel.add(tunnelPrivateKeyRowPanel);
         sshTunnelConfigPanel.add(tunnelPassphraseRowPanel);
@@ -250,9 +245,9 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         sslConfigPanel.setLayout(new BoxLayout(sslConfigPanel, BoxLayout.Y_AXIS));
         sslConfigPanel.add(createOptionRow(sslTrustAllCertificatesCheckBox, sslVerifyHostnameCheckBox));
         sslConfigPanel.add(createFieldRow("CA File:", sslTruststoreField, createRightSpacer()));
-        sslConfigPanel.add(createFieldRow("CA Password:", sslTruststorePasswordField, createRightSpacer()));
+        sslConfigPanel.add(createFieldRow("CA Password:", sslTruststorePasswordFieldComponent, createRightSpacer()));
         sslConfigPanel.add(createFieldRow("Client Cert:", sslKeystoreField, createRightSpacer()));
-        sslConfigPanel.add(createFieldRow("Key Password:", sslKeystorePasswordField, createRightSpacer()));
+        sslConfigPanel.add(createFieldRow("Key Password:", sslKeystorePasswordFieldComponent, createRightSpacer()));
 
         updateSectionVisibility(sshTunnelConfigPanel, sshTunnelCheckBox.isSelected());
         updateSectionVisibility(sslConfigPanel, sslTlsCheckBox.isSelected());
@@ -285,43 +280,32 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
     }
 
     private JPanel createHostPortRow() {
-        return createHostPortRow("Host:", hostField, "Port:", portField);
+        return createHostPortRow("Host:", hostField, portField);
     }
 
 
-    private JPanel createHostPortRow(String labelText, JComponent field, String sideLabelText, JComponent sideField) {
-        JPanel rowPanel = new JPanel(new GridBagLayout());
+    private JPanel createHostPortRow(String labelText, JComponent field, JComponent sideField) {
+        JPanel rowPanel = new JPanel(new BorderLayout());
         rowPanel.setBorder(JBUI.Borders.emptyBottom(6));
+        applyInputFieldHeight(field);
 
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.gridy = 0;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.anchor = GridBagConstraints.WEST;
+        JPanel sidePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        sidePanel.setOpaque(false);
+        sidePanel.setPreferredSize(new Dimension(RIGHT_SPACER_WIDTH, getStandardInputFieldHeight()));
+        sidePanel.add(createPortSeparatorLabel());
+        applyInputFieldHeight(sideField);
+        sidePanel.add(sideField);
 
-        gbc.gridx = 0;
-        gbc.weightx = 0;
-        gbc.insets = JBUI.insets(0, 0, 0, 0);
-        rowPanel.add(createLabel(labelText), gbc);
-
-        gbc.gridx = 1;
-        gbc.weightx = 1;
-        gbc.insets = JBUI.insets(0, 0, 0, 8);
-        rowPanel.add(field, gbc);
-
-        gbc.gridx = 2;
-        gbc.weightx = 0;
-        gbc.insets = JBUI.insets(0, 0, 0, 4);
-        rowPanel.add(createPortLabel(sideLabelText), gbc);
-
-        gbc.gridx = 3;
-        gbc.insets = JBUI.emptyInsets();
-        rowPanel.add(sideField, gbc);
+        rowPanel.add(createLabel(labelText), BorderLayout.WEST);
+        rowPanel.add(field, BorderLayout.CENTER);
+        rowPanel.add(sidePanel, BorderLayout.EAST);
         return rowPanel;
     }
 
     private JPanel createFieldRow(String labelText, JComponent field, JComponent extraComponent) {
         JPanel rowPanel = new JPanel(new BorderLayout());
         rowPanel.setBorder(JBUI.Borders.emptyBottom(6));
+        applyInputFieldHeight(field);
         rowPanel.add(createLabel(labelText), BorderLayout.WEST);
         rowPanel.add(field, BorderLayout.CENTER);
         rowPanel.add(extraComponent, BorderLayout.EAST);
@@ -370,25 +354,73 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         return label;
     }
 
-    private JLabel createPortLabel(String text) {
-        JLabel label = new JLabel(text);
-        label.setPreferredSize(new Dimension(PORT_LABEL_WIDTH, 24));
+    private JLabel createPortSeparatorLabel() {
+        JLabel label = new JLabel(":");
+        label.setPreferredSize(new Dimension(PORT_SEPARATOR_WIDTH, getStandardInputFieldHeight()));
         return label;
     }
 
     private JComponent createRightSpacer() {
         JPanel spacer = new JPanel();
         spacer.setOpaque(false);
-        spacer.setPreferredSize(new Dimension(RIGHT_SPACER_WIDTH, 24));
+        spacer.setPreferredSize(new Dimension(RIGHT_SPACER_WIDTH, getStandardInputFieldHeight()));
         return spacer;
     }
 
     private void setupPortField(JTextField textField) {
-        Dimension size = new Dimension(PORT_FIELD_WIDTH, 24);
+        Dimension size = new Dimension(PORT_FIELD_WIDTH, getStandardInputFieldHeight());
         textField.setColumns(6);
         textField.setPreferredSize(size);
         textField.setMinimumSize(size);
         textField.setMaximumSize(size);
+    }
+
+    private JComponent createPasswordFieldComponent(JPasswordField passwordField) {
+        char defaultEchoChar = passwordField.getEchoChar() == 0 ? '*' : passwordField.getEchoChar();
+        passwordField.setEchoChar(defaultEchoChar);
+        applyInputFieldHeight(passwordField);
+
+        JToggleButton toggleButton = new JToggleButton(PASSWORD_VISIBLE_ICON);
+        toggleButton.setToolTipText("Show Password");
+        toggleButton.setFocusable(false);
+        toggleButton.setOpaque(false);
+        toggleButton.setContentAreaFilled(false);
+        toggleButton.setFocusPainted(false);
+        toggleButton.setRolloverEnabled(true);
+        toggleButton.setBorder(JBUI.Borders.empty(0, 4));
+        toggleButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        toggleButton.setPreferredSize(new Dimension(32, getStandardInputFieldHeight()));
+        toggleButton.addItemListener(e -> {
+            boolean showPassword = e.getStateChange() == ItemEvent.SELECTED;
+            passwordField.setEchoChar(showPassword ? (char) 0 : defaultEchoChar);
+            toggleButton.setIcon(showPassword ? PASSWORD_HIDDEN_ICON : PASSWORD_VISIBLE_ICON);
+            toggleButton.setToolTipText(showPassword ? "Hide Password" : "Show Password");
+        });
+
+        JPanel wrapperPanel = new JPanel(new BorderLayout());
+        wrapperPanel.setOpaque(true);
+        wrapperPanel.setBackground(passwordField.getBackground());
+        wrapperPanel.setBorder(passwordField.getBorder());
+
+        passwordField.setBorder(JBUI.Borders.emptyLeft(6));
+        passwordField.setOpaque(false);
+
+        wrapperPanel.add(passwordField, BorderLayout.CENTER);
+        wrapperPanel.add(toggleButton, BorderLayout.EAST);
+        wrapperPanel.setPreferredSize(new Dimension(passwordField.getPreferredSize().width, getStandardInputFieldHeight()));
+        return wrapperPanel;
+    }
+
+    private void applyInputFieldHeight(JComponent component) {
+        Dimension preferredSize = component.getPreferredSize();
+        component.setPreferredSize(new Dimension(preferredSize.width, getStandardInputFieldHeight()));
+    }
+
+    private int getStandardInputFieldHeight() {
+        if (hostField != null) {
+            return hostField.getPreferredSize().height;
+        }
+        return new JTextField().getPreferredSize().height;
     }
 
     private JPanel createTabPanel(JCheckBox enableCheckBox, JComponent configPanel) {
@@ -663,33 +695,37 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
             centerPanel.revalidate();
             centerPanel.repaint();
             testResultLoadingDecorator.startLoading(false);
-            CancellablePromise<RedisPoolManager.TestConnectionResult> promise = ReadAction.nonBlocking(() -> RedisPoolManager.getTestConnectionResult(
-                    buildConnectionInfo(connection == null ? null : connection.getId())
-            )).submit(ThreadPoolManager.getExecutor());
-            promise.onSuccess(testConnectionResult -> ApplicationManager.getApplication().invokeLater(() -> {
-                String message = StringUtils.defaultIfBlank(testConnectionResult.getMsg(), testConnectionResult.isSuccess() ? "Connection succeeded." : "Connection failed.");
-                if (testConnectionResult.isSuccess()) {
-                    testResultTextPane.setText(isGenericSuccessMessage(message)
-                            ? "✓ Connection succeeded."
-                            : "✓ Connection succeeded. " + message);
-                } else {
-                    testResultTextPane.setText(isGenericFailureMessage(message)
-                            ? "✗ Connection failed."
-                            : "✗ Connection failed. " + message);
+            ThreadPoolManager.execute(() -> {
+                try {
+                    RedisPoolManager.TestConnectionResult testConnectionResult =
+                            RedisPoolManager.getTestConnectionResult(buildConnectionInfo(connection == null ? null : connection.getId()));
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        String message = StringUtils.defaultIfBlank(testConnectionResult.getMsg(), testConnectionResult.isSuccess() ? "Connection succeeded." : "Connection failed.");
+                        if (testConnectionResult.isSuccess()) {
+                            testResultTextPane.setText(isGenericSuccessMessage(message)
+                                    ? "✓ Connection succeeded."
+                                    : "✓ Connection succeeded. " + message);
+                        } else {
+                            testResultTextPane.setText(isGenericFailureMessage(message)
+                                    ? "✗ Connection failed."
+                                    : "✗ Connection failed. " + message);
+                        }
+                        testResultTextPane.setForeground(testConnectionResult.isSuccess() ? JBColor.GREEN : JBColor.RED);
+                        testResultLoadingDecorator.stopLoading();
+                        centerPanel.revalidate();
+                        centerPanel.repaint();
+                    });
+                } catch (Throwable throwable) {
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        String message = throwable.getCause() == null ? throwable.getMessage() : throwable.getCause().getMessage();
+                        testResultTextPane.setText("✗ Connection failed. " + StringUtils.defaultIfBlank(message, "Failed"));
+                        testResultTextPane.setForeground(JBColor.RED);
+                        testResultLoadingDecorator.stopLoading();
+                        centerPanel.revalidate();
+                        centerPanel.repaint();
+                    });
                 }
-                testResultTextPane.setForeground(testConnectionResult.isSuccess() ? JBColor.GREEN : JBColor.RED);
-                testResultLoadingDecorator.stopLoading();
-                centerPanel.revalidate();
-                centerPanel.repaint();
-            }));
-            promise.onError(throwable -> ApplicationManager.getApplication().invokeLater(() -> {
-                String message = throwable.getCause() == null ? throwable.getMessage() : throwable.getCause().getMessage();
-                testResultTextPane.setText("✗ Connection failed. " + StringUtils.defaultIfBlank(message, "Failed"));
-                testResultTextPane.setForeground(JBColor.RED);
-                testResultLoadingDecorator.stopLoading();
-                centerPanel.revalidate();
-                centerPanel.repaint();
-            }));
+            });
         }
     }
 
