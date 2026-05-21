@@ -43,7 +43,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
 
     private static final int LABEL_WIDTH = 150;
     private static final int RIGHT_SPACER_WIDTH = 170;
-    private static final int PORT_SEPARATOR_WIDTH = 12;
+    private static final int PORT_SEPARATOR_WIDTH = 6;
     private static final int PORT_FIELD_WIDTH = 52;
     private static final Icon PASSWORD_VISIBLE_ICON = IconLoader.getIcon("/icons/password-visible.svg", ConnectionSettingsDialog.class);
     private static final Icon PASSWORD_HIDDEN_ICON = IconLoader.getIcon("/icons/password-hidden.svg", ConnectionSettingsDialog.class);
@@ -383,6 +383,9 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
 
     private JComponent createPasswordFieldComponent(JPasswordField passwordField) {
         char defaultEchoChar = passwordField.getEchoChar() == 0 ? '*' : passwordField.getEchoChar();
+        Insets standardTextFieldMargin = hostField != null
+                ? hostField.getMargin()
+                : new JTextField().getMargin();
         passwordField.setEchoChar(defaultEchoChar);
         applyInputFieldHeight(passwordField);
 
@@ -408,7 +411,13 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         wrapperPanel.setBackground(passwordField.getBackground());
         wrapperPanel.setBorder(passwordField.getBorder());
 
-        passwordField.setBorder(JBUI.Borders.emptyLeft(6));
+        passwordField.setBorder(JBUI.Borders.empty());
+        if (standardTextFieldMargin != null) {
+            passwordField.setMargin(JBUI.insets(standardTextFieldMargin.top,
+                    standardTextFieldMargin.left,
+                    standardTextFieldMargin.bottom,
+                    standardTextFieldMargin.right));
+        }
         passwordField.setOpaque(false);
 
         wrapperPanel.add(passwordField, BorderLayout.CENTER);
@@ -774,11 +783,17 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
     }
 
     private boolean isGenericSuccessMessage(String message) {
-        return StringUtils.equalsAnyIgnoreCase(StringUtils.trim(message), "Succeeded", "Success", "Connection succeeded.");
+        String trimmedMessage = StringUtils.trim(message);
+        return "Succeeded".equalsIgnoreCase(trimmedMessage)
+                || "Success".equalsIgnoreCase(trimmedMessage)
+                || "Connection succeeded.".equalsIgnoreCase(trimmedMessage);
     }
 
     private boolean isGenericFailureMessage(String message) {
-        return StringUtils.equalsAnyIgnoreCase(StringUtils.trim(message), "Failed", "Fail", "Connection failed.");
+        String trimmedMessage = StringUtils.trim(message);
+        return "Failed".equalsIgnoreCase(trimmedMessage)
+                || "Fail".equalsIgnoreCase(trimmedMessage)
+                || "Connection failed.".equalsIgnoreCase(trimmedMessage);
     }
 
 }
