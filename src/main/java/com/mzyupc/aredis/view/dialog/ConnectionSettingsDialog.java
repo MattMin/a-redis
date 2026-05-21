@@ -11,6 +11,7 @@ import com.intellij.openapi.ui.LoadingDecorator;
 import com.intellij.openapi.ui.TextFieldWithBrowseButton;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.openapi.util.Comparing;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.NumberDocument;
@@ -81,8 +82,10 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
     private final ConnectionInfo connection;
     private final Tree connectionTree;
     private final ConnectionManager connectionManager;
+    private final Disposable loadingDecoratorDisposable;
 
     private final Project project;
+    private volatile boolean disposed;
 
     /**
      * if connectionId is blank ? New Connection : Edit Connection
@@ -98,6 +101,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         this.connection = connection;
         this.connectionTree = connectionTree;
         this.connectionManager = connectionManager;
+        this.loadingDecoratorDisposable = Disposer.newDisposable("ConnectionSettingsDialog.loadingDecorator");
         this.setTitle("Connection Settings");
         this.setSize(720, 460);
         this.myOKAction = new CustomOKAction();
@@ -222,7 +226,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         testResultTextPane.setAlignmentX(SwingConstants.LEFT);
         testResultTextPane.setVisible(true);
         testResultTextPane.setText(" ");
-        testResultLoadingDecorator = new LoadingDecorator(testResultTextPane, this, 0);
+        testResultLoadingDecorator = new LoadingDecorator(testResultTextPane, loadingDecoratorDisposable, 0);
 
         JPanel generalConfigPanel = new JPanel();
         generalConfigPanel.setLayout(new BoxLayout(generalConfigPanel, BoxLayout.Y_AXIS));
@@ -630,7 +634,18 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
 
     @Override
     public void dispose() {
+        disposed = true;
+        if (testResultLoadingDecorator != null) {
+            testResultLoadingDecorator.stopLoading();
+        }
+        if (!Disposer.isDisposed(loadingDecoratorDisposable)) {
+            Disposer.dispose(loadingDecoratorDisposable);
+        }
         super.dispose();
+    }
+
+    private boolean isDialogDisposed() {
+        return disposed || Disposer.isDisposed(loadingDecoratorDisposable);
     }
 
     /**
@@ -705,6 +720,9 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                     RedisPoolManager.TestConnectionResult testConnectionResult =
                             RedisPoolManager.getTestConnectionResult(buildConnectionInfo(connection == null ? null : connection.getId()));
                     ApplicationManager.getApplication().invokeLater(() -> {
+                        if (isDialogDisposed()) {
+                            return;
+                        }
                         String message = StringUtils.defaultIfBlank(testConnectionResult.getMsg(), testConnectionResult.isSuccess() ? "Connection succeeded." : "Connection failed.");
                         if (testConnectionResult.isSuccess()) {
                             testResultTextPane.setText(isGenericSuccessMessage(message)
@@ -722,6 +740,9 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                     }, ModalityState.stateForComponent(centerPanel));
                 } catch (Throwable throwable) {
                     ApplicationManager.getApplication().invokeLater(() -> {
+                        if (isDialogDisposed()) {
+                            return;
+                        }
                         String message = throwable.getCause() == null ? throwable.getMessage() : throwable.getCause().getMessage();
                         testResultTextPane.setText("✗ Connection failed. " + StringUtils.defaultIfBlank(message, "Failed"));
                         testResultTextPane.setForeground(JBColor.RED);
