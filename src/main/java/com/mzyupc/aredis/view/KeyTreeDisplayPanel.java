@@ -127,7 +127,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                 int x = e.getX();
                 int y = e.getY();
 
-                if (e.getClickCount() == 2) {
+                if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
                     // 第一个选中的节点路径
                     TreePath selectionPath = keyTree.getSelectionPath();
                     if (selectionPath == null) {
