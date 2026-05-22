@@ -8,7 +8,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### TODO
-- Test Connection 正常连接时无反馈
+- Key Tree 展示优化 
+  - DB 后括号的数量展示过滤出的数量, 不展示总数量
+  - 总数量展示在当前 Displayed key count 这里, 当前 Displayed key count 就不用展示了(上一条已经展示了过滤后的数量) 
+- 在连接上点一下鼠标左键, 又点了一下鼠标右键会触发双击的操作, 打开连接, 需要优化, 双击操作只能是双击鼠标左键
 
 ### Added
 - SSH 隧道功能, 支持通过 SSH 连接到 Redis 服务器, 包括密码认证和密钥认证两种方式

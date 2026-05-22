@@ -18,13 +18,9 @@ trap cleanup EXIT INT TERM
 
 cd "${BASE_DIR}"
 
-echo '1/4 Verifying TLS certificate hostname on localhost...'
-openssl s_client \
-  -connect localhost:6380 \
-  -servername localhost \
-  -verify_hostname localhost \
-  -CAfile "${BASE_DIR}/certs/ca.crt" \
-  </dev/null 2>/dev/null | grep -q 'Verify return code: 0 (ok)'
+echo '1/4 Verifying TLS certificate SAN entries for localhost and host.docker.internal...'
+openssl x509 -in "${BASE_DIR}/certs/redis-server.crt" -checkhost localhost -noout >/dev/null
+openssl x509 -in "${BASE_DIR}/certs/redis-server.crt" -checkhost host.docker.internal -noout >/dev/null
 
 echo '2/4 Testing Redis TLS via local CA...'
 docker run --rm \

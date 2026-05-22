@@ -63,6 +63,7 @@ public class RedisPoolManager implements Disposable {
     private JedisPool pool = null;
     private Session tunnelSession = null;
     private Integer tunnelLocalPort = null;
+    private volatile Throwable lastConnectionError = null;
 
     public RedisPoolManager(ConnectionInfo connectionInfo) {
         this(connectionInfo, false);
@@ -90,7 +91,7 @@ public class RedisPoolManager implements Disposable {
             if (jedis == null) {
                 return TestConnectionResult.builder()
                         .success(false)
-                        .msg("Failed to get Redis connection")
+                        .msg(redisPoolManager.getLastConnectionErrorMessage("Failed to get Redis connection"))
                         .build();
             }
             String pong = jedis.ping();
@@ -105,7 +106,7 @@ public class RedisPoolManager implements Disposable {
                     .msg(pong)
                     .build();
         } catch (Exception e) {
-            String errorMsg = Objects.requireNonNullElse(e.getCause(), e).getMessage();
+            String errorMsg = redisPoolManager.buildDetailedErrorMessage(e);
             return TestConnectionResult.builder()
                     .success(false)
                     .msg(errorMsg)
@@ -137,6 +138,7 @@ public class RedisPoolManager implements Disposable {
             tunnelSession = null;
         }
         tunnelLocalPort = null;
+        lastConnectionError = null;
     }
 
     private synchronized JedisPool getJedisPool() {
@@ -299,6 +301,8 @@ public class RedisPoolManager implements Disposable {
         KeyStore keyStore = KeyStore.getInstance(getKeyStoreType(path));
         try (InputStream inputStream = new FileInputStream(path)) {
             keyStore.load(inputStream, toPasswordChars(password));
+        } catch (Exception e) {
+            throw buildKeyStoreLoadException(path, e);
         }
         return keyStore;
     }
@@ -318,6 +322,39 @@ public class RedisPoolManager implements Disposable {
 
     private char[] toPasswordChars(String password) {
         return StringUtils.isEmpty(password) ? null : password.toCharArray();
+    }
+
+    private Exception buildKeyStoreLoadException(String path, Exception e) {
+        String message = buildDetailedErrorMessage(e);
+        if (StringUtils.containsIgnoreCase(message, "keystore password was incorrect")
+                || StringUtils.containsIgnoreCase(message, "password was incorrect")
+                || StringUtils.containsIgnoreCase(message, "keystore tampered with")) {
+            return new Exception(String.format(
+                    "Failed to load %s '%s': keystore password was incorrect. Please check %s.",
+                    isTrustStorePath(path) ? "CA truststore" : "client certificate keystore",
+                    path,
+                    getCertificatePasswordFieldName(path)
+            ), e);
+        }
+
+        if (StringUtils.endsWithAny(StringUtils.lowerCase(path), ".p12", ".pfx", ".jks")) {
+            return new Exception(String.format(
+                    "Failed to load %s '%s'. Please check the file format and %s. Details: %s",
+                    isTrustStorePath(path) ? "CA truststore" : "client certificate keystore",
+                    path,
+                    getCertificatePasswordFieldName(path),
+                    StringUtils.defaultIfBlank(message, e.getClass().getSimpleName())
+            ), e);
+        }
+        return e;
+    }
+
+    private boolean isTrustStorePath(String path) {
+        return StringUtils.equals(path, connectionInfo.getSslTruststorePath());
+    }
+
+    private String getCertificatePasswordFieldName(String path) {
+        return isTrustStorePath(path) ? "CA Password" : "Key Password";
     }
 
     /**
@@ -396,6 +433,7 @@ public class RedisPoolManager implements Disposable {
 
     private void initPool() {
         try {
+            clearLastConnectionError();
             ConnectionEndpoint endpoint = getConnectionEndpoint();
             pool = new JedisPool(
                     JEDIS_POOL_CONFIG,
@@ -404,9 +442,10 @@ public class RedisPoolManager implements Disposable {
             );
         } catch (Exception e) {
             invalidate();
+            rememberConnectionError(e);
             log.error("初始化redis pool失败", e);
             if (!suppressErrorDialog) {
-                ErrorDialog.show("Failed to initialize the Redis pool." + "\n" + e.getMessage());
+                ErrorDialog.show(buildDetailedErrorMessage(e));
             }
         }
     }
@@ -427,15 +466,53 @@ public class RedisPoolManager implements Disposable {
             if (db != Protocol.DEFAULT_DATABASE) {
                 resource.select(db);
             }
+            clearLastConnectionError();
             return resource;
         } catch (Exception e) {
+            rememberConnectionError(e);
             log.warn("Failed to get resource from the pool", e);
-            String message = Objects.requireNonNullElse(e.getCause(), e).getMessage();
+            String message = buildDetailedErrorMessage(e);
             if (!suppressErrorDialog) {
                 ErrorDialog.show(message);
             }
         }
         return null;
+    }
+
+    private void rememberConnectionError(Throwable throwable) {
+        lastConnectionError = throwable;
+    }
+
+    private void clearLastConnectionError() {
+        lastConnectionError = null;
+    }
+
+    private String getLastConnectionErrorMessage(String defaultMessage) {
+        return lastConnectionError == null ? defaultMessage : buildDetailedErrorMessage(lastConnectionError);
+    }
+
+    private String buildDetailedErrorMessage(Throwable throwable) {
+        if (throwable == null) {
+            return "Unknown error";
+        }
+
+        List<String> messages = new ArrayList<>();
+        Throwable current = throwable;
+        while (current != null) {
+            String message = StringUtils.trimToNull(current.getMessage());
+            if (message != null && !messages.contains(message)) {
+                messages.add(message);
+            }
+            current = current.getCause();
+        }
+
+        if (messages.isEmpty()) {
+            return throwable.getClass().getSimpleName();
+        }
+        if (messages.size() == 1) {
+            return messages.get(0);
+        }
+        return messages.get(0) + " Root cause: " + messages.get(messages.size() - 1);
     }
 
     /**

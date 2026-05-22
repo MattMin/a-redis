@@ -15,6 +15,7 @@ import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.NumberDocument;
+import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.ui.treeStructure.Tree;
 import com.intellij.util.ui.JBUI;
@@ -45,6 +46,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
     private static final int RIGHT_SPACER_WIDTH = 170;
     private static final int PORT_SEPARATOR_WIDTH = 6;
     private static final int PORT_FIELD_WIDTH = 52;
+    private static final int TEST_RESULT_HEIGHT = 96;
     private static final Icon PASSWORD_VISIBLE_ICON = IconLoader.getIcon("/icons/password-visible.svg", ConnectionSettingsDialog.class);
     private static final Icon PASSWORD_HIDDEN_ICON = IconLoader.getIcon("/icons/password-hidden.svg", ConnectionSettingsDialog.class);
 
@@ -461,13 +463,23 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
     private JPanel createTestResultPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(JBUI.Borders.emptyBottom(4));
-        Dimension resultAreaSize = new Dimension(0, 40);
+        Dimension resultAreaSize = new Dimension(0, TEST_RESULT_HEIGHT);
         testResultTextPane.setPreferredSize(resultAreaSize);
         testResultTextPane.setMinimumSize(resultAreaSize);
         JComponent loadingComponent = testResultLoadingDecorator.getComponent();
         loadingComponent.setPreferredSize(resultAreaSize);
         loadingComponent.setMinimumSize(resultAreaSize);
-        panel.add(loadingComponent, BorderLayout.CENTER);
+
+        JBScrollPane scrollPane = new JBScrollPane(
+                loadingComponent,
+                ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
+                ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
+        );
+        scrollPane.setBorder(JBUI.Borders.empty());
+        scrollPane.setPreferredSize(resultAreaSize);
+        scrollPane.setMinimumSize(resultAreaSize);
+
+        panel.add(scrollPane, BorderLayout.CENTER);
         return panel;
     }
 

@@ -11,6 +11,18 @@ services:
     networks:
       - aredis-test-net
 
+  redis-mtls:
+    image: redis:7.2-alpine
+    container_name: aredis-redis-mtls
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    ports:
+      - "6381:6381"
+    volumes:
+      - ./redis/mtls/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - ./certs:/certs:ro
+    networks:
+      - aredis-test-net
+
   redis-private:
     image: redis:7.2-alpine
     container_name: aredis-redis-private
