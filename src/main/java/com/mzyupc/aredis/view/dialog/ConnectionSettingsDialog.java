@@ -170,7 +170,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                 newConnection ? null : connection.getTunnelPrivateKeyPath(),
                 "Select a Private Key",
                 "Select an SSH private key file",
-                getFileChooserDescriptor("pem", "key", "ppk"));
+                getPrivateKeyFileChooserDescriptor());
 
         tunnelPassphraseField = new JPasswordField(newConnection ? null : connection.getTunnelPassphrase());
         tunnelPassphraseField.setToolTipText("SSH private key passphrase (Optional)");
@@ -770,6 +770,13 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                         file.isDirectory() || matchesExtension(file.getExtension(), extensions));
     }
 
+    private FileChooserDescriptor getPrivateKeyFileChooserDescriptor() {
+        return new FileChooserDescriptor(true, false, false, false, false, false)
+                .withFileFilter(file -> file.isDirectory()
+                        || matchesExtension(file.getExtension(), "pem", "key", "ppk")
+                        || isOpenSshPrivateKeyFile(file.getName()));
+    }
+
     private boolean matchesExtension(String extension, String... extensions) {
         if (extension == null) {
             return false;
@@ -780,6 +787,13 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
             }
         }
         return false;
+    }
+
+    private boolean isOpenSshPrivateKeyFile(String fileName) {
+        if (StringUtils.isBlank(fileName)) {
+            return false;
+        }
+        return StringUtils.startsWith(fileName, "id_");
     }
 
     private boolean isGenericSuccessMessage(String message) {

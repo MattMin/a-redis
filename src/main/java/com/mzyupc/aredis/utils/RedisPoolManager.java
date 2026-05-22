@@ -208,28 +208,30 @@ public class RedisPoolManager implements Disposable {
             if (sslConfiguration.getSslSocketFactory() != null) {
                 builder.sslSocketFactory(sslConfiguration.getSslSocketFactory());
             }
-            if (sslConfiguration.getHostnameVerifier() != null) {
-                builder.hostnameVerifier(sslConfiguration.getHostnameVerifier());
+            if (sslConfiguration.getSslParameters() != null) {
+                builder.sslParameters(sslConfiguration.getSslParameters());
             }
         }
         return builder.build();
     }
 
     private SslConfiguration createSslConfiguration() throws Exception {
-        HostnameVerifier hostnameVerifier = Boolean.FALSE.equals(connectionInfo.getSslVerifyHostname())
-                ? (hostname, session) -> true
-                : HttpsURLConnection.getDefaultHostnameVerifier();
+        SSLParameters sslParameters = null;
+        if (!Boolean.FALSE.equals(connectionInfo.getSslVerifyHostname())) {
+            sslParameters = new SSLParameters();
+            sslParameters.setEndpointIdentificationAlgorithm("HTTPS");
+        }
 
         boolean customSslContext = Boolean.TRUE.equals(connectionInfo.getSslTrustAllCertificates())
                 || StringUtils.isNotBlank(connectionInfo.getSslTruststorePath())
                 || StringUtils.isNotBlank(connectionInfo.getSslKeystorePath());
         if (!customSslContext) {
-            return new SslConfiguration(null, hostnameVerifier);
+            return new SslConfiguration(null, sslParameters);
         }
 
         SSLContext sslContext = SSLContext.getInstance("TLS");
         sslContext.init(loadKeyManagers(), loadTrustManagers(), new SecureRandom());
-        return new SslConfiguration(sslContext.getSocketFactory(), hostnameVerifier);
+        return new SslConfiguration(sslContext.getSocketFactory(), sslParameters);
     }
 
     private KeyManager[] loadKeyManagers() throws Exception {
@@ -636,11 +638,11 @@ public class RedisPoolManager implements Disposable {
     @Getter
     private static class SslConfiguration {
         private final SSLSocketFactory sslSocketFactory;
-        private final HostnameVerifier hostnameVerifier;
+        private final SSLParameters sslParameters;
 
-        private SslConfiguration(SSLSocketFactory sslSocketFactory, HostnameVerifier hostnameVerifier) {
+        private SslConfiguration(SSLSocketFactory sslSocketFactory, SSLParameters sslParameters) {
             this.sslSocketFactory = sslSocketFactory;
-            this.hostnameVerifier = hostnameVerifier;
+            this.sslParameters = sslParameters;
         }
     }
 }
