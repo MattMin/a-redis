@@ -40,6 +40,10 @@ public class ConsolePanel extends JPanel implements Disposable {
     private static final int COLLAPSED_RESULT_LINES = 8;
     private static final int COLLAPSED_RESULT_MAX_LENGTH = 600;
     private static final int CARD_ARC = 14;
+    private static final int CARD_MAX_WIDTH = 1960;
+    private static final int CARD_MIN_WIDTH = 320;
+    private static final int CARD_ACTION_BUTTON_SIZE = 24;
+    private static final int CARD_ACTION_GAP = 2;
     private static final Color CARD_BACKGROUND = new JBColor(new Color(245, 247, 250), new Color(60, 63, 65));
     private static final Color CARD_BORDER = new JBColor(new Color(221, 226, 230), new Color(83, 86, 88));
     private static final Color ERROR_CARD_BACKGROUND = new JBColor(new Color(255, 236, 236), new Color(83, 49, 49));
@@ -317,6 +321,7 @@ public class ConsolePanel extends JPanel implements Disposable {
         JButton rerunButton = createCardActionButton(AllIcons.Actions.Refresh, "Re-run command");
         rerunButton.addActionListener(e -> rerunCommand(commandText));
         cardActions.add(copyButton);
+        cardActions.add(Box.createHorizontalStrut(JBUI.scale(CARD_ACTION_GAP)));
         cardActions.add(rerunButton);
 
         JPanel headerPanel = new JPanel(new BorderLayout(6, 0));
@@ -338,13 +343,8 @@ public class ConsolePanel extends JPanel implements Disposable {
             @Override
             public Dimension getPreferredSize() {
                 Insets insets = getInsets();
-                int maxWidth = getAvailableCardMaxWidth();
+                int preferredWidth = getAvailableCardWidth();
                 int actionWidth = cardActions.getPreferredSize().width;
-                int naturalHeaderWidth = estimateTextWidth(headerTextArea.getText(), headerTextArea.getFont()) + actionWidth;
-                int naturalResultWidth = estimateTextWidth(resultTextArea.getText(), resultTextArea.getFont());
-                int preferredWidth = Math.min(maxWidth,
-                        Math.max(JBUI.scale(120), Math.max(naturalHeaderWidth, naturalResultWidth) + insets.left + insets.right));
-
                 int innerWidth = Math.max(JBUI.scale(96), preferredWidth - insets.left - insets.right);
                 int headerTextWidth = Math.max(JBUI.scale(72), innerWidth - actionWidth - JBUI.scale(6));
 
@@ -358,7 +358,7 @@ public class ConsolePanel extends JPanel implements Disposable {
 
             @Override
             public Dimension getMaximumSize() {
-                return new Dimension(getAvailableCardMaxWidth(), Integer.MAX_VALUE);
+                return new Dimension(getAvailableCardWidth(), Integer.MAX_VALUE);
             }
         };
         card.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -377,6 +377,7 @@ public class ConsolePanel extends JPanel implements Disposable {
                 card.repaint();
                 scrollResultToBottom();
             });
+            cardActions.add(Box.createHorizontalStrut(JBUI.scale(CARD_ACTION_GAP)));
             cardActions.add(toggleButton);
         }
 
@@ -433,6 +434,10 @@ public class ConsolePanel extends JPanel implements Disposable {
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         button.setToolTipText(toolTipText);
         button.setBorderPainted(false);
+        Dimension size = JBUI.size(CARD_ACTION_BUTTON_SIZE, CARD_ACTION_BUTTON_SIZE);
+        button.setPreferredSize(size);
+        button.setMinimumSize(size);
+        button.setMaximumSize(size);
         return button;
     }
 
@@ -461,22 +466,12 @@ public class ConsolePanel extends JPanel implements Disposable {
         );
     }
 
-    private int getAvailableCardMaxWidth() {
+    private int getAvailableCardWidth() {
         int viewportWidth = resultScrollPane.getViewport().getWidth();
         if (viewportWidth <= 0) {
-            return JBUI.scale(720);
+            return JBUI.scale(CARD_MAX_WIDTH);
         }
-        return Math.max(JBUI.scale(140), Math.min(JBUI.scale(720), viewportWidth - JBUI.scale(24)));
-    }
-
-    private int estimateTextWidth(String text, Font font) {
-        FontMetrics fontMetrics = getFontMetrics(font);
-        int maxLineWidth = 0;
-        String[] lines = StringUtils.defaultString(text).split("\\r?\\n", -1);
-        for (String line : lines) {
-            maxLineWidth = Math.max(maxLineWidth, fontMetrics.stringWidth(line));
-        }
-        return maxLineWidth;
+        return Math.max(JBUI.scale(CARD_MIN_WIDTH), Math.min(JBUI.scale(CARD_MAX_WIDTH), viewportWidth - JBUI.scale(24)));
     }
 
     private String buildResultText(List<String> result) {
