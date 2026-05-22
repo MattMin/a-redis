@@ -144,11 +144,20 @@ public class ConnectionManager implements Disposable {
         ConnectionManager connectionManager = this;
         connectionTree.addMouseListener(new MouseAdapter() {
             @Override
+            public void mousePressed(MouseEvent e) {
+                super.mousePressed(e);
+                showPopupIfNeeded(e, connectionTree);
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                super.mouseReleased(e);
+                showPopupIfNeeded(e, connectionTree);
+            }
+
+            @Override
             public void mouseClicked(MouseEvent e) {
                 super.mouseClicked(e);
-
-                int x = e.getX();
-                int y = e.getY();
 
                 // connectionTree的双击事件，仅响应鼠标左键双击
                 if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
@@ -214,17 +223,34 @@ public class ConnectionManager implements Disposable {
                     }
 
                 }
-
-                if (e.getButton() == MouseEvent.BUTTON3) {
-                    // 获取右键点击所在connectionNodede路径
-                    TreePath pathForLocation = connectionTree.getSelectionPath();
-                    if (pathForLocation != null && pathForLocation.getPathCount() == 2) {
-                        createConnectionPopupMenu(connectionTree, connectionTreeModel, connectionTreeLoadingDecorator).getComponent().show(connectionTree, x, y);
-                    }
-                }
             }
         });
         return connectionTree;
+    }
+
+    private void showPopupIfNeeded(MouseEvent e, Tree connectionTree) {
+        if (!e.isPopupTrigger()) {
+            return;
+        }
+
+        TreePath pathForLocation = connectionTree.getPathForLocation(e.getX(), e.getY());
+        if (pathForLocation == null) {
+            return;
+        }
+
+        connectionTree.setSelectionPath(pathForLocation);
+        if (pathForLocation.getPathCount() == 2) {
+            createConnectionPopupMenu(connectionTree, connectionTreeModel, connectionTreeLoadingDecorator)
+                    .getComponent()
+                    .show(connectionTree, e.getX(), e.getY());
+            return;
+        }
+
+        if (pathForLocation.getPathCount() == 3) {
+            createDbPopupMenu(connectionTree)
+                    .getComponent()
+                    .show(connectionTree, e.getX(), e.getY());
+        }
     }
 
     /**
@@ -621,31 +647,49 @@ public class ConnectionManager implements Disposable {
         ConsoleAction consoleAction = new ConsoleAction();
         consoleAction.setAction(e -> {
             TreePath selectionPath = connectionTree.getSelectionPath();
-            if (selectionPath == null || selectionPath.getPathCount() != 2) {
+            if (selectionPath == null) {
                 return;
             }
 
-            DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) selectionPath.getPath()[1];
-            ConnectionInfo connectionInfo = (ConnectionInfo) connectionNode.getUserObject();
-
-            // test connection
-            RedisPoolManager redis = getConnectionRedisMap().get(connectionInfo.getId());
-            try (Jedis jedis = redis.getJedis(0)) {
-                if (jedis == null) {
-                    return;
-                }
+            Object[] path = selectionPath.getPath();
+            if (path.length == 2) {
+                DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) path[1];
+                ConnectionInfo connectionInfo = (ConnectionInfo) connectionNode.getUserObject();
+                openConsole(connectionInfo, 0);
+                return;
             }
 
-            // console
-            ConsoleVirtualFile consoleVirtualFile = new ConsoleVirtualFile(
-                    connectionInfo.getName() + "-Console",
-                    project,
-                    connectionInfo,
-                    connectionRedisMap.get(connectionInfo.getId())
-            );
-            ConsoleFileSystem.getInstance(project).openEditor(consoleVirtualFile);
+            if (path.length == 3) {
+                DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) path[1];
+                DefaultMutableTreeNode dbNode = (DefaultMutableTreeNode) path[2];
+                ConnectionInfo connectionInfo = (ConnectionInfo) connectionNode.getUserObject();
+                DbInfo dbInfo = (DbInfo) dbNode.getUserObject();
+                openConsole(connectionInfo, dbInfo.getIndex());
+            }
         });
         return consoleAction;
+    }
+
+    private void openConsole(ConnectionInfo connectionInfo, int dbIndex) {
+        RedisPoolManager redis = getConnectionRedisMap().get(connectionInfo.getId());
+        if (redis == null) {
+            return;
+        }
+
+        try (Jedis jedis = redis.getJedis(dbIndex)) {
+            if (jedis == null) {
+                return;
+            }
+        }
+
+        ConsoleVirtualFile consoleVirtualFile = new ConsoleVirtualFile(
+                connectionInfo.getName() + "-Console",
+                project,
+                connectionInfo,
+                redis,
+                dbIndex
+        );
+        ConsoleFileSystem.getInstance(project).openEditor(consoleVirtualFile);
     }
 
     private InfoAction createInfoAction(Tree connectionTree) {
@@ -714,6 +758,14 @@ public class ConnectionManager implements Disposable {
         actionGroup.add(createInfoAction(connectionTree));
         actionGroup.addSeparator();
         actionGroup.add(createCloseAction(connectionTree, connectionTreeModel));
+        ActionPopupMenu menu = ActionManager.getInstance().createActionPopupMenu(ActionPlaces.POPUP, actionGroup);
+        menu.setTargetComponent(connectionTree);
+        return menu;
+    }
+
+    private ActionPopupMenu createDbPopupMenu(Tree connectionTree) {
+        DefaultActionGroup actionGroup = new DefaultActionGroup();
+        actionGroup.add(createConsoleAction(connectionTree));
         ActionPopupMenu menu = ActionManager.getInstance().createActionPopupMenu(ActionPlaces.POPUP, actionGroup);
         menu.setTargetComponent(connectionTree);
         return menu;

@@ -23,9 +23,11 @@ import java.io.OutputStream;
 @Getter
 public class ConsoleVirtualFile extends VirtualFile {
     private final String name;
+    private final String path;
     private final Project project;
     private final ConnectionInfo connectionInfo;
     private final RedisPoolManager redisPoolManager;
+    private final int dbIndex;
     private final ConsolePanel consolePanel;
 
     @Override
@@ -33,12 +35,14 @@ public class ConsoleVirtualFile extends VirtualFile {
         return new ConsoleFileType();
     }
 
-    public ConsoleVirtualFile(String name, Project project, ConnectionInfo connectionInfo, RedisPoolManager redisPoolManager) {
+    public ConsoleVirtualFile(String name, Project project, ConnectionInfo connectionInfo, RedisPoolManager redisPoolManager, int dbIndex) {
         this.project = project;
         this.name = name;
+        this.path = name + "#DB" + dbIndex;
         this.connectionInfo = connectionInfo;
         this.redisPoolManager = redisPoolManager;
-        this.consolePanel = new ConsolePanel(project, connectionInfo, redisPoolManager);
+        this.dbIndex = dbIndex;
+        this.consolePanel = new ConsolePanel(connectionInfo, redisPoolManager, dbIndex);
     }
 
     @Override
@@ -55,7 +59,7 @@ public class ConsoleVirtualFile extends VirtualFile {
     @Override
     public @NonNls
     @NotNull String getPath() {
-        return name;
+        return path;
     }
 
     @Override
@@ -127,12 +131,12 @@ public class ConsoleVirtualFile extends VirtualFile {
             return false;
         }
         ConsoleVirtualFile that = (ConsoleVirtualFile) o;
-        return Objects.equal(connectionInfo, that.connectionInfo);
+        return dbIndex == that.dbIndex && Objects.equal(connectionInfo, that.connectionInfo);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(connectionInfo);
+        return Objects.hashCode(connectionInfo, dbIndex);
     }
 
     public ConsolePanel getConsolePanel() {
