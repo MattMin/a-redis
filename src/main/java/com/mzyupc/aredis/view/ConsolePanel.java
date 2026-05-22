@@ -5,7 +5,9 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.ide.CopyPasteManager;
+import com.intellij.openapi.ui.ComboBox;
 import com.intellij.ui.JBColor;
+import com.intellij.ui.SearchTextField;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
@@ -17,26 +19,32 @@ import com.mzyupc.aredis.utils.ThreadPoolManager;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import org.apache.commons.compress.utils.Lists;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.client.utils.DateUtils;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import javax.swing.border.AbstractBorder;
 import javax.swing.border.Border;
 import javax.swing.text.BadLocationException;
+import javax.swing.text.DefaultHighlighter;
+import javax.swing.text.Highlighter;
 import java.awt.*;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.*;
 import java.awt.geom.RoundRectangle2D;
-import java.util.Date;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * @author mzyupc@163.com
  */
 public class ConsolePanel extends JPanel implements Disposable {
     private static final String EXECUTE_ACTION = "aredis.console.execute";
+    private static final String FOCUS_SEARCH_ACTION = "aredis.console.focusSearch";
+    private static final DateTimeFormatter COMMAND_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final int COLLAPSED_RESULT_LINES = 8;
     private static final int COLLAPSED_RESULT_MAX_LENGTH = 600;
     private static final int CARD_ARC = 14;
@@ -44,14 +52,20 @@ public class ConsolePanel extends JPanel implements Disposable {
     private static final int CARD_MIN_WIDTH = 320;
     private static final int CARD_ACTION_BUTTON_SIZE = 24;
     private static final int CARD_ACTION_GAP = 2;
+    private static final int SEARCH_FIELD_WIDTH = 260;
     private static final Color CARD_BACKGROUND = new JBColor(new Color(245, 247, 250), new Color(60, 63, 65));
     private static final Color CARD_BORDER = new JBColor(new Color(221, 226, 230), new Color(83, 86, 88));
+    private static final Color SELECTED_CARD_BORDER = new JBColor(new Color(74, 126, 255), new Color(104, 151, 255));
     private static final Color ERROR_CARD_BACKGROUND = new JBColor(new Color(255, 236, 236), new Color(83, 49, 49));
     private static final Color ERROR_CARD_BORDER = new JBColor(new Color(220, 94, 94), new Color(163, 93, 93));
     private static final Color ERROR_HEADER_COLOR = new JBColor(new Color(168, 33, 33), new Color(255, 166, 166));
     private static final Color ERROR_RESULT_COLOR = new JBColor(new Color(143, 43, 43), new Color(255, 180, 180));
     private static final Color ERROR_BADGE_BACKGROUND = new JBColor(new Color(220, 53, 69), new Color(183, 68, 83));
     private static final Color ERROR_BADGE_FOREGROUND = new JBColor(Color.WHITE, Color.WHITE);
+    private static final Highlighter.HighlightPainter SEARCH_MATCH_PAINTER =
+            new DefaultHighlighter.DefaultHighlightPainter(new JBColor(new Color(255, 236, 153), new Color(105, 88, 41)));
+    private static final Highlighter.HighlightPainter CURRENT_SEARCH_MATCH_PAINTER =
+            new DefaultHighlighter.DefaultHighlightPainter(new JBColor(new Color(255, 196, 77), new Color(142, 98, 32)));
 
     private final ConnectionInfo connectionInfo;
     private final RedisPoolManager redisPoolManager;
@@ -60,6 +74,15 @@ public class ConsolePanel extends JPanel implements Disposable {
     private final JBTextArea inputArea;
     private final JBLabel dbLabel;
     private final List<String> commandHistory = new LinkedList<>();
+    private final List<ExecutionCard> executionCards = new ArrayList<>();
+    private final List<SearchMatch> searchMatches = new ArrayList<>();
+    private SearchTextField searchTextField;
+    private JComboBox<SearchScope> searchScopeComboBox;
+    private JBLabel searchStatusLabel;
+    private JButton previousSearchButton;
+    private JButton nextSearchButton;
+    private ExecutionCard selectedSearchCard;
+    private int currentSearchMatchIndex = -1;
     private volatile int currentDb;
     private int historyIndex = -1;
     private String editingCommand = "";
@@ -101,8 +124,73 @@ public class ConsolePanel extends JPanel implements Disposable {
         inputPanel.add(headerPanel, BorderLayout.NORTH);
         inputPanel.add(inputScrollPane, BorderLayout.CENTER);
 
-        this.add(resultScrollPane, BorderLayout.CENTER);
+        JPanel resultPanel = new JPanel(new BorderLayout());
+        resultPanel.add(createSearchPanel(), BorderLayout.NORTH);
+        resultPanel.add(resultScrollPane, BorderLayout.CENTER);
+
+        this.add(resultPanel, BorderLayout.CENTER);
         this.add(inputPanel, BorderLayout.SOUTH);
+
+        installSearchShortcut();
+    }
+
+    private JPanel createSearchPanel() {
+        searchTextField = new SearchTextField();
+        searchTextField.setToolTipText("Search console output");
+        searchTextField.setPreferredSize(JBUI.size(SEARCH_FIELD_WIDTH, searchTextField.getPreferredSize().height));
+        searchTextField.addDocumentListener(new javax.swing.event.DocumentListener() {
+            @Override
+            public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                updateSearchMatches(false);
+            }
+
+            @Override
+            public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                updateSearchMatches(false);
+            }
+
+            @Override
+            public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                updateSearchMatches(false);
+            }
+        });
+        searchTextField.addKeyboardListener(new KeyAdapter() {
+            @Override
+            public void keyReleased(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                    moveSearchMatch(e.isShiftDown() ? -1 : 1);
+                }
+            }
+        });
+
+        searchScopeComboBox = new ComboBox<>(SearchScope.values());
+        searchScopeComboBox.setFocusable(false);
+        searchScopeComboBox.addItemListener(e -> {
+            if (e.getStateChange() == ItemEvent.SELECTED) {
+                updateSearchMatches(false);
+            }
+        });
+
+        previousSearchButton = createCardActionButton(AllIcons.Actions.FindAndShowPrevMatches, "Previous match");
+        previousSearchButton.addActionListener(e -> moveSearchMatch(-1));
+        nextSearchButton = createCardActionButton(AllIcons.Actions.FindAndShowNextMatches, "Next match");
+        nextSearchButton.addActionListener(e -> moveSearchMatch(1));
+        searchStatusLabel = new JBLabel();
+        searchStatusLabel.setForeground(JBColor.GRAY);
+
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, JBUI.scale(4), JBUI.scale(4)));
+        searchPanel.setBorder(BorderFactory.createCompoundBorder(
+                JBUI.Borders.customLine(JBColor.border(), 0, 0, 1, 0),
+                JBUI.Borders.emptyLeft(8)
+        ));
+        searchPanel.add(new JBLabel("Search:"));
+        searchPanel.add(searchTextField);
+        searchPanel.add(searchScopeComboBox);
+        searchPanel.add(previousSearchButton);
+        searchPanel.add(nextSearchButton);
+        searchPanel.add(searchStatusLabel);
+        updateSearchStatus();
+        return searchPanel;
     }
 
     private void installResultResizeListener() {
@@ -151,6 +239,23 @@ public class ConsolePanel extends JPanel implements Disposable {
                     showNextHistory();
                     e.consume();
                 }
+            }
+        });
+    }
+
+    private void installSearchShortcut() {
+        KeyStroke findShortcut = KeyStroke.getKeyStroke(KeyEvent.VK_F, Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx());
+        InputMap inputMap = getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT);
+        ActionMap actionMap = getActionMap();
+        inputMap.put(findShortcut, FOCUS_SEARCH_ACTION);
+        actionMap.put(FOCUS_SEARCH_ACTION, new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (searchTextField == null) {
+                    return;
+                }
+                searchTextField.requestFocusInWindow();
+                searchTextField.getTextEditor().selectAll();
             }
         });
     }
@@ -290,22 +395,25 @@ public class ConsolePanel extends JPanel implements Disposable {
     }
 
     private void appendExecutionLog(String commandText, List<String> result) {
-        JPanel card = createExecutionCard(commandText, result);
-        resultContainer.add(card);
+        ExecutionCard card = createExecutionCard(commandText, result);
+        executionCards.add(card);
+        resultContainer.add(card.wrapper);
         resultContainer.revalidate();
         resultContainer.repaint();
+        updateSearchMatches(true);
         scrollResultToBottom();
     }
 
-    private JPanel createExecutionCard(String commandText, List<String> result) {
+    private ExecutionCard createExecutionCard(String commandText, List<String> result) {
         boolean error = hasErrorResult(result);
-        String headerText = String.format("%s  %s", DateUtils.formatDate(new Date(), "yyyy-MM-dd HH:mm:ss"), commandText);
+        String headerText = String.format("%s  %s", LocalDateTime.now().format(COMMAND_TIME_FORMATTER), commandText);
         String fullResultText = buildResultText(result);
         boolean collapsible = isCollapsibleResult(fullResultText);
         String collapsedResultText = collapsible ? buildCollapsedResultText(fullResultText) : fullResultText;
-        boolean[] collapsed = new boolean[]{false};
+        ExecutionCard[] cardRef = new ExecutionCard[1];
 
         JBTextArea headerTextArea = createCardTextArea(headerText, new Font(Font.MONOSPACED, error ? Font.BOLD : Font.PLAIN, 12), error ? ERROR_HEADER_COLOR : JBColor.GRAY);
+        headerTextArea.setBorder(JBUI.Borders.emptyTop(3));
         JBTextArea resultTextArea = createCardTextArea(fullResultText, new Font(Font.MONOSPACED, Font.PLAIN, 13), error ? ERROR_RESULT_COLOR : JBColor.foreground());
 
         JPanel leftPanel = new JPanel(new BorderLayout(0, 4));
@@ -323,6 +431,8 @@ public class ConsolePanel extends JPanel implements Disposable {
         cardActions.add(copyButton);
         cardActions.add(Box.createHorizontalStrut(JBUI.scale(CARD_ACTION_GAP)));
         cardActions.add(rerunButton);
+        JButton searchBlockButton = createCardActionButton(AllIcons.Actions.Find, "Search this block");
+        searchBlockButton.addActionListener(e -> selectSearchCard(cardRef[0], true));
 
         JPanel headerPanel = new JPanel(new BorderLayout(6, 0));
         headerPanel.setOpaque(false);
@@ -364,22 +474,21 @@ public class ConsolePanel extends JPanel implements Disposable {
         card.setAlignmentX(Component.LEFT_ALIGNMENT);
         card.setOpaque(false);
         card.setBackground(error ? ERROR_CARD_BACKGROUND : CARD_BACKGROUND);
-        card.setBorder(createCardBorder(error));
+        card.setBorder(createCardBorder(error, false));
 
+        JButton toggleButton = null;
         if (collapsible) {
-            JButton toggleButton = createCardActionButton(AllIcons.General.ArrowUp, "Collapse result");
+            toggleButton = createCardActionButton(AllIcons.General.ArrowUp, "Collapse result");
             toggleButton.addActionListener(e -> {
-                collapsed[0] = !collapsed[0];
-                resultTextArea.setText(collapsed[0] ? collapsedResultText : fullResultText);
-                ((JButton) e.getSource()).setToolTipText(collapsed[0] ? "Expand result" : "Collapse result");
-                ((JButton) e.getSource()).setIcon(collapsed[0] ? AllIcons.General.ArrowDown : AllIcons.General.ArrowUp);
-                card.revalidate();
-                card.repaint();
-                scrollResultToBottom();
+                ExecutionCard executionCard = cardRef[0];
+                setCardCollapsed(executionCard, !executionCard.collapsed);
+                updateSearchMatches(true);
             });
             cardActions.add(Box.createHorizontalStrut(JBUI.scale(CARD_ACTION_GAP)));
             cardActions.add(toggleButton);
         }
+        cardActions.add(Box.createHorizontalStrut(JBUI.scale(CARD_ACTION_GAP)));
+        cardActions.add(searchBlockButton);
 
         card.add(headerPanel, BorderLayout.NORTH);
         card.add(resultTextArea, BorderLayout.CENTER);
@@ -389,7 +498,20 @@ public class ConsolePanel extends JPanel implements Disposable {
         wrapper.setAlignmentX(Component.LEFT_ALIGNMENT);
         wrapper.setBorder(JBUI.Borders.emptyBottom(6));
         wrapper.add(card);
-        return wrapper;
+
+        ExecutionCard executionCard = new ExecutionCard(
+                wrapper,
+                card,
+                headerTextArea,
+                resultTextArea,
+                toggleButton,
+                fullResultText,
+                collapsedResultText,
+                error,
+                collapsible);
+        cardRef[0] = executionCard;
+        installCardSelection(executionCard);
+        return executionCard;
     }
 
     private JBTextArea createCardTextArea(String text, Font font, Color foreground) {
@@ -438,6 +560,7 @@ public class ConsolePanel extends JPanel implements Disposable {
         button.setPreferredSize(size);
         button.setMinimumSize(size);
         button.setMaximumSize(size);
+        button.setAlignmentY(Component.CENTER_ALIGNMENT);
         return button;
     }
 
@@ -459,9 +582,9 @@ public class ConsolePanel extends JPanel implements Disposable {
         };
     }
 
-    private Border createCardBorder(boolean error) {
+    private Border createCardBorder(boolean error, boolean selected) {
         return BorderFactory.createCompoundBorder(
-                new RoundedBorder(error ? ERROR_CARD_BORDER : CARD_BORDER, JBUI.scale(CARD_ARC)),
+                new RoundedBorder(selected ? SELECTED_CARD_BORDER : error ? ERROR_CARD_BORDER : CARD_BORDER, JBUI.scale(CARD_ARC)),
                 JBUI.Borders.empty(10, 12, 10, 12)
         );
     }
@@ -472,6 +595,205 @@ public class ConsolePanel extends JPanel implements Disposable {
             return JBUI.scale(CARD_MAX_WIDTH);
         }
         return Math.max(JBUI.scale(CARD_MIN_WIDTH), Math.min(JBUI.scale(CARD_MAX_WIDTH), viewportWidth - JBUI.scale(24)));
+    }
+
+    private void installCardSelection(ExecutionCard card) {
+        MouseAdapter listener = new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                selectSearchCard(card, false);
+            }
+        };
+        card.wrapper.addMouseListener(listener);
+        card.card.addMouseListener(listener);
+    }
+
+    private void selectSearchCard(ExecutionCard card, boolean focusSearch) {
+        if (card == null) {
+            return;
+        }
+        updateSelectedSearchCard(card);
+        if (searchScopeComboBox != null) {
+            searchScopeComboBox.setSelectedItem(SearchScope.SELECTED_BLOCK);
+        }
+        updateSearchMatches(false);
+        if (focusSearch && searchTextField != null) {
+            searchTextField.requestFocusInWindow();
+        }
+    }
+
+    private void updateSelectedSearchCard(ExecutionCard card) {
+        if (selectedSearchCard == card) {
+            return;
+        }
+        if (selectedSearchCard != null) {
+            selectedSearchCard.card.setBorder(createCardBorder(selectedSearchCard.error, false));
+        }
+        selectedSearchCard = card;
+        selectedSearchCard.card.setBorder(createCardBorder(selectedSearchCard.error, true));
+        selectedSearchCard.card.repaint();
+    }
+
+    private void setCardCollapsed(ExecutionCard card, boolean collapsed) {
+        if (card == null || !card.collapsible) {
+            return;
+        }
+        card.collapsed = collapsed;
+        card.resultTextArea.setText(collapsed ? card.collapsedResultText : card.fullResultText);
+        card.toggleButton.setToolTipText(collapsed ? "Expand result" : "Collapse result");
+        card.toggleButton.setIcon(collapsed ? AllIcons.General.ArrowDown : AllIcons.General.ArrowUp);
+        card.card.revalidate();
+        card.card.repaint();
+    }
+
+    private void updateSearchMatches(boolean preserveCurrentMatch) {
+        int previousMatchIndex = currentSearchMatchIndex;
+        clearSearchHighlights();
+        searchMatches.clear();
+        currentSearchMatchIndex = -1;
+
+        String query = getSearchQuery();
+        if (StringUtils.isBlank(query)) {
+            updateSearchStatus();
+            return;
+        }
+
+        List<ExecutionCard> cards = getSearchableCards();
+        for (ExecutionCard card : cards) {
+            expandCollapsedCardForSearch(card, query);
+            addSearchMatches(card, card.headerTextArea, query);
+            addSearchMatches(card, card.resultTextArea, query);
+        }
+
+        if (!searchMatches.isEmpty()) {
+            currentSearchMatchIndex = preserveCurrentMatch
+                    ? Math.min(Math.max(previousMatchIndex, 0), searchMatches.size() - 1)
+                    : 0;
+            refreshSearchHighlightStyles();
+            if (!preserveCurrentMatch) {
+                scrollToSearchMatch(searchMatches.get(currentSearchMatchIndex));
+            }
+        }
+        updateSearchStatus();
+    }
+
+    private String getSearchQuery() {
+        return searchTextField == null ? StringUtils.EMPTY : StringUtils.trimToEmpty(searchTextField.getText());
+    }
+
+    private List<ExecutionCard> getSearchableCards() {
+        if (getSearchScope() == SearchScope.SELECTED_BLOCK) {
+            List<ExecutionCard> cards = new ArrayList<>();
+            if (selectedSearchCard != null) {
+                cards.add(selectedSearchCard);
+            }
+            return cards;
+        }
+        return executionCards;
+    }
+
+    private SearchScope getSearchScope() {
+        Object selectedItem = searchScopeComboBox == null ? null : searchScopeComboBox.getSelectedItem();
+        return selectedItem instanceof SearchScope ? (SearchScope) selectedItem : SearchScope.ALL_BLOCKS;
+    }
+
+    private void expandCollapsedCardForSearch(ExecutionCard card, String query) {
+        if (card.collapsed && containsIgnoreCase(card.fullResultText, query)) {
+            setCardCollapsed(card, false);
+        }
+    }
+
+    private boolean containsIgnoreCase(String text, String query) {
+        return StringUtils.defaultString(text).toLowerCase(Locale.ROOT).contains(query.toLowerCase(Locale.ROOT));
+    }
+
+    private void addSearchMatches(ExecutionCard card, JTextArea textArea, String query) {
+        String text = StringUtils.defaultString(textArea.getText());
+        String lowerText = text.toLowerCase(Locale.ROOT);
+        String lowerQuery = query.toLowerCase(Locale.ROOT);
+        int index = lowerText.indexOf(lowerQuery);
+        while (index >= 0) {
+            try {
+                Object tag = textArea.getHighlighter().addHighlight(index, index + query.length(), SEARCH_MATCH_PAINTER);
+                searchMatches.add(new SearchMatch(card, textArea, index, index + query.length(), tag));
+            } catch (BadLocationException ignore) {
+            }
+            index = lowerText.indexOf(lowerQuery, index + Math.max(1, lowerQuery.length()));
+        }
+    }
+
+    private void clearSearchHighlights() {
+        for (ExecutionCard card : executionCards) {
+            card.headerTextArea.getHighlighter().removeAllHighlights();
+            card.resultTextArea.getHighlighter().removeAllHighlights();
+        }
+    }
+
+    private void refreshSearchHighlightStyles() {
+        for (int i = 0; i < searchMatches.size(); i++) {
+            SearchMatch match = searchMatches.get(i);
+            if (match.tag != null) {
+                match.textArea.getHighlighter().removeHighlight(match.tag);
+            }
+            try {
+                match.tag = match.textArea.getHighlighter().addHighlight(
+                        match.startOffset,
+                        match.endOffset,
+                        i == currentSearchMatchIndex ? CURRENT_SEARCH_MATCH_PAINTER : SEARCH_MATCH_PAINTER);
+            } catch (BadLocationException ignore) {
+                match.tag = null;
+            }
+        }
+    }
+
+    private void moveSearchMatch(int direction) {
+        if (searchMatches.isEmpty()) {
+            return;
+        }
+        currentSearchMatchIndex = (currentSearchMatchIndex + direction + searchMatches.size()) % searchMatches.size();
+        refreshSearchHighlightStyles();
+        scrollToSearchMatch(searchMatches.get(currentSearchMatchIndex));
+        updateSearchStatus();
+    }
+
+    private void scrollToSearchMatch(SearchMatch match) {
+        updateSelectedSearchCard(match.card);
+        try {
+            Shape shape = match.textArea.modelToView2D(match.startOffset);
+            Rectangle rectangle = shape == null ? null : shape.getBounds();
+            if (rectangle != null) {
+                rectangle.grow(JBUI.scale(20), JBUI.scale(20));
+                match.textArea.scrollRectToVisible(rectangle);
+            }
+        } catch (BadLocationException ignore) {
+        }
+    }
+
+    private void updateSearchStatus() {
+        boolean hasMatches = !searchMatches.isEmpty();
+        if (previousSearchButton != null) {
+            previousSearchButton.setEnabled(hasMatches);
+        }
+        if (nextSearchButton != null) {
+            nextSearchButton.setEnabled(hasMatches);
+        }
+        if (searchStatusLabel == null) {
+            return;
+        }
+        String query = getSearchQuery();
+        if (StringUtils.isBlank(query)) {
+            searchStatusLabel.setText(StringUtils.EMPTY);
+            return;
+        }
+        if (getSearchScope() == SearchScope.SELECTED_BLOCK && selectedSearchCard == null) {
+            searchStatusLabel.setText("Select a block");
+            return;
+        }
+        if (!hasMatches) {
+            searchStatusLabel.setText("0 matches");
+            return;
+        }
+        searchStatusLabel.setText(String.format("%s / %s", currentSearchMatchIndex + 1, searchMatches.size()));
     }
 
     private String buildResultText(List<String> result) {
@@ -615,6 +937,11 @@ public class ConsolePanel extends JPanel implements Disposable {
             @Override
             public void actionPerformed(@NotNull AnActionEvent anActionEvent) {
                 resultContainer.removeAll();
+                executionCards.clear();
+                searchMatches.clear();
+                selectedSearchCard = null;
+                currentSearchMatchIndex = -1;
+                updateSearchStatus();
                 resultContainer.revalidate();
                 resultContainer.repaint();
                 clearInput();
@@ -629,6 +956,71 @@ public class ConsolePanel extends JPanel implements Disposable {
 
     @Override
     public void dispose() {
+    }
+
+    private enum SearchScope {
+        ALL_BLOCKS("All blocks"),
+        SELECTED_BLOCK("Selected block");
+
+        private final String text;
+
+        SearchScope(String text) {
+            this.text = text;
+        }
+
+        @Override
+        public String toString() {
+            return text;
+        }
+    }
+
+    private static class ExecutionCard {
+        private final JPanel wrapper;
+        private final JPanel card;
+        private final JBTextArea headerTextArea;
+        private final JBTextArea resultTextArea;
+        private final JButton toggleButton;
+        private final String fullResultText;
+        private final String collapsedResultText;
+        private final boolean error;
+        private final boolean collapsible;
+        private boolean collapsed;
+
+        private ExecutionCard(JPanel wrapper,
+                              JPanel card,
+                              JBTextArea headerTextArea,
+                              JBTextArea resultTextArea,
+                              JButton toggleButton,
+                              String fullResultText,
+                              String collapsedResultText,
+                              boolean error,
+                              boolean collapsible) {
+            this.wrapper = wrapper;
+            this.card = card;
+            this.headerTextArea = headerTextArea;
+            this.resultTextArea = resultTextArea;
+            this.toggleButton = toggleButton;
+            this.fullResultText = fullResultText;
+            this.collapsedResultText = collapsedResultText;
+            this.error = error;
+            this.collapsible = collapsible;
+        }
+    }
+
+    private static class SearchMatch {
+        private final ExecutionCard card;
+        private final JTextArea textArea;
+        private final int startOffset;
+        private final int endOffset;
+        private Object tag;
+
+        private SearchMatch(ExecutionCard card, JTextArea textArea, int startOffset, int endOffset, Object tag) {
+            this.card = card;
+            this.textArea = textArea;
+            this.startOffset = startOffset;
+            this.endOffset = endOffset;
+            this.tag = tag;
+        }
     }
 
     private static class RoundedBorder extends AbstractBorder {
