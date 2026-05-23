@@ -8,9 +8,6 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import redis.clients.jedis.Jedis;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.time.Duration;
 import java.util.UUID;
 
@@ -27,8 +24,8 @@ class InfoDialogIntegrationTest {
 
     @Test
     void shouldFetchAllInfoSectionsFromLocalRedisCluster() {
-        Assumptions.assumeTrue(isPortOpen("127.0.0.1", 7001),
-                "Local Redis Cluster is not running on 127.0.0.1:7001");
+        Assumptions.assumeTrue(isLocalRedisClusterReady(),
+                "Local Redis Cluster is not ready for cluster-mode access on 127.0.0.1:7001");
 
         redisPoolManager = new RedisPoolManager(ConnectionInfo.builder()
                 .id(UUID.randomUUID().toString())
@@ -55,8 +52,8 @@ class InfoDialogIntegrationTest {
 
     @Test
     void shouldSupportRepeatedInfoRefreshesFromLocalRedisCluster() {
-        Assumptions.assumeTrue(isPortOpen("127.0.0.1", 7001),
-                "Local Redis Cluster is not running on 127.0.0.1:7001");
+        Assumptions.assumeTrue(isLocalRedisClusterReady(),
+                "Local Redis Cluster is not ready for cluster-mode access on 127.0.0.1:7001");
 
         redisPoolManager = new RedisPoolManager(ConnectionInfo.builder()
                 .id(UUID.randomUUID().toString())
@@ -82,13 +79,15 @@ class InfoDialogIntegrationTest {
         }
     }
 
-    private boolean isPortOpen(String host, int port) {
-        try (Socket socket = new Socket()) {
-            socket.connect(new InetSocketAddress(host, port), 1000);
-            return true;
-        } catch (IOException e) {
-            return false;
-        }
+    private boolean isLocalRedisClusterReady() {
+        RedisPoolManager.TestConnectionResult testConnectionResult = RedisPoolManager.getTestConnectionResult(ConnectionInfo.builder()
+                .id(UUID.randomUUID().toString())
+                .name("local-redis-cluster")
+                .url("127.0.0.1")
+                .port("7001")
+                .clusterMode(true)
+                .build());
+        return testConnectionResult.isSuccess();
     }
 }
 

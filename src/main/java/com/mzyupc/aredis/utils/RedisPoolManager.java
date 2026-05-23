@@ -23,6 +23,8 @@ import redis.clients.jedis.util.JedisClusterCRC16;
 import javax.net.ssl.*;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.security.KeyStore;
 import java.security.SecureRandom;
 import java.security.cert.Certificate;
@@ -30,6 +32,7 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.*;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -42,6 +45,9 @@ public class RedisPoolManager implements Disposable {
     private static final String LOCALHOST = "127.0.0.1";
     private static final String CLUSTER_KEYSPACE_SECTION = "# Keyspace\r\ndb0:keys=%s,expires=0,avg_ttl=0";
     private static final String CLUSTER_SELECT_UNSUPPORTED_MESSAGE = "ERR SELECT is not allowed in cluster mode";
+    private static final String CLUSTER_CONSOLE_UNSUPPORTED_COMMAND_MESSAGE =
+            "ERR Command '%s' is not supported in cluster console mode yet. Please connect to a single Redis node to run this command.";
+    private static final int CLUSTER_ENDPOINT_CONNECT_TIMEOUT_MILLIS = 200;
 
     private static final JedisPoolConfig JEDIS_POOL_CONFIG;
 
@@ -124,11 +130,10 @@ public class RedisPoolManager implements Disposable {
 
     private String pingForTestConnection() throws Exception {
         if (isClusterMode()) {
-            JedisCluster jedisCluster = getJedisCluster();
-            if (jedisCluster == null) {
-                return null;
-            }
-            return executeOnFirstClusterMaster(Jedis::ping);
+            return executeOnConfiguredClusterNode(node -> {
+                node.clusterInfo();
+                return node.ping();
+            });
         }
         try (Jedis jedis = getJedis(Protocol.DEFAULT_DATABASE)) {
             if (jedis == null) {
@@ -268,15 +273,15 @@ public class RedisPoolManager implements Disposable {
             if (hostAndPort == null) {
                 return null;
             }
-            HostAndPort discovered = discoveredMappings.get(hostAndPort.getHost());
-            if (discovered != null) {
-                return discovered;
+            HostAndPort mapped = discoveredMappings.get(getClusterEndpointKey(hostAndPort));
+            if (mapped != null) {
+                return mapped;
             }
-            Integer mappedPort = resolveDockerClusterPort(hostAndPort.getHost(), hostAndPort.getPort());
-            if (mappedPort == null) {
-                return hostAndPort;
+            HostAndPort remappedEndpoint = remapClusterNodeEndpoint(hostAndPort, configuredHost, this::isEndpointReachable);
+            if (!sameEndpoint(hostAndPort, remappedEndpoint)) {
+                discoveredMappings.put(getClusterEndpointKey(hostAndPort), remappedEndpoint);
             }
-            return new HostAndPort(configuredHost, mappedPort);
+            return remappedEndpoint;
         };
     }
 
@@ -294,30 +299,38 @@ public class RedisPoolManager implements Disposable {
                     createClientConfig(null, false))) {
                 String clusterNodes = seedNode.clusterNodes();
                 if (StringUtils.isNotBlank(clusterNodes)) {
-                    for (String line : clusterNodes.split("\\r?\\n")) {
-                        String trimmedLine = StringUtils.trimToEmpty(line);
-                        if (StringUtils.isBlank(trimmedLine)) {
+                    List<ClusterNodeDescriptor> clusterNodeDescriptors = extractClusterNodeDescriptors(clusterNodes);
+                    for (ClusterNodeDescriptor clusterNodeDescriptor : clusterNodeDescriptors) {
+                        HostAndPort announcedEndpoint = clusterNodeDescriptor.getAnnouncedEndpoint();
+                        if (announcedEndpoint == null) {
                             continue;
                         }
-                        String[] segments = trimmedLine.split("\\s+");
-                        if (segments.length < 2) {
+                        HostAndPort mappedEndpoint = remapClusterNodeEndpoint(announcedEndpoint, configuredHost, this::isEndpointReachable);
+                        if (!sameEndpoint(announcedEndpoint, mappedEndpoint)) {
+                            putClusterEndpointMapping(mappings, announcedEndpoint.getHost(), announcedEndpoint.getPort(), mappedEndpoint);
+                        }
+
+                        if (StringUtils.isNotBlank(clusterNodeDescriptor.getAnnouncedHostName())) {
+                            putClusterEndpointMapping(mappings,
+                                    clusterNodeDescriptor.getAnnouncedHostName(),
+                                    announcedEndpoint.getPort(),
+                                    mappedEndpoint);
+                        }
+                    }
+
+                    Map<String, HostAndPort> publishedPortMappings = discoverPublishedClusterNodeMappings(configuredHost, clusterNodeDescriptors);
+                    for (ClusterNodeDescriptor clusterNodeDescriptor : clusterNodeDescriptors) {
+                        HostAndPort publishedEndpoint = publishedPortMappings.get(clusterNodeDescriptor.getNodeId());
+                        HostAndPort announcedEndpoint = clusterNodeDescriptor.getAnnouncedEndpoint();
+                        if (publishedEndpoint == null || announcedEndpoint == null) {
                             continue;
                         }
-                        String[] hostSegment = segments[1].split(",", 2);
-                        String endpoint = hostSegment[0];
-                        String rawHost = StringUtils.substringBefore(endpoint, ":");
-                        String announcedHostName = hostSegment.length > 1 ? hostSegment[1] : null;
-                        Integer mappedPort = resolveDockerClusterPort(announcedHostName, 6379);
-                        if (mappedPort == null) {
-                            mappedPort = resolveDockerClusterPort(rawHost, 6379);
-                        }
-                        if (mappedPort == null) {
-                            continue;
-                        }
-                        HostAndPort mappedEndpoint = new HostAndPort(configuredHost, mappedPort);
-                        mappings.put(rawHost, mappedEndpoint);
-                        if (StringUtils.isNotBlank(announcedHostName)) {
-                            mappings.put(announcedHostName, mappedEndpoint);
+                        putClusterEndpointMapping(mappings, announcedEndpoint.getHost(), announcedEndpoint.getPort(), publishedEndpoint);
+                        if (StringUtils.isNotBlank(clusterNodeDescriptor.getAnnouncedHostName())) {
+                            putClusterEndpointMapping(mappings,
+                                    clusterNodeDescriptor.getAnnouncedHostName(),
+                                    announcedEndpoint.getPort(),
+                                    publishedEndpoint);
                         }
                     }
                 }
@@ -329,22 +342,240 @@ public class RedisPoolManager implements Disposable {
         }
     }
 
-    private Integer resolveDockerClusterPort(String host, int port) {
-        if (port != 6379) {
+    private Map<String, HostAndPort> discoverPublishedClusterNodeMappings(String configuredHost,
+                                                                          List<ClusterNodeDescriptor> clusterNodeDescriptors) {
+        if (!shouldDiscoverPublishedClusterPorts(configuredHost, clusterNodeDescriptors)) {
+            return Collections.emptyMap();
+        }
+
+        int configuredPort = Integer.parseInt(connectionInfo.getPort());
+        int portOffset = Math.max(32, clusterNodeDescriptors.size() * 4);
+        int startPort = Math.max(1, configuredPort - portOffset);
+        int endPort = configuredPort + portOffset;
+
+        Set<String> remainingNodeIds = clusterNodeDescriptors.stream()
+                .map(ClusterNodeDescriptor::getNodeId)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Map<String, HostAndPort> discoveredMappings = new HashMap<>();
+        for (int port = startPort; port <= endPort && !remainingNodeIds.isEmpty(); port++) {
+            String nodeId = fetchClusterNodeId(configuredHost, port);
+            if (StringUtils.isBlank(nodeId) || !remainingNodeIds.remove(nodeId)) {
+                continue;
+            }
+            discoveredMappings.put(nodeId, new HostAndPort(configuredHost, port));
+        }
+        return discoveredMappings;
+    }
+
+    private boolean shouldDiscoverPublishedClusterPorts(String configuredHost,
+                                                        List<ClusterNodeDescriptor> clusterNodeDescriptors) {
+        if (!isLocalHost(configuredHost)
+                || StringUtils.isBlank(connectionInfo.getPort())
+                || !StringUtils.isNumeric(connectionInfo.getPort())
+                || clusterNodeDescriptors == null
+                || clusterNodeDescriptors.size() <= 1) {
+            return false;
+        }
+
+        int configuredPort = Integer.parseInt(connectionInfo.getPort());
+        return clusterNodeDescriptors.stream()
+                .map(ClusterNodeDescriptor::getAnnouncedEndpoint)
+                .filter(Objects::nonNull)
+                .map(HostAndPort::getPort)
+                .anyMatch(port -> port > 0 && port != configuredPort);
+    }
+
+    private boolean isLocalHost(String host) {
+        return StringUtils.equalsAnyIgnoreCase(StringUtils.trimToEmpty(host), "127.0.0.1", "localhost", "::1");
+    }
+
+    private String fetchClusterNodeId(String host, int port) {
+        try (Jedis jedis = new Jedis(new HostAndPort(host, port), createClientConfig(null, false))) {
+            return StringUtils.trimToNull(jedis.clusterMyId());
+        } catch (Exception e) {
             return null;
         }
-        if (StringUtils.isBlank(host) || !StringUtils.startsWith(host, "redis-node-")) {
+    }
+
+    private void putClusterEndpointMapping(Map<String, HostAndPort> mappings, String host, int port, HostAndPort mappedEndpoint) {
+        if (StringUtils.isBlank(host) || mappedEndpoint == null) {
+            return;
+        }
+        mappings.put(getClusterEndpointKey(host, port), mappedEndpoint);
+    }
+
+    private HostAndPort resolveClusterNodeEndpoint(HostAndPort announcedEndpoint) {
+        if (announcedEndpoint == null) {
             return null;
         }
-        String suffix = StringUtils.substringAfter(host, "redis-node-");
-        if (!StringUtils.isNumeric(suffix)) {
+        String configuredHost = StringUtils.defaultIfBlank(connectionInfo.getUrl(), LOCALHOST);
+        HostAndPort mappedEndpoint = loadClusterHostAndPortMapping(configuredHost).get(getClusterEndpointKey(announcedEndpoint));
+        if (mappedEndpoint != null) {
+            return mappedEndpoint;
+        }
+        return remapClusterNodeEndpoint(announcedEndpoint, configuredHost, this::isEndpointReachable);
+    }
+
+    private HostAndPort remapClusterNodeEndpoint(HostAndPort announcedEndpoint, String configuredHost) {
+        return remapClusterNodeEndpoint(announcedEndpoint, configuredHost, this::isEndpointReachable);
+    }
+
+    static HostAndPort remapClusterNodeEndpoint(HostAndPort announcedEndpoint,
+                                                String configuredHost,
+                                                BiFunction<String, Integer, Boolean> reachabilityChecker) {
+        if (announcedEndpoint == null) {
             return null;
         }
-        int nodeIndex = Integer.parseInt(suffix);
-        if (nodeIndex < 1 || nodeIndex > 6) {
+
+        String announcedHost = StringUtils.trimToNull(announcedEndpoint.getHost());
+        int announcedPort = announcedEndpoint.getPort();
+        if (announcedHost == null || announcedPort <= 0) {
+            return new HostAndPort(StringUtils.defaultIfBlank(configuredHost, LOCALHOST), announcedPort);
+        }
+
+        if (Boolean.TRUE.equals(reachabilityChecker.apply(announcedHost, announcedPort))) {
+            return announcedEndpoint;
+        }
+
+        if (StringUtils.isBlank(configuredHost)) {
+            return announcedEndpoint;
+        }
+
+        if (Boolean.TRUE.equals(reachabilityChecker.apply(configuredHost, announcedPort))) {
+            return new HostAndPort(configuredHost, announcedPort);
+        }
+
+        return announcedEndpoint;
+    }
+
+    static String getClusterEndpointKey(HostAndPort endpoint) {
+        if (endpoint == null) {
             return null;
         }
-        return 7000 + nodeIndex;
+        return getClusterEndpointKey(endpoint.getHost(), endpoint.getPort());
+    }
+
+    static String getClusterEndpointKey(String host, int port) {
+        return StringUtils.defaultString(StringUtils.trimToEmpty(host)).toLowerCase(Locale.ROOT) + ":" + port;
+    }
+
+    private boolean sameEndpoint(HostAndPort left, HostAndPort right) {
+        if (left == right) {
+            return true;
+        }
+        if (left == null || right == null) {
+            return false;
+        }
+        return StringUtils.equalsIgnoreCase(left.getHost(), right.getHost()) && left.getPort() == right.getPort();
+    }
+
+    private static HostAndPort parseClusterNodeEndpoint(String clusterNodeEndpoint) {
+        if (StringUtils.isBlank(clusterNodeEndpoint)) {
+            return null;
+        }
+
+        String endpoint = StringUtils.substringBefore(clusterNodeEndpoint, "@");
+        if (StringUtils.isBlank(endpoint)) {
+            return null;
+        }
+
+        String host;
+        String portText;
+        if (StringUtils.startsWith(endpoint, "[")) {
+            int closingBracketIndex = endpoint.indexOf(']');
+            if (closingBracketIndex <= 0 || closingBracketIndex + 2 >= endpoint.length()) {
+                return null;
+            }
+            host = endpoint.substring(1, closingBracketIndex);
+            portText = endpoint.substring(closingBracketIndex + 2);
+        } else {
+            host = StringUtils.substringBeforeLast(endpoint, ":");
+            portText = StringUtils.substringAfterLast(endpoint, ":");
+        }
+        if (StringUtils.isBlank(host) || !StringUtils.isNumeric(portText)) {
+            return null;
+        }
+        return new HostAndPort(host, Integer.parseInt(portText));
+    }
+
+    static List<HostAndPort> extractClusterMasterEndpoints(String clusterNodes) {
+        Map<String, HostAndPort> masters = new LinkedHashMap<>();
+        for (ClusterNodeDescriptor clusterNodeDescriptor : extractClusterNodeDescriptors(clusterNodes)) {
+            if (!clusterNodeDescriptor.isMaster() || clusterNodeDescriptor.getAnnouncedEndpoint() == null) {
+                continue;
+            }
+            HostAndPort endpoint = clusterNodeDescriptor.getAnnouncedEndpoint();
+            masters.putIfAbsent(getClusterEndpointKey(endpoint), endpoint);
+        }
+        return new ArrayList<>(masters.values());
+    }
+
+    static List<ClusterNodeDescriptor> extractClusterNodeDescriptors(String clusterNodes) {
+        if (StringUtils.isBlank(clusterNodes)) {
+            return Collections.emptyList();
+        }
+
+        List<ClusterNodeDescriptor> descriptors = new ArrayList<>();
+        for (String line : clusterNodes.split("\\r?\\n")) {
+            String trimmedLine = StringUtils.trimToEmpty(line);
+            if (StringUtils.isBlank(trimmedLine)) {
+                continue;
+            }
+
+            String[] segments = trimmedLine.split("\\s+");
+            if (segments.length < 3) {
+                continue;
+            }
+
+            String[] hostSegments = segments[1].split(",");
+            descriptors.add(new ClusterNodeDescriptor(
+                    StringUtils.trimToNull(segments[0]),
+                    parseClusterNodeEndpoint(hostSegments[0]),
+                    findClusterNodeHostnameAlias(hostSegments),
+                    StringUtils.trimToEmpty(segments[2])
+            ));
+        }
+        return descriptors;
+    }
+
+    private static boolean isClusterNodeMaster(String flags) {
+        if (StringUtils.isBlank(flags)) {
+            return false;
+        }
+        Set<String> flagSet = Arrays.stream(flags.split(","))
+                .map(StringUtils::trimToEmpty)
+                .map(StringUtils::lowerCase)
+                .collect(Collectors.toSet());
+        return flagSet.contains("master")
+                && !flagSet.contains("fail")
+                && !flagSet.contains("handshake")
+                && !flagSet.contains("noaddr");
+    }
+
+    private static String findClusterNodeHostnameAlias(String[] hostSegments) {
+        if (hostSegments == null || hostSegments.length < 2) {
+            return null;
+        }
+        for (int i = 1; i < hostSegments.length; i++) {
+            String candidate = StringUtils.trimToNull(hostSegments[i]);
+            if (candidate != null && !StringUtils.contains(candidate, "=")) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private boolean isEndpointReachable(String host, int port) {
+        if (StringUtils.isBlank(host) || port <= 0) {
+            return false;
+        }
+        try (Socket socket = new Socket()) {
+            socket.connect(new InetSocketAddress(host, port), CLUSTER_ENDPOINT_CONNECT_TIMEOUT_MILLIS);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private SslConfiguration createSslConfiguration() throws Exception {
@@ -448,6 +679,13 @@ public class RedisPoolManager implements Disposable {
     private boolean isCertificateFile(String path) {
         String lowerCasePath = StringUtils.lowerCase(path);
         return StringUtils.endsWithAny(lowerCasePath, ".crt", ".cer", ".pem");
+    }
+
+    private Jedis openClusterNode(HostAndPort endpoint) throws Exception {
+        if (endpoint == null) {
+            return null;
+        }
+        return new Jedis(endpoint, createClientConfig(null, false));
     }
 
     private char[] toPasswordChars(String password) {
@@ -894,7 +1132,12 @@ public class RedisPoolManager implements Disposable {
                 return Collections.singletonList(StringUtils.defaultIfBlank(executeOnFirstClusterMaster(Jedis::ping), "PONG"));
             }
 
-            if (args.length == 0 || isCommandWithoutKey(cmd)) {
+            ClusterCommandRoute route = resolveClusterCommandRoute(cmd, args);
+            if (route.isUnsupported()) {
+                return Collections.singletonList(route.getErrorMessage());
+            }
+
+            if (route.isFirstMaster()) {
                 return executeOnFirstClusterMaster(node -> {
                     Connection client = node.getClient();
                     client.sendCommand(cmd, args);
@@ -902,7 +1145,7 @@ public class RedisPoolManager implements Disposable {
                 });
             }
 
-            try (Connection connection = getJedisCluster().getConnectionFromSlot(JedisClusterCRC16.getSlot(args[0]))) {
+            try (Connection connection = getJedisCluster().getConnectionFromSlot(JedisClusterCRC16.getSlot(args[route.getKeyArgIndex()]))) {
                 connection.sendCommand(cmd, args);
                 return convertRedisResponse(cmd, connection.getOne());
             }
@@ -911,7 +1154,62 @@ public class RedisPoolManager implements Disposable {
         }
     }
 
-    private boolean isCommandWithoutKey(Protocol.Command cmd) {
+    static ClusterCommandRoute resolveClusterCommandRoute(Protocol.Command cmd, String... args) {
+        if (cmd == null) {
+            return ClusterCommandRoute.unsupported(String.format(CLUSTER_CONSOLE_UNSUPPORTED_COMMAND_MESSAGE, "unknown"));
+        }
+        if (args == null || args.length == 0 || isCommandWithoutKey(cmd)) {
+            return ClusterCommandRoute.firstMaster();
+        }
+
+        String commandName = cmd.name();
+        if (isFirstArgClusterKeyCommand(commandName)) {
+            return ClusterCommandRoute.slot(0);
+        }
+        if ("EVAL".equals(commandName) || "EVALSHA".equals(commandName)) {
+            return resolveEvalClusterCommandRoute(commandName, args);
+        }
+        if ("OBJECT".equals(commandName) || "MEMORY".equals(commandName) || "XINFO".equals(commandName)
+                || "XGROUP".equals(commandName)) {
+            return args.length >= 2
+                    ? ClusterCommandRoute.slot(1)
+                    : ClusterCommandRoute.unsupported(String.format(CLUSTER_CONSOLE_UNSUPPORTED_COMMAND_MESSAGE, commandName));
+        }
+        if ("XREAD".equals(commandName) || "XREADGROUP".equals(commandName)) {
+            int streamsKeywordIndex = indexOfIgnoreCase(args, "STREAMS");
+            if (streamsKeywordIndex >= 0 && streamsKeywordIndex + 1 < args.length) {
+                return ClusterCommandRoute.slot(streamsKeywordIndex + 1);
+            }
+        }
+        return ClusterCommandRoute.unsupported(String.format(CLUSTER_CONSOLE_UNSUPPORTED_COMMAND_MESSAGE, commandName));
+    }
+
+    private static ClusterCommandRoute resolveEvalClusterCommandRoute(String commandName, String... args) {
+        if (args.length < 2 || !StringUtils.isNumeric(args[1])) {
+            return ClusterCommandRoute.unsupported(String.format(CLUSTER_CONSOLE_UNSUPPORTED_COMMAND_MESSAGE, commandName));
+        }
+        int keyCount = Integer.parseInt(args[1]);
+        if (keyCount <= 0) {
+            return ClusterCommandRoute.firstMaster();
+        }
+        return args.length >= 3
+                ? ClusterCommandRoute.slot(2)
+                : ClusterCommandRoute.unsupported(String.format(CLUSTER_CONSOLE_UNSUPPORTED_COMMAND_MESSAGE, commandName));
+    }
+
+    private static int indexOfIgnoreCase(String[] values, String target) {
+        if (values == null || target == null) {
+            return -1;
+        }
+        for (int i = 0; i < values.length; i++) {
+            if (StringUtils.equalsIgnoreCase(values[i], target)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean isCommandWithoutKey(Protocol.Command cmd) {
         return cmd == Protocol.Command.CLUSTER
                 || cmd == Protocol.Command.INFO
                 || cmd == Protocol.Command.DBSIZE
@@ -922,6 +1220,95 @@ public class RedisPoolManager implements Disposable {
                 || cmd == Protocol.Command.CLIENT
                 || cmd == Protocol.Command.CONFIG
                 || cmd == Protocol.Command.COMMAND;
+    }
+
+    private static boolean isFirstArgClusterKeyCommand(String commandName) {
+        switch (commandName) {
+            case "APPEND":
+            case "BITCOUNT":
+            case "BITPOS":
+            case "DECR":
+            case "DECRBY":
+            case "DEL":
+            case "DUMP":
+            case "EXISTS":
+            case "EXPIRE":
+            case "EXPIREAT":
+            case "GET":
+            case "GETBIT":
+            case "GETDEL":
+            case "GETEX":
+            case "GETRANGE":
+            case "GETSET":
+            case "HDEL":
+            case "HEXISTS":
+            case "HGET":
+            case "HGETALL":
+            case "HINCRBY":
+            case "HKEYS":
+            case "HLEN":
+            case "HMGET":
+            case "HMSET":
+            case "HSCAN":
+            case "HSET":
+            case "HVALS":
+            case "INCR":
+            case "INCRBY":
+            case "LINDEX":
+            case "LINSERT":
+            case "LLEN":
+            case "LPOP":
+            case "LPUSH":
+            case "LRANGE":
+            case "LREM":
+            case "LSET":
+            case "LTRIM":
+            case "MGET":
+            case "MSET":
+            case "PERSIST":
+            case "PEXPIRE":
+            case "PEXPIREAT":
+            case "PFADD":
+            case "PFCOUNT":
+            case "PTTL":
+            case "RENAME":
+            case "RENAMENX":
+            case "RPOP":
+            case "RPOPLPUSH":
+            case "RPUSH":
+            case "SADD":
+            case "SCARD":
+            case "SET":
+            case "SETBIT":
+            case "SETEX":
+            case "SETRANGE":
+            case "SISMEMBER":
+            case "SMEMBERS":
+            case "SPOP":
+            case "SREM":
+            case "SSCAN":
+            case "STRLEN":
+            case "TOUCH":
+            case "TTL":
+            case "TYPE":
+            case "UNLINK":
+            case "XLEN":
+            case "XRANGE":
+            case "XREVRANGE":
+            case "ZADD":
+            case "ZCARD":
+            case "ZINCRBY":
+            case "ZRANGE":
+            case "ZRANK":
+            case "ZREM":
+            case "ZREVRANGE":
+            case "ZREVRANK":
+            case "ZSCORE":
+            case "ZSCAN":
+                return true;
+            default:
+                return false;
+        }
     }
 
     private List<String> convertRedisResponse(Protocol.Command cmd, Object response) {
@@ -981,8 +1368,46 @@ public class RedisPoolManager implements Disposable {
                 normalizedSection == null ? node.info() : node.info(normalizedSection)), "");
     }
 
+    private <T> T executeOnConfiguredClusterNode(ClusterNodeCallback<T> callback) throws Exception {
+        ConnectionEndpoint endpoint = getConnectionEndpoint();
+        try (Jedis jedis = new Jedis(
+                new HostAndPort(endpoint.getHost(), endpoint.getPort()),
+                createClientConfig(null, false))) {
+            return callback.doInNode(jedis);
+        }
+    }
+
+    private List<HostAndPort> loadClusterMasterEndpoints() {
+        try {
+            List<HostAndPort> masterEndpoints = executeOnConfiguredClusterNode(node -> extractClusterMasterEndpoints(node.clusterNodes()));
+            if (masterEndpoints == null || masterEndpoints.isEmpty()) {
+                return Collections.emptyList();
+            }
+
+            Map<String, HostAndPort> resolvedEndpoints = new LinkedHashMap<>();
+            for (HostAndPort masterEndpoint : masterEndpoints) {
+                HostAndPort resolvedEndpoint = resolveClusterNodeEndpoint(masterEndpoint);
+                if (resolvedEndpoint != null) {
+                    resolvedEndpoints.putIfAbsent(getClusterEndpointKey(resolvedEndpoint), resolvedEndpoint);
+                }
+            }
+            return new ArrayList<>(resolvedEndpoints.values());
+        } catch (Exception e) {
+            log.debug("Failed to discover cluster master endpoints from configured seed node", e);
+            return Collections.emptyList();
+        }
+    }
+
     @Nullable
     private Jedis getPreferredClusterMasterNode() {
+        for (HostAndPort endpoint : loadClusterMasterEndpoints()) {
+            try {
+                return openClusterNode(endpoint);
+            } catch (Exception e) {
+                log.debug("Failed to open preferred cluster master node {}", endpoint, e);
+            }
+        }
+
         JedisCluster jedisCluster = getJedisCluster();
         if (jedisCluster == null) {
             return null;
@@ -993,26 +1418,52 @@ public class RedisPoolManager implements Disposable {
                 return new Jedis(connection);
             }
         } catch (Exception e) {
-            log.warn("Failed to get preferred cluster master node from slot cache", e);
+            log.debug("Failed to get preferred cluster master node from slot cache, will fall back to other cluster nodes", e);
         }
         return null;
     }
 
     private List<Jedis> getClusterMasterNodes() {
+        Map<String, Jedis> masters = new LinkedHashMap<>();
+
+        for (HostAndPort endpoint : loadClusterMasterEndpoints()) {
+            try {
+                Jedis node = openClusterNode(endpoint);
+                if (node != null) {
+                    masters.putIfAbsent(getClusterEndpointKey(endpoint), node);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to connect to discovered cluster master node {}", endpoint, e);
+            }
+        }
+        if (!masters.isEmpty()) {
+            return new ArrayList<>(masters.values());
+        }
+
         JedisCluster jedisCluster = getJedisCluster();
         if (jedisCluster == null) {
             return Collections.emptyList();
         }
-        List<Jedis> masters = new ArrayList<>();
+
         for (Map.Entry<String, ConnectionPool> entry : jedisCluster.getClusterNodes().entrySet()) {
-            Jedis node = new Jedis(entry.getValue().getResource());
-            if (isMasterNode(node)) {
-                masters.add(node);
-            } else {
-                node.close();
+            HostAndPort announcedEndpoint = parseClusterNodeEndpoint(entry.getKey());
+            HostAndPort resolvedEndpoint = resolveClusterNodeEndpoint(announcedEndpoint);
+            String endpointKey = getClusterEndpointKey(resolvedEndpoint);
+            if (resolvedEndpoint == null || masters.containsKey(endpointKey)) {
+                continue;
+            }
+            try {
+                Jedis node = openClusterNode(resolvedEndpoint);
+                if (node != null && isMasterNode(node)) {
+                    masters.put(endpointKey, node);
+                } else if (node != null) {
+                    node.close();
+                }
+            } catch (Exception e) {
+                log.warn("Failed to inspect cluster node {}", resolvedEndpoint, e);
             }
         }
-        return masters;
+        return new ArrayList<>(masters.values());
     }
 
     private boolean isMasterNode(Jedis node) {
@@ -1035,6 +1486,15 @@ public class RedisPoolManager implements Disposable {
     }
 
     private <T> T executeOnFirstClusterMaster(ClusterNodeCallback<T> callback) throws Exception {
+        try {
+            T configuredNodeResult = executeOnConfiguredClusterNode(callback);
+            if (configuredNodeResult != null) {
+                return configuredNodeResult;
+            }
+        } catch (Exception e) {
+            log.debug("Failed to execute cluster callback on configured seed node, will try discovered nodes", e);
+        }
+
         Jedis preferredNode = getPreferredClusterMasterNode();
         if (preferredNode != null) {
             try (Jedis currentNode = preferredNode) {
@@ -1053,6 +1513,37 @@ public class RedisPoolManager implements Disposable {
         T doInNode(Jedis jedis) throws Exception;
     }
 
+    @Getter
+    static class ClusterCommandRoute {
+        private final Integer keyArgIndex;
+        private final String errorMessage;
+
+        private ClusterCommandRoute(Integer keyArgIndex, String errorMessage) {
+            this.keyArgIndex = keyArgIndex;
+            this.errorMessage = errorMessage;
+        }
+
+        static ClusterCommandRoute firstMaster() {
+            return new ClusterCommandRoute(null, null);
+        }
+
+        static ClusterCommandRoute slot(int keyArgIndex) {
+            return new ClusterCommandRoute(keyArgIndex, null);
+        }
+
+        static ClusterCommandRoute unsupported(String errorMessage) {
+            return new ClusterCommandRoute(null, errorMessage);
+        }
+
+        boolean isFirstMaster() {
+            return errorMessage == null && keyArgIndex == null;
+        }
+
+        boolean isUnsupported() {
+            return errorMessage != null;
+        }
+    }
+
     @Builder
     @Getter
     public static class TestConnectionResult {
@@ -1068,6 +1559,25 @@ public class RedisPoolManager implements Disposable {
         private ConnectionEndpoint(String host, int port) {
             this.host = host;
             this.port = port;
+        }
+    }
+
+    @Getter
+    static class ClusterNodeDescriptor {
+        private final String nodeId;
+        private final HostAndPort announcedEndpoint;
+        private final String announcedHostName;
+        private final String flags;
+
+        private ClusterNodeDescriptor(String nodeId, HostAndPort announcedEndpoint, String announcedHostName, String flags) {
+            this.nodeId = nodeId;
+            this.announcedEndpoint = announcedEndpoint;
+            this.announcedHostName = announcedHostName;
+            this.flags = flags;
+        }
+
+        private boolean isMaster() {
+            return isClusterNodeMaster(flags);
         }
     }
 
