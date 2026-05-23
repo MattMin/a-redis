@@ -1,0 +1,239 @@
+services:
+  redis-node-1:
+    image: redis:7.2-alpine
+    container_name: aredis-redis-node-1
+    hostname: redis-node-1
+    command:
+      - redis-server
+      - --port
+      - "6379"
+      - --bind
+      - 0.0.0.0
+      - --protected-mode
+      - "no"
+      - --appendonly
+      - "no"
+      - --cluster-enabled
+      - "yes"
+      - --cluster-config-file
+      - nodes.conf
+      - --cluster-node-timeout
+      - "5000"
+      - --cluster-announce-hostname
+      - redis-node-1
+      - --cluster-announce-port
+      - "6379"
+      - --cluster-announce-bus-port
+      - "16379"
+    ports:
+      - "7001:6379"
+      - "17001:16379"
+    volumes:
+      - redis-cluster-node-1:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  redis-node-2:
+    image: redis:7.2-alpine
+    container_name: aredis-redis-node-2
+    hostname: redis-node-2
+    command:
+      - redis-server
+      - --port
+      - "6379"
+      - --bind
+      - 0.0.0.0
+      - --protected-mode
+      - "no"
+      - --appendonly
+      - "no"
+      - --cluster-enabled
+      - "yes"
+      - --cluster-config-file
+      - nodes.conf
+      - --cluster-node-timeout
+      - "5000"
+      - --cluster-announce-hostname
+      - redis-node-2
+      - --cluster-announce-port
+      - "6379"
+      - --cluster-announce-bus-port
+      - "16379"
+    ports:
+      - "7002:6379"
+      - "17002:16379"
+    volumes:
+      - redis-cluster-node-2:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  redis-node-3:
+    image: redis:7.2-alpine
+    container_name: aredis-redis-node-3
+    hostname: redis-node-3
+    command:
+      - redis-server
+      - --port
+      - "6379"
+      - --bind
+      - 0.0.0.0
+      - --protected-mode
+      - "no"
+      - --appendonly
+      - "no"
+      - --cluster-enabled
+      - "yes"
+      - --cluster-config-file
+      - nodes.conf
+      - --cluster-node-timeout
+      - "5000"
+      - --cluster-announce-hostname
+      - redis-node-3
+      - --cluster-announce-port
+      - "6379"
+      - --cluster-announce-bus-port
+      - "16379"
+    ports:
+      - "7003:6379"
+      - "17003:16379"
+    volumes:
+      - redis-cluster-node-3:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  redis-node-4:
+    image: redis:7.2-alpine
+    container_name: aredis-redis-node-4
+    hostname: redis-node-4
+    command:
+      - redis-server
+      - --port
+      - "6379"
+      - --bind
+      - 0.0.0.0
+      - --protected-mode
+      - "no"
+      - --appendonly
+      - "no"
+      - --cluster-enabled
+      - "yes"
+      - --cluster-config-file
+      - nodes.conf
+      - --cluster-node-timeout
+      - "5000"
+      - --cluster-announce-hostname
+      - redis-node-4
+      - --cluster-announce-port
+      - "6379"
+      - --cluster-announce-bus-port
+      - "16379"
+    ports:
+      - "7004:6379"
+      - "17004:16379"
+    volumes:
+      - redis-cluster-node-4:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  redis-node-5:
+    image: redis:7.2-alpine
+    container_name: aredis-redis-node-5
+    hostname: redis-node-5
+    command:
+      - redis-server
+      - --port
+      - "6379"
+      - --bind
+      - 0.0.0.0
+      - --protected-mode
+      - "no"
+      - --appendonly
+      - "no"
+      - --cluster-enabled
+      - "yes"
+      - --cluster-config-file
+      - nodes.conf
+      - --cluster-node-timeout
+      - "5000"
+      - --cluster-announce-hostname
+      - redis-node-5
+      - --cluster-announce-port
+      - "6379"
+      - --cluster-announce-bus-port
+      - "16379"
+    ports:
+      - "7005:6379"
+      - "17005:16379"
+    volumes:
+      - redis-cluster-node-5:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  redis-node-6:
+    image: redis:7.2-alpine
+    container_name: aredis-redis-node-6
+    hostname: redis-node-6
+    command:
+      - redis-server
+      - --port
+      - "6379"
+      - --bind
+      - 0.0.0.0
+      - --protected-mode
+      - "no"
+      - --appendonly
+      - "no"
+      - --cluster-enabled
+      - "yes"
+      - --cluster-config-file
+      - nodes.conf
+      - --cluster-node-timeout
+      - "5000"
+      - --cluster-announce-hostname
+      - redis-node-6
+      - --cluster-announce-port
+      - "6379"
+      - --cluster-announce-bus-port
+      - "16379"
+    ports:
+      - "7006:6379"
+      - "17006:16379"
+    volumes:
+      - redis-cluster-node-6:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  redis-cluster-init:
+    image: redis:7.2-alpine
+    container_name: aredis-redis-cluster-init
+    depends_on:
+      - redis-node-1
+      - redis-node-2
+      - redis-node-3
+      - redis-node-4
+      - redis-node-5
+      - redis-node-6
+    entrypoint: >
+      sh -c '
+        sleep 8
+        yes yes | redis-cli --cluster create \
+          redis-node-1:6379 \
+          redis-node-2:6379 \
+          redis-node-3:6379 \
+          redis-node-4:6379 \
+          redis-node-5:6379 \
+          redis-node-6:6379 \
+          --cluster-replicas 1
+      '
+    restart: "no"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  redis-cluster-node-1:
+  redis-cluster-node-2:
+  redis-cluster-node-3:
+  redis-cluster-node-4:
+  redis-cluster-node-5:
+  redis-cluster-node-6:
+

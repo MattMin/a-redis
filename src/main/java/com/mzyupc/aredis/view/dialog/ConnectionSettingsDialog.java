@@ -69,6 +69,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
     JPanel tunnelPrivateKeyRowPanel;
     JPanel tunnelPassphraseRowPanel;
     JCheckBox sslTlsCheckBox;
+    JCheckBox clusterModeCheckBox;
     JCheckBox sslTrustAllCertificatesCheckBox;
     JCheckBox sslVerifyHostnameCheckBox;
     TextFieldWithBrowseButton sslTruststoreField;
@@ -192,6 +193,9 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         sslTlsCheckBox = new JCheckBox("Enable SSL/TLS");
         sslTlsCheckBox.setSelected(!newConnection && Boolean.TRUE.equals(connection.getSslTls()));
 
+        clusterModeCheckBox = new JCheckBox("Enable Cluster Mode");
+        clusterModeCheckBox.setSelected(!newConnection && Boolean.TRUE.equals(connection.getClusterMode()));
+
         sslTrustAllCertificatesCheckBox = new JCheckBox("Trust all certificates");
         sslTrustAllCertificatesCheckBox.setSelected(!newConnection && Boolean.TRUE.equals(connection.getSslTrustAllCertificates()));
 
@@ -257,6 +261,12 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         sslConfigPanel.add(createFieldRow("Client Cert:", sslKeystoreField, createRightSpacer()));
         sslConfigPanel.add(createFieldRow("Key Password:", sslKeystorePasswordFieldComponent, createRightSpacer()));
 
+        JPanel clusterConfigPanel = new JPanel();
+        clusterConfigPanel.setLayout(new BoxLayout(clusterConfigPanel, BoxLayout.Y_AXIS));
+        clusterConfigPanel.add(createDescriptionRow("Connect current host/port as a Redis Cluster seed node."));
+        clusterConfigPanel.add(createDescriptionRow("Cluster mode uses only DB0 and automatically discovers cluster nodes."));
+        clusterConfigPanel.add(createDescriptionRow("SSH Tunnel is not supported together with Cluster Mode."));
+
         updateSectionVisibility(sshTunnelConfigPanel, sshTunnelCheckBox.isSelected());
         updateSectionVisibility(sslConfigPanel, sslTlsCheckBox.isSelected());
         updateTunnelAuthModeVisibility();
@@ -267,6 +277,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
 
         JBTabbedPane securityTabs = new JBTabbedPane();
         securityTabs.addTab("General", createStaticTabPanel(generalConfigPanel));
+        securityTabs.addTab("Cluster", createTabPanel(clusterModeCheckBox, clusterConfigPanel));
         securityTabs.addTab("SSH Tunnel", createTabPanel(sshTunnelCheckBox, sshTunnelConfigPanel));
         securityTabs.addTab("SSL/TLS", createTabPanel(sslTlsCheckBox, sslConfigPanel));
         securityTabs.setPreferredSize(new Dimension(0, 320));
@@ -324,8 +335,19 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         JPanel rowPanel = new JPanel(new BorderLayout());
         rowPanel.setBorder(JBUI.Borders.emptyBottom(6));
         JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        leftPanel.setOpaque(false);
         leftPanel.add(checkBox);
         rowPanel.add(leftPanel, BorderLayout.WEST);
+        return rowPanel;
+    }
+
+    private JPanel createDescriptionRow(String text) {
+        JPanel rowPanel = new JPanel(new BorderLayout());
+        rowPanel.setOpaque(false);
+        rowPanel.setBorder(JBUI.Borders.empty(0, 10, 8, 10));
+        JLabel label = new JLabel(text);
+        label.setForeground(JBColor.GRAY);
+        rowPanel.add(label, BorderLayout.WEST);
         return rowPanel;
     }
 
@@ -400,7 +422,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         toggleButton.setRolloverEnabled(true);
         toggleButton.setBorder(JBUI.Borders.empty(0, 4));
         toggleButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        toggleButton.setPreferredSize(new Dimension(32, getStandardInputFieldHeight()));
+        toggleButton.setPreferredSize(new Dimension(28, 20));
         toggleButton.addItemListener(e -> {
             boolean showPassword = e.getStateChange() == ItemEvent.SELECTED;
             passwordField.setEchoChar(showPassword ? (char) 0 : defaultEchoChar);
@@ -408,22 +430,38 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
             toggleButton.setToolTipText(showPassword ? "Hide Password" : "Show Password");
         });
 
-        JPanel wrapperPanel = new JPanel(new BorderLayout());
-        wrapperPanel.setOpaque(true);
-        wrapperPanel.setBackground(passwordField.getBackground());
-        wrapperPanel.setBorder(passwordField.getBorder());
-
-        passwordField.setBorder(JBUI.Borders.empty());
         if (standardTextFieldMargin != null) {
             passwordField.setMargin(JBUI.insets(standardTextFieldMargin.top,
                     standardTextFieldMargin.left,
                     standardTextFieldMargin.bottom,
-                    standardTextFieldMargin.right));
+                    standardTextFieldMargin.right + toggleButton.getPreferredSize().width));
         }
-        passwordField.setOpaque(false);
 
-        wrapperPanel.add(passwordField, BorderLayout.CENTER);
-        wrapperPanel.add(toggleButton, BorderLayout.EAST);
+        JPanel wrapperPanel = new JPanel(null) {
+            @Override
+            public boolean isOptimizedDrawingEnabled() {
+                return false;
+            }
+
+            @Override
+            public void doLayout() {
+                int width = getWidth();
+                int height = getHeight();
+                passwordField.setBounds(0, 0, width, height);
+
+                Dimension buttonSize = toggleButton.getPreferredSize();
+                Insets insets = passwordField.getInsets();
+                int rightInset = insets == null ? 0 : insets.right;
+                int x = Math.max(0, width - buttonSize.width - Math.max(4, rightInset - buttonSize.width));
+                int y = Math.max(0, (height - buttonSize.height) / 2);
+                toggleButton.setBounds(x, y, buttonSize.width, buttonSize.height);
+            }
+        };
+        wrapperPanel.setOpaque(false);
+        wrapperPanel.add(passwordField);
+        wrapperPanel.add(toggleButton);
+        wrapperPanel.setComponentZOrder(toggleButton, 0);
+        wrapperPanel.setComponentZOrder(passwordField, 1);
         wrapperPanel.setPreferredSize(new Dimension(passwordField.getPreferredSize().width, getStandardInputFieldHeight()));
         return wrapperPanel;
     }
@@ -522,6 +560,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                 .global(globalCheckBox.isSelected())
                 .password(getOptionalPassword(passwordField))
                 .user(getOptionalText(userNameTextField))
+                .clusterMode(clusterModeCheckBox.isSelected())
                 .sshTunnel(sshTunnelCheckBox.isSelected())
                 .tunnelHost(getOptionalText(tunnelHostField))
                 .tunnelPort(getOptionalText(tunnelPortField))
@@ -546,6 +585,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         target.setPassword(source.getPassword());
         target.setUser(source.getUser());
         target.setGlobal(source.getGlobal());
+        target.setClusterMode(source.getClusterMode());
         target.setSshTunnel(source.getSshTunnel());
         target.setTunnelHost(source.getTunnelHost());
         target.setTunnelPort(source.getTunnelPort());
@@ -612,6 +652,10 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         }
         if (!StringUtils.isNumeric(port)) {
             return new ValidationInfo("Port must be in digital form");
+        }
+
+        if (clusterModeCheckBox.isSelected() && sshTunnelCheckBox.isSelected()) {
+            return new ValidationInfo("Cluster Mode does not support SSH Tunnel currently");
         }
 
         if (sshTunnelCheckBox.isSelected()) {

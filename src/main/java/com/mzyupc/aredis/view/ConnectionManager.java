@@ -482,6 +482,7 @@ public class ConnectionManager implements Disposable {
                 .port(connectionInfo.getPort())
                 .user(connectionInfo.getUser())
                 .password(connectionInfo.getPassword())
+                .clusterMode(connectionInfo.getClusterMode())
                 .sshTunnel(connectionInfo.getSshTunnel())
                 .tunnelHost(connectionInfo.getTunnelHost())
                 .tunnelPort(connectionInfo.getTunnelPort())
@@ -703,11 +704,6 @@ public class ConnectionManager implements Disposable {
             DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) selectionPath.getPath()[1];
             ConnectionInfo connectionInfo = (ConnectionInfo) connectionNode.getUserObject();
             RedisPoolManager redis = getConnectionRedisMap().get(connectionInfo.getId());
-            try (Jedis jedis = redis.getJedis(0)) {
-                if (jedis == null) {
-                    return;
-                }
-            }
             new InfoDialog(project, redis).show();
         });
         return infoAction;

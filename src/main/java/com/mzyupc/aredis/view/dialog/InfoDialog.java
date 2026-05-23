@@ -1,5 +1,7 @@
 package com.mzyupc.aredis.view.dialog;
 
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.ui.JBColor;
@@ -7,6 +9,7 @@ import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.ui.table.JBTable;
 import com.mzyupc.aredis.utils.RedisPoolManager;
+import com.mzyupc.aredis.utils.ThreadPoolManager;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
@@ -19,7 +22,10 @@ import javax.swing.border.LineBorder;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
+import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -29,7 +35,7 @@ import java.util.Optional;
  * 确认提醒窗口
  */
 public class InfoDialog extends DialogWrapper {
-    private static final String[] SECTIONS = new String[]{
+    static final String[] SECTIONS = new String[]{
             "server", "clients", "memory", "persistence",
             "stats", "replication", "cpu", "commandstats",
             "cluster", "keyspace"
@@ -37,6 +43,8 @@ public class InfoDialog extends DialogWrapper {
 
     private final RedisPoolManager redisPoolManager;
     private JBTabbedPane sectionTabPane;
+    private JPanel centerPanel;
+    private volatile boolean disposed;
 
     /**
      * @param project
@@ -47,6 +55,7 @@ public class InfoDialog extends DialogWrapper {
         this.setTitle("Info");
         this.setResizable(true);
         this.setAutoAdjustable(true);
+        this.setSize(860, 560);
         this.init();
     }
 
@@ -56,27 +65,99 @@ public class InfoDialog extends DialogWrapper {
     }
 
     @Override
+    public void dispose() {
+        disposed = true;
+        super.dispose();
+    }
+
+    @Override
     protected @Nullable
     JComponent createCenterPanel() {
         sectionTabPane = new JBTabbedPane(JTabbedPane.LEFT, JTabbedPane.WRAP_TAB_LAYOUT);
+        centerPanel = new JPanel(new java.awt.BorderLayout());
+        centerPanel.setPreferredSize(new Dimension(860, 520));
+        centerPanel.add(sectionTabPane, java.awt.BorderLayout.CENTER);
+        setLoadingPlaceholder();
+        loadAllSectionsAsync(null);
+        return centerPanel;
+    }
 
-        try (Jedis jedis = redisPoolManager.getJedis(0)) {
-            if (jedis == null) {
-                return sectionTabPane;
-            }
-            for (String section : SECTIONS) {
-                String info = jedis.info(section);
-                Optional<SectionInfo> optionalSectionInfo = parseSectionInfo(info);
-                if (optionalSectionInfo.isPresent()) {
-                    SectionInfo sectionInfo = optionalSectionInfo.get();
-                    JBTable infoTable = createInfoTable(sectionInfo);
-                    // 使用tab展示
-                    sectionTabPane.addTab(sectionInfo.getTitle(), new JBScrollPane(infoTable));
+    private void setLoadingPlaceholder() {
+        sectionTabPane.removeAll();
+        sectionTabPane.addTab("Loading", createMessageComponent("Loading Redis info..."));
+    }
+
+    private void setErrorPlaceholder(String message) {
+        sectionTabPane.removeAll();
+        sectionTabPane.addTab("Error", createMessageComponent(StringUtils.defaultIfBlank(message, "Failed to load Redis info.")));
+    }
+
+    private JComponent createMessageComponent(String message) {
+        JTextArea textArea = new JTextArea(message);
+        textArea.setEditable(false);
+        textArea.setLineWrap(true);
+        textArea.setWrapStyleWord(true);
+        textArea.setOpaque(false);
+        textArea.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
+        JBScrollPane scrollPane = new JBScrollPane(textArea);
+        scrollPane.setPreferredSize(new Dimension(820, 480));
+        return scrollPane;
+    }
+
+    private void loadAllSectionsAsync(@Nullable String preferredSectionTitle) {
+        setLoadingPlaceholder();
+        ThreadPoolManager.execute(() -> {
+            try (Jedis jedis = redisPoolManager.getJedis(0)) {
+                if (jedis == null) {
+                    invokeOnDialogUiThread(() -> setErrorPlaceholder("Failed to get Redis connection."));
+                    return;
                 }
+
+                List<SectionInfo> sections = new ArrayList<>();
+                for (String section : SECTIONS) {
+                    Optional<SectionInfo> optionalSectionInfo = parseSectionInfo(jedis.info(section));
+                    optionalSectionInfo.ifPresent(sections::add);
+                }
+
+                invokeOnDialogUiThread(() -> renderSections(sections, preferredSectionTitle));
+            } catch (Exception e) {
+                invokeOnDialogUiThread(() -> setErrorPlaceholder(e.getMessage()));
+            }
+        });
+    }
+
+    private void invokeOnDialogUiThread(Runnable runnable) {
+        if (centerPanel == null) {
+            ApplicationManager.getApplication().invokeLater(runnable);
+            return;
+        }
+        ApplicationManager.getApplication().invokeLater(() -> {
+            if (disposed) {
+                return;
+            }
+            runnable.run();
+        }, ModalityState.stateForComponent(centerPanel));
+    }
+
+    private void renderSections(List<SectionInfo> sections, @Nullable String preferredSectionTitle) {
+        sectionTabPane.removeAll();
+        if (sections.isEmpty()) {
+            setErrorPlaceholder("No Redis info available.");
+            return;
+        }
+        int selectedIndex = 0;
+        for (int i = 0; i < sections.size(); i++) {
+            SectionInfo sectionInfo = sections.get(i);
+            sectionTabPane.addTab(sectionInfo.getDisplayTitle(), new JBScrollPane(createInfoTable(sectionInfo)));
+            if (preferredSectionTitle != null && preferredSectionTitle.equals(sectionInfo.getDisplayTitle())) {
+                selectedIndex = i;
             }
         }
-
-        return sectionTabPane;
+        if (sectionTabPane.getTabCount() > 0) {
+            sectionTabPane.setSelectedIndex(selectedIndex);
+        }
+        centerPanel.revalidate();
+        centerPanel.repaint();
     }
 
     /**
@@ -90,21 +171,33 @@ public class InfoDialog extends DialogWrapper {
             return Optional.empty();
         }
         SectionInfo sectionInfo = new SectionInfo();
-        String[] split = info.split("\\r\\n");
-        if (split.length == 0) {
+        String[] lines = info.split("\\r?\\n");
+        if (lines.length == 0) {
             return Optional.empty();
         }
 
-        sectionInfo.setTitle(split[0]);
-        if (split.length == 1) {
+        String title = StringUtils.trimToEmpty(lines[0]);
+        sectionInfo.setTitle(title);
+        sectionInfo.setDisplayTitle(StringUtils.removeStart(title, "# "));
+        if (lines.length == 1) {
+            sectionInfo.setInfoArray(new String[0][2]);
             return Optional.of(sectionInfo);
         }
 
-        String[][] infoArray = new String[split.length - 1][2];
-        for (int i = 1; i < split.length; i++) {
-            infoArray[i - 1] = split[i].split(":");
+        List<String[]> rows = new ArrayList<>();
+        for (int i = 1; i < lines.length; i++) {
+            String line = StringUtils.trimToEmpty(lines[i]);
+            if (StringUtils.isBlank(line) || StringUtils.startsWith(line, "#")) {
+                continue;
+            }
+            String[] pair = line.split(":", 2);
+            if (pair.length == 2) {
+                rows.add(new String[]{pair[0], pair[1]});
+            } else {
+                rows.add(new String[]{line, ""});
+            }
         }
-        sectionInfo.setInfoArray(infoArray);
+        sectionInfo.setInfoArray(rows.toArray(new String[0][2]));
         return Optional.of(sectionInfo);
     }
 
@@ -147,23 +240,12 @@ public class InfoDialog extends DialogWrapper {
 
         @Override
         protected void doAction(ActionEvent e) {
-            // 实现刷新功能
-            try (Jedis jedis = redisPoolManager.getJedis(0)) {
-                if (jedis == null) {
-                    return;
-                }
-
-                // 选中的title
-                int selectedIndex = sectionTabPane.getSelectedIndex();
-                String title = sectionTabPane.getTitleAt(selectedIndex);
-
-                String info = jedis.info(title.replaceAll("\\s|#", ""));
-                Optional<SectionInfo> optionalSectionInfo = parseSectionInfo(info);
-                if (optionalSectionInfo.isPresent()) {
-                    JBTable infoTable = createInfoTable(optionalSectionInfo.get());
-                    sectionTabPane.setComponentAt(selectedIndex, new JBScrollPane(infoTable));
-                }
+            String title = null;
+            int selectedIndex = sectionTabPane.getSelectedIndex();
+            if (selectedIndex >= 0 && selectedIndex < sectionTabPane.getTabCount()) {
+                title = sectionTabPane.getTitleAt(selectedIndex);
             }
+            loadAllSectionsAsync(title);
         }
     }
 
@@ -196,8 +278,9 @@ public class InfoDialog extends DialogWrapper {
 
     @Getter
     @Setter
-    private class SectionInfo {
+    private static class SectionInfo {
         private String title;
+        private String displayTitle;
         private String[][] infoArray;
     }
 }

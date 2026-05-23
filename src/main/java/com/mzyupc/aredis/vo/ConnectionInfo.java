@@ -50,6 +50,8 @@ public class ConnectionInfo {
 
     private Boolean sslTls;
 
+    private Boolean clusterMode;
+
     private Boolean sslTrustAllCertificates;
 
     private Boolean sslVerifyHostname;
@@ -153,6 +155,10 @@ public class ConnectionInfo {
 
     public Boolean getSslTls() {
         return sslTls;
+    }
+
+    public Boolean getClusterMode() {
+        return clusterMode;
     }
 
     public Boolean getSslTrustAllCertificates() {
