@@ -43,6 +43,7 @@ import java.util.stream.Collectors;
 public class RedisPoolManager implements Disposable {
 
     private static final String LOCALHOST = "127.0.0.1";
+    private static final String[] CLIENT_KEYSTORE_EXTENSIONS = new String[]{"jks", "p12", "pfx"};
     private static final String CLUSTER_KEYSPACE_SECTION = "# Keyspace\r\ndb0:keys=%s,expires=0,avg_ttl=0";
     private static final String CLUSTER_SELECT_UNSUPPORTED_MESSAGE = "ERR SELECT is not allowed in cluster mode";
     private static final String CLUSTER_CONSOLE_UNSUPPORTED_COMMAND_MESSAGE =
@@ -601,6 +602,12 @@ public class RedisPoolManager implements Disposable {
         if (StringUtils.isBlank(connectionInfo.getSslKeystorePath())) {
             return null;
         }
+        if (!isSupportedClientKeystorePath(connectionInfo.getSslKeystorePath())) {
+            throw new Exception(String.format(
+                    "Client certificate keystore '%s' must be a JKS or PKCS12 file (.jks, .p12, .pfx). PEM/CRT/CER files are not supported here.",
+                    connectionInfo.getSslKeystorePath()
+            ));
+        }
 
         KeyStore keyStore = loadStandardKeyStore(
                 connectionInfo.getSslKeystorePath(),
@@ -679,6 +686,19 @@ public class RedisPoolManager implements Disposable {
     private boolean isCertificateFile(String path) {
         String lowerCasePath = StringUtils.lowerCase(path);
         return StringUtils.endsWithAny(lowerCasePath, ".crt", ".cer", ".pem");
+    }
+
+    public static boolean isSupportedClientKeystorePath(String path) {
+        if (StringUtils.isBlank(path)) {
+            return false;
+        }
+        String lowerCasePath = StringUtils.lowerCase(path);
+        for (String extension : CLIENT_KEYSTORE_EXTENSIONS) {
+            if (StringUtils.endsWith(lowerCasePath, "." + extension)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private Jedis openClusterNode(HostAndPort endpoint) throws Exception {

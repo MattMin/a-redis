@@ -17,7 +17,6 @@ import com.mzyupc.aredis.action.CustomAction;
 import com.mzyupc.aredis.utils.RedisPoolManager;
 import com.mzyupc.aredis.utils.ThreadPoolManager;
 import com.mzyupc.aredis.vo.ConnectionInfo;
-import org.apache.commons.compress.utils.Lists;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 
@@ -33,10 +32,8 @@ import java.awt.event.*;
 import java.awt.geom.RoundRectangle2D;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.LinkedList;
+import java.util.*;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * @author mzyupc@163.com
@@ -287,11 +284,78 @@ public class ConsolePanel extends JPanel implements Disposable {
         return textArea;
     }
 
-    private String normalizeCommand(String text) {
+    static String normalizeCommand(String text) {
         if (text == null) {
             return null;
         }
-        return text.replace("\r", "").replace("\n", "").trim();
+        return text.replace("\r\n", "\n").replace('\r', '\n').trim();
+    }
+
+    static ParsedConsoleCommand parseCommand(String text) {
+        String normalizedCommand = normalizeCommand(text);
+        if (StringUtils.isBlank(normalizedCommand)) {
+            return null;
+        }
+
+        List<String> tokens = tokenizeCommand(normalizedCommand);
+        if (tokens.isEmpty()) {
+            return null;
+        }
+
+        return new ParsedConsoleCommand(
+                normalizedCommand,
+                tokens.get(0),
+                new ArrayList<>(tokens.subList(1, tokens.size()))
+        );
+    }
+
+    static List<String> tokenizeCommand(String commandText) {
+        if (StringUtils.isBlank(commandText)) {
+            return Collections.emptyList();
+        }
+
+        List<String> tokens = new ArrayList<>();
+        StringBuilder currentToken = new StringBuilder();
+        Character quoteChar = null;
+        boolean tokenStarted = false;
+        for (int i = 0; i < commandText.length(); i++) {
+            char currentChar = commandText.charAt(i);
+            if (quoteChar != null) {
+                if (currentChar == quoteChar) {
+                    quoteChar = null;
+                } else {
+                    currentToken.append(currentChar);
+                }
+                tokenStarted = true;
+                continue;
+            }
+
+            if (currentChar == '"' || currentChar == '\'') {
+                quoteChar = currentChar;
+                tokenStarted = true;
+                continue;
+            }
+
+            if (Character.isWhitespace(currentChar)) {
+                addCommandToken(tokens, currentToken, tokenStarted);
+                tokenStarted = false;
+                continue;
+            }
+
+            currentToken.append(currentChar);
+            tokenStarted = true;
+        }
+
+        addCommandToken(tokens, currentToken, tokenStarted);
+        return tokens;
+    }
+
+    private static void addCommandToken(List<String> tokens, StringBuilder currentToken, boolean tokenStarted) {
+        if (!tokenStarted) {
+            return;
+        }
+        tokens.add(currentToken.toString());
+        currentToken.setLength(0);
     }
 
     private void clearInput() {
@@ -360,26 +424,33 @@ public class ConsolePanel extends JPanel implements Disposable {
     }
 
     private void executeCommand(String commandText) {
+        ParsedConsoleCommand parsedCommand = parseCommand(commandText);
+        if (parsedCommand == null) {
+            return;
+        }
         int executingDb = currentDb;
         ThreadPoolManager.execute(() -> {
-            String[] split = commandText.split("\\s");
-            List<String> result = redisPoolManager.execRedisCommand(executingDb, split[0], assembleArgs(split));
-            boolean selectSuccess = "select".equalsIgnoreCase(split[0])
-                    && split.length > 1
+            List<String> result = redisPoolManager.execRedisCommand(
+                    executingDb,
+                    parsedCommand.getCommand(),
+                    parsedCommand.getArgsArray()
+            );
+            boolean selectSuccess = "select".equalsIgnoreCase(parsedCommand.getCommand())
+                    && !parsedCommand.getArgs().isEmpty()
                     && result != null
                     && result.stream().anyMatch(item -> "OK".equalsIgnoreCase(StringUtils.trim(item)));
 
             int nextDb = executingDb;
             if (selectSuccess) {
                 try {
-                    nextDb = Integer.parseInt(split[1]);
+                    nextDb = Integer.parseInt(parsedCommand.getArgs().get(0));
                 } catch (NumberFormatException ignore) {
                 }
             }
 
             int finalNextDb = nextDb;
             ApplicationManager.getApplication().invokeLater(() -> {
-                appendExecutionLog(commandText, result);
+                appendExecutionLog(parsedCommand.getDisplayText(), result);
                 if (finalNextDb != currentDb) {
                     currentDb = finalNextDb;
                     updateDbLabel();
@@ -882,56 +953,6 @@ public class ConsolePanel extends JPanel implements Disposable {
         });
     }
 
-    private String[] assembleArgs(String[] split) {
-        List<String> result = Lists.newArrayList();
-        boolean inString = false;
-        boolean doubleQuote = false;
-        StringBuilder arg = new StringBuilder();
-        for (int i = 1; i < split.length; i++) {
-            String s = split[i];
-            if (s.matches("^[\"'].*[\"']$")) {
-                result.add(s.replaceAll("[\"']", ""));
-                continue;
-            }
-            if (!StringUtils.isEmpty(arg.toString())) {
-                arg.append(" ");
-            }
-
-            if (s.startsWith("\"") && !inString) {
-                arg.append(s.replace("\"", ""));
-                inString = true;
-                doubleQuote = true;
-                continue;
-            }
-            if (s.startsWith("'") && !inString) {
-                arg.append(s.replace("'", ""));
-                inString = true;
-                doubleQuote = false;
-                continue;
-            }
-            if (s.endsWith("\"") && inString && doubleQuote) {
-                arg.append(s.replace("\"", ""));
-                inString = false;
-                result.add(arg.toString());
-                arg = new StringBuilder();
-                continue;
-            }
-            if (s.endsWith("'") && inString && !doubleQuote) {
-                arg.append(s.replace("'", ""));
-                inString = false;
-                result.add(arg.toString());
-                arg = new StringBuilder();
-                continue;
-            }
-            if (inString) {
-                arg.append(s);
-                continue;
-            }
-            result.add(s);
-        }
-        return result.toArray(new String[0]);
-    }
-
     private AnAction createClearAction() {
         return new CustomAction("Clear console", "Clear console", AllIcons.Actions.GC) {
             @Override
@@ -1020,6 +1041,34 @@ public class ConsolePanel extends JPanel implements Disposable {
             this.startOffset = startOffset;
             this.endOffset = endOffset;
             this.tag = tag;
+        }
+    }
+
+    static class ParsedConsoleCommand {
+        private final String displayText;
+        private final String command;
+        private final List<String> args;
+
+        private ParsedConsoleCommand(String displayText, String command, List<String> args) {
+            this.displayText = displayText;
+            this.command = command;
+            this.args = args;
+        }
+
+        String getDisplayText() {
+            return displayText;
+        }
+
+        String getCommand() {
+            return command;
+        }
+
+        List<String> getArgs() {
+            return args;
+        }
+
+        String[] getArgsArray() {
+            return args.toArray(new String[0]);
         }
     }
 

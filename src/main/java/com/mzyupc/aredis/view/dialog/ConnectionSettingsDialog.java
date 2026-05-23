@@ -216,9 +216,9 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
 
         sslKeystoreField = createBrowseField(
                 newConnection ? null : connection.getSslKeystorePath(),
-                "Select Client Certificate / Keystore",
-                "Select a client certificate keystore file",
-                getFileChooserDescriptor("jks", "p12", "pfx", "crt", "cer", "pem"));
+                "Select Client Keystore",
+                "Select a client certificate keystore file (.jks, .p12, .pfx)",
+                getFileChooserDescriptor("jks", "p12", "pfx"));
 
         sslKeystorePasswordField = new JPasswordField(newConnection ? null : connection.getSslKeystorePassword());
         sslKeystorePasswordField.setToolTipText("Client key password (Optional)");
@@ -626,6 +626,16 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         return null;
     }
 
+    private ValidationInfo validateClientKeystorePath(String path) {
+        if (StringUtils.isBlank(path)) {
+            return null;
+        }
+        if (!RedisPoolManager.isSupportedClientKeystorePath(path)) {
+            return new ValidationInfo("Client Certificate must be a JKS or PKCS12 keystore (.jks, .p12, .pfx)");
+        }
+        return null;
+    }
+
     @Override
     public @Nullable
     JComponent getPreferredFocusedComponent() {
@@ -690,6 +700,10 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                 return validationInfo;
             }
             validationInfo = validateFilePath(sslKeystoreField.getText(), "Client Certificate");
+            if (validationInfo != null) {
+                return validationInfo;
+            }
+            validationInfo = validateClientKeystorePath(sslKeystoreField.getText());
             if (validationInfo != null) {
                 return validationInfo;
             }
