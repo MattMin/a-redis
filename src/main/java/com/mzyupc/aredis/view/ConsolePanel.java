@@ -13,7 +13,6 @@ import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.ui.components.panels.VerticalLayout;
 import com.intellij.util.ui.JBUI;
-import com.mzyupc.aredis.action.CustomAction;
 import com.mzyupc.aredis.utils.RedisPoolManager;
 import com.mzyupc.aredis.utils.ThreadPoolManager;
 import com.mzyupc.aredis.vo.ConnectionInfo;
@@ -101,14 +100,9 @@ public class ConsolePanel extends JPanel implements Disposable {
         installInputListener();
         installResultResizeListener();
 
-        DefaultActionGroup actions = new DefaultActionGroup();
-        actions.add(createClearAction());
-        ActionToolbar actionToolbar = ActionManager.getInstance().createActionToolbar(ActionPlaces.TOOLBAR, actions, false);
-        actionToolbar.setTargetComponent(inputArea);
-
         JPanel headerPanel = new JPanel(new BorderLayout());
         headerPanel.add(dbLabel, BorderLayout.WEST);
-        headerPanel.add(actionToolbar.getComponent(), BorderLayout.EAST);
+        headerPanel.add(createClearButton(), BorderLayout.EAST);
 
         JBScrollPane inputScrollPane = new JBScrollPane(inputArea);
         inputScrollPane.setBorder(BorderFactory.createCompoundBorder(
@@ -953,23 +947,25 @@ public class ConsolePanel extends JPanel implements Disposable {
         });
     }
 
-    private AnAction createClearAction() {
-        return new CustomAction("Clear console", "Clear console", AllIcons.Actions.GC) {
-            @Override
-            public void actionPerformed(@NotNull AnActionEvent anActionEvent) {
-                resultContainer.removeAll();
-                executionCards.clear();
-                searchMatches.clear();
-                selectedSearchCard = null;
-                currentSearchMatchIndex = -1;
-                updateSearchStatus();
-                resultContainer.revalidate();
-                resultContainer.repaint();
-                clearInput();
-                updateDbLabel();
-            }
-        };
+    private JButton createClearButton() {
+        JButton clearButton = createCardActionButton(AllIcons.Actions.GC, "Clear console");
+        clearButton.addActionListener(e -> clearConsole());
+        return clearButton;
     }
+
+    private void clearConsole() {
+        resultContainer.removeAll();
+        executionCards.clear();
+        searchMatches.clear();
+        selectedSearchCard = null;
+        currentSearchMatchIndex = -1;
+        updateSearchStatus();
+        resultContainer.revalidate();
+        resultContainer.repaint();
+        clearInput();
+        updateDbLabel();
+    }
+
 
     public JComponent getPreferredFocusedComponent() {
         return inputArea;
