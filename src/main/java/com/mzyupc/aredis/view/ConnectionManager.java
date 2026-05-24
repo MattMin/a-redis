@@ -24,6 +24,7 @@ import com.mzyupc.aredis.utils.RedisPoolManager;
 import com.mzyupc.aredis.utils.ThreadPoolManager;
 import com.mzyupc.aredis.view.dialog.ConfirmDialog;
 import com.mzyupc.aredis.view.dialog.ConnectionSettingsDialog;
+import com.mzyupc.aredis.view.dialog.ErrorDialog;
 import com.mzyupc.aredis.view.dialog.InfoDialog;
 import com.mzyupc.aredis.view.editor.ConsoleFileSystem;
 import com.mzyupc.aredis.view.editor.ConsoleVirtualFile;
@@ -33,6 +34,7 @@ import com.mzyupc.aredis.view.render.ConnectionTreeCellRenderer;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import com.mzyupc.aredis.vo.DbInfo;
 import com.mzyupc.aredis.vo.Keyspace;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
@@ -55,6 +57,7 @@ import static com.mzyupc.aredis.utils.JTreeUtil.expandTree;
 /**
  * @author mzyupc@163.com
  */
+@Slf4j
 public class ConnectionManager implements Disposable {
     /**
      * connectionId-redisPoolManager
@@ -383,11 +386,14 @@ public class ConnectionManager implements Disposable {
                         connectionTreeLoadingDecorator.stopLoading();
                     }
                 });
-            } catch (Throwable throwable) {
+            } catch (Exception exception) {
+                log.warn("Failed to load Redis connections", exception);
                 ApplicationManager.getApplication().invokeLater(() -> {
                     if (connectionTreeLoadingDecorator != null) {
                         connectionTreeLoadingDecorator.stopLoading();
                     }
+                    ErrorDialog.show("Failed to load Redis connections: "
+                            + StringUtils.defaultIfBlank(exception.getMessage(), exception.getClass().getSimpleName()));
                 });
             }
         });
@@ -487,6 +493,7 @@ public class ConnectionManager implements Disposable {
                 .tunnelHost(connectionInfo.getTunnelHost())
                 .tunnelPort(connectionInfo.getTunnelPort())
                 .tunnelUser(connectionInfo.getTunnelUser())
+                .tunnelVerifyHostKey(connectionInfo.getTunnelVerifyHostKey())
                 .tunnelPassword(connectionInfo.getTunnelPassword())
                 .tunnelPrivateKeyPath(connectionInfo.getTunnelPrivateKeyPath())
                 .tunnelPassphrase(connectionInfo.getTunnelPassphrase())

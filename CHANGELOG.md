@@ -7,11 +7,24 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### TODO
+## [1.3.0] - 2026-05-24
 
 ### Added
 - SSH 隧道功能, 支持通过 SSH 连接到 Redis 服务器, 包括密码认证和密钥认证两种方式
 - SSL/TLS 支持, 允许用户通过安全连接访问 Redis 服务器
+- Redis Cluster 模式支持, 包括集群节点端点映射
+- Console 输出搜索、命令历史和更完整的命令解析
+
+### Changed
+- 重构 Console 展示布局, 以卡片形式展示命令执行结果
+- Info 对话框改为异步加载 Redis INFO 各 section
+- 连接树加载改为异步读取连接配置
+
+### Fixed
+- SSH Tunnel 默认启用主机密钥校验, 避免静默信任未知跳板机
+- Cluster 模式端点映射缓存改为线程安全容器
+- Cluster Console 对跨 slot 多 key 命令返回明确错误
+- 连接树异步加载失败时记录日志并显示错误提示
 
 ## [1.2.0]
 

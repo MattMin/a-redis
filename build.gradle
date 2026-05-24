@@ -58,6 +58,16 @@ patchPluginXml {
     sinceBuild = '241.19416.15'
     untilBuild = provider { null }
     changeNotes = """
+      1.3.0<br>
+      <ul>
+          <li>Added SSH tunnel support with password and private-key authentication.</li>
+          <li>Added SSL/TLS support, including CA truststore and client keystore options.</li>
+          <li>Added Redis Cluster mode support with cluster node endpoint mapping.</li>
+          <li>Redesigned the Redis console with command history, searchable output, and improved command parsing.</li>
+          <li>Improved Redis Info loading so sections are fetched asynchronously.</li>
+          <li>Hardened SSH tunnel host-key verification and improved cluster-mode error handling.</li>
+      </ul>
+
       1.2.0<br>
       <ul>
           <li>Improved the Filter search experience: you can now type a keyword directly and wildcards are added automatically.</li>

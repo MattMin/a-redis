@@ -21,6 +21,7 @@ import redis.clients.jedis.resps.Tuple;
 import redis.clients.jedis.util.JedisClusterCRC16;
 
 import javax.net.ssl.*;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
@@ -32,6 +33,7 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -46,9 +48,12 @@ public class RedisPoolManager implements Disposable {
     private static final String[] CLIENT_KEYSTORE_EXTENSIONS = new String[]{"jks", "p12", "pfx"};
     private static final String CLUSTER_KEYSPACE_SECTION = "# Keyspace\r\ndb0:keys=%s,expires=0,avg_ttl=0";
     private static final String CLUSTER_SELECT_UNSUPPORTED_MESSAGE = "ERR SELECT is not allowed in cluster mode";
+    private static final String CLUSTER_CROSS_SLOT_MESSAGE =
+            "ERR CROSSSLOT Keys in request don't hash to the same slot";
     private static final String CLUSTER_CONSOLE_UNSUPPORTED_COMMAND_MESSAGE =
             "ERR Command '%s' is not supported in cluster console mode yet. Please connect to a single Redis node to run this command.";
     private static final int CLUSTER_ENDPOINT_CONNECT_TIMEOUT_MILLIS = 200;
+    private static final String DEFAULT_KNOWN_HOSTS_PATH = System.getProperty("user.home") + File.separator + ".ssh" + File.separator + "known_hosts";
 
     private static final JedisPoolConfig JEDIS_POOL_CONFIG;
 
@@ -213,6 +218,10 @@ public class RedisPoolManager implements Disposable {
                 jsch.addIdentity(connectionInfo.getTunnelPrivateKeyPath());
             }
         }
+        boolean verifyHostKey = Boolean.TRUE.equals(connectionInfo.getTunnelVerifyHostKey());
+        if (verifyHostKey) {
+            configureKnownHosts(jsch);
+        }
 
         Session session = jsch.getSession(
                 connectionInfo.getTunnelUser(),
@@ -223,7 +232,7 @@ public class RedisPoolManager implements Disposable {
             session.setPassword(connectionInfo.getTunnelPassword());
         }
         Properties config = new Properties();
-        config.put("StrictHostKeyChecking", "no");
+        config.put("StrictHostKeyChecking", verifyHostKey ? "yes" : "no");
         session.setConfig(config);
         session.connect(Protocol.DEFAULT_TIMEOUT);
         int localPort = session.setPortForwardingL(
@@ -234,6 +243,13 @@ public class RedisPoolManager implements Disposable {
         tunnelSession = session;
         tunnelLocalPort = localPort;
         return new ConnectionEndpoint(LOCALHOST, localPort);
+    }
+
+    private void configureKnownHosts(JSch jsch) throws Exception {
+        File knownHostsFile = new File(DEFAULT_KNOWN_HOSTS_PATH);
+        if (knownHostsFile.isFile()) {
+            jsch.setKnownHosts(knownHostsFile.getAbsolutePath());
+        }
     }
 
     private DefaultJedisClientConfig createClientConfig(@Nullable Integer db, boolean clusterMode) throws Exception {
@@ -294,7 +310,7 @@ public class RedisPoolManager implements Disposable {
             if (clusterHostAndPortMapping != null) {
                 return clusterHostAndPortMapping;
             }
-            Map<String, HostAndPort> mappings = new HashMap<>();
+            Map<String, HostAndPort> mappings = new ConcurrentHashMap<>();
             try (Jedis seedNode = new Jedis(
                     new HostAndPort(connectionInfo.getUrl(), Integer.parseInt(connectionInfo.getPort())),
                     createClientConfig(null, false))) {
@@ -1156,6 +1172,9 @@ public class RedisPoolManager implements Disposable {
             if (route.isUnsupported()) {
                 return Collections.singletonList(route.getErrorMessage());
             }
+            if (hasCrossSlotKeys(cmd, args)) {
+                return Collections.singletonList(CLUSTER_CROSS_SLOT_MESSAGE);
+            }
 
             if (route.isFirstMaster()) {
                 return executeOnFirstClusterMaster(node -> {
@@ -1215,6 +1234,97 @@ public class RedisPoolManager implements Disposable {
         return args.length >= 3
                 ? ClusterCommandRoute.slot(2)
                 : ClusterCommandRoute.unsupported(String.format(CLUSTER_CONSOLE_UNSUPPORTED_COMMAND_MESSAGE, commandName));
+    }
+
+    static boolean hasCrossSlotKeys(Protocol.Command cmd, String... args) {
+        List<String> keys = extractClusterCommandKeys(cmd, args);
+        if (keys.size() <= 1) {
+            return false;
+        }
+        Integer slot = null;
+        for (String key : keys) {
+            if (StringUtils.isEmpty(key)) {
+                continue;
+            }
+            int currentSlot = JedisClusterCRC16.getSlot(key);
+            if (slot == null) {
+                slot = currentSlot;
+                continue;
+            }
+            if (slot != currentSlot) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static List<String> extractClusterCommandKeys(Protocol.Command cmd, String... args) {
+        if (cmd == null || args == null || args.length == 0) {
+            return Collections.emptyList();
+        }
+        switch (cmd) {
+            case DEL:
+            case EXISTS:
+            case MGET:
+            case TOUCH:
+            case UNLINK:
+                return Arrays.asList(args);
+            case MSET:
+            case MSETNX:
+                return everyNthArg(args, 0, 2);
+            case RENAME:
+            case RENAMENX:
+            case RPOPLPUSH:
+            case BRPOPLPUSH:
+            case LMOVE:
+            case BLMOVE:
+            case SMOVE:
+                return firstArgs(args, 2);
+            case EVAL:
+            case EVALSHA:
+                return extractEvalKeys(args);
+            case XREAD:
+            case XREADGROUP:
+                return extractXReadKeys(args);
+            default:
+                return Collections.emptyList();
+        }
+    }
+
+    private static List<String> everyNthArg(String[] args, int startIndex, int step) {
+        List<String> keys = new ArrayList<>();
+        for (int i = startIndex; i < args.length; i += step) {
+            keys.add(args[i]);
+        }
+        return keys;
+    }
+
+    private static List<String> firstArgs(String[] args, int count) {
+        if (args.length < count) {
+            return Collections.emptyList();
+        }
+        return Arrays.asList(Arrays.copyOfRange(args, 0, count));
+    }
+
+    private static List<String> extractEvalKeys(String[] args) {
+        if (args.length < 2 || !StringUtils.isNumeric(args[1])) {
+            return Collections.emptyList();
+        }
+        int keyCount = Math.min(Integer.parseInt(args[1]), Math.max(0, args.length - 2));
+        return keyCount == 0 ? Collections.emptyList() : Arrays.asList(Arrays.copyOfRange(args, 2, 2 + keyCount));
+    }
+
+    private static List<String> extractXReadKeys(String[] args) {
+        int streamsKeywordIndex = indexOfIgnoreCase(args, "STREAMS");
+        if (streamsKeywordIndex < 0 || streamsKeywordIndex + 1 >= args.length) {
+            return Collections.emptyList();
+        }
+        int remainingArgCount = args.length - streamsKeywordIndex - 1;
+        int keyCount = remainingArgCount / 2;
+        if (keyCount <= 0) {
+            return Collections.emptyList();
+        }
+        return Arrays.asList(Arrays.copyOfRange(args, streamsKeywordIndex + 1, streamsKeywordIndex + 1 + keyCount));
     }
 
     private static int indexOfIgnoreCase(String[] values, String target) {
@@ -1624,6 +1734,11 @@ public class RedisPoolManager implements Disposable {
         }
 
         @Override
+        public Connection getClient() {
+            throw new UnsupportedOperationException("Cluster mode does not expose a single Redis connection client");
+        }
+
+        @Override
         public String ping() {
             try {
                 return executeOnFirstClusterMaster(Jedis::ping);
@@ -1721,6 +1836,11 @@ public class RedisPoolManager implements Disposable {
         }
 
         @Override
+        public String info() {
+            return info(null);
+        }
+
+        @Override
         public String set(String key, String value) {
             return delegate.set(key, value);
         }
@@ -1801,7 +1921,8 @@ public class RedisPoolManager implements Disposable {
 
         @Override
         public ScanResult<String> scan(String cursor, ScanParams params) {
-            List<String> keys = scanKeys(cursor, "*", 20000, Protocol.DEFAULT_DATABASE);
+            String pattern = params == null ? "*" : StringUtils.defaultIfBlank(params.match(), "*");
+            List<String> keys = scanKeys(cursor, pattern, 20000, Protocol.DEFAULT_DATABASE);
             return new ScanResult<>(ScanParams.SCAN_POINTER_START, keys);
         }
     }

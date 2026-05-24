@@ -60,6 +60,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
     JTextField tunnelHostField;
     JTextField tunnelPortField;
     JTextField tunnelUserField;
+    JCheckBox tunnelVerifyHostKeyCheckBox;
     JPasswordField tunnelPasswordField;
     TextFieldWithBrowseButton tunnelPrivateKeyField;
     JPasswordField tunnelPassphraseField;
@@ -165,6 +166,12 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         tunnelUserField = new JTextField(newConnection ? null : connection.getTunnelUser());
         tunnelUserField.setToolTipText("SSH tunnel username");
 
+        tunnelVerifyHostKeyCheckBox = new JCheckBox("Verify SSH host key");
+        tunnelVerifyHostKeyCheckBox.setSelected(newConnection || Boolean.TRUE.equals(connection.getTunnelVerifyHostKey()));
+        tunnelVerifyHostKeyCheckBox.setToolTipText("Verify the SSH server host key using ~/.ssh/known_hosts");
+        tunnelVerifyHostKeyCheckBox.setBorder(JBUI.Borders.emptyRight(10));
+        tunnelVerifyHostKeyCheckBox.setPreferredSize(new Dimension(RIGHT_SPACER_WIDTH, getStandardInputFieldHeight()));
+
         tunnelPasswordField = new JPasswordField(newConnection ? null : connection.getTunnelPassword());
         tunnelPasswordField.setToolTipText("SSH tunnel password");
         JComponent tunnelPasswordFieldComponent = createPasswordFieldComponent(tunnelPasswordField);
@@ -244,7 +251,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         sshTunnelConfigPanel = new JPanel();
         sshTunnelConfigPanel.setLayout(new BoxLayout(sshTunnelConfigPanel, BoxLayout.Y_AXIS));
         sshTunnelConfigPanel.add(createHostPortRow("SSH Host:", tunnelHostField, tunnelPortField));
-        sshTunnelConfigPanel.add(createFieldRow("SSH Username:", tunnelUserField, createRightSpacer()));
+        sshTunnelConfigPanel.add(createFieldRow("SSH Username:", tunnelUserField, tunnelVerifyHostKeyCheckBox));
         sshTunnelConfigPanel.add(createTunnelAuthTypeRow());
         tunnelPasswordRowPanel = createFieldRow("SSH Password:", tunnelPasswordFieldComponent, createRightSpacer());
         tunnelPrivateKeyRowPanel = createFieldRow("Private Key File:", tunnelPrivateKeyField, createRightSpacer());
@@ -565,6 +572,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
                 .tunnelHost(getOptionalText(tunnelHostField))
                 .tunnelPort(getOptionalText(tunnelPortField))
                 .tunnelUser(getOptionalText(tunnelUserField))
+                .tunnelVerifyHostKey(tunnelVerifyHostKeyCheckBox.isSelected())
                 .tunnelPassword(usePrivateKey ? null : getOptionalPassword(tunnelPasswordField))
                 .tunnelPrivateKeyPath(usePrivateKey ? getOptionalText(tunnelPrivateKeyField) : null)
                 .tunnelPassphrase(usePrivateKey ? getOptionalPassword(tunnelPassphraseField) : null)
@@ -590,6 +598,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         target.setTunnelHost(source.getTunnelHost());
         target.setTunnelPort(source.getTunnelPort());
         target.setTunnelUser(source.getTunnelUser());
+        target.setTunnelVerifyHostKey(source.getTunnelVerifyHostKey());
         target.setTunnelPassword(source.getTunnelPassword());
         target.setTunnelPrivateKeyPath(source.getTunnelPrivateKeyPath());
         target.setTunnelPassphrase(source.getTunnelPassphrase());

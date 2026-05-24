@@ -40,6 +40,8 @@ public class ConnectionInfo {
 
     private String tunnelUser;
 
+    private Boolean tunnelVerifyHostKey;
+
     @Transient
     private String tunnelPassword;
 
@@ -137,6 +139,10 @@ public class ConnectionInfo {
 
     public String getTunnelUser() {
         return tunnelUser;
+    }
+
+    public Boolean getTunnelVerifyHostKey() {
+        return tunnelVerifyHostKey;
     }
 
     @Transient

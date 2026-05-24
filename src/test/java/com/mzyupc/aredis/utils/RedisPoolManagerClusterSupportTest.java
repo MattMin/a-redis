@@ -129,5 +129,36 @@ class RedisPoolManagerClusterSupportTest {
         Assertions.assertTrue(route.isUnsupported());
         Assertions.assertTrue(route.getErrorMessage().contains("SCAN"));
     }
-}
 
+    @Test
+    void shouldDetectCrossSlotKeysForMultiKeyCommand() {
+        Assertions.assertTrue(RedisPoolManager.hasCrossSlotKeys(
+                Protocol.Command.MGET,
+                "user:1",
+                "order:1"
+        ));
+    }
+
+    @Test
+    void shouldAllowMultiKeyCommandWithSameHashTagSlot() {
+        Assertions.assertFalse(RedisPoolManager.hasCrossSlotKeys(
+                Protocol.Command.MGET,
+                "user:{42}:name",
+                "user:{42}:email"
+        ));
+    }
+
+    @Test
+    void shouldExtractXreadStreamKeysForCrossSlotCheck() {
+        Assertions.assertTrue(RedisPoolManager.hasCrossSlotKeys(
+                Protocol.Command.XREAD,
+                "COUNT",
+                "2",
+                "STREAMS",
+                "orders-stream",
+                "payments-stream",
+                "0-0",
+                "0-0"
+        ));
+    }
+}
