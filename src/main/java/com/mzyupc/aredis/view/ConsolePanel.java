@@ -567,6 +567,8 @@ public class ConsolePanel extends JPanel implements Disposable {
         ExecutionCard executionCard = new ExecutionCard(
                 wrapper,
                 card,
+                headerPanel,
+                leftPanel,
                 headerTextArea,
                 resultTextArea,
                 toggleButton,
@@ -669,8 +671,19 @@ public class ConsolePanel extends JPanel implements Disposable {
                 selectSearchCard(card, false);
             }
         };
-        card.wrapper.addMouseListener(listener);
-        card.card.addMouseListener(listener);
+        installCardSelectionListener(listener,
+                card.wrapper,
+                card.card,
+                card.headerPanel,
+                card.leftPanel,
+                card.headerTextArea,
+                card.resultTextArea);
+    }
+
+    private void installCardSelectionListener(MouseListener listener, JComponent... components) {
+        for (JComponent component : components) {
+            component.addMouseListener(listener);
+        }
     }
 
     private void selectSearchCard(ExecutionCard card, boolean focusSearch) {
@@ -995,6 +1008,8 @@ public class ConsolePanel extends JPanel implements Disposable {
     private static class ExecutionCard {
         private final JPanel wrapper;
         private final JPanel card;
+        private final JPanel headerPanel;
+        private final JPanel leftPanel;
         private final JBTextArea headerTextArea;
         private final JBTextArea resultTextArea;
         private final JButton toggleButton;
@@ -1006,6 +1021,8 @@ public class ConsolePanel extends JPanel implements Disposable {
 
         private ExecutionCard(JPanel wrapper,
                               JPanel card,
+                              JPanel headerPanel,
+                              JPanel leftPanel,
                               JBTextArea headerTextArea,
                               JBTextArea resultTextArea,
                               JButton toggleButton,
@@ -1015,6 +1032,8 @@ public class ConsolePanel extends JPanel implements Disposable {
                               boolean collapsible) {
             this.wrapper = wrapper;
             this.card = card;
+            this.headerPanel = headerPanel;
+            this.leftPanel = leftPanel;
             this.headerTextArea = headerTextArea;
             this.resultTextArea = resultTextArea;
             this.toggleButton = toggleButton;
