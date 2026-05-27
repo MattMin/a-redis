@@ -927,7 +927,8 @@ public class ConsolePanel extends JPanel implements Disposable {
                 || normalized.startsWith("NOAUTH")
                 || normalized.startsWith("NOPERM")
                 || normalized.startsWith("READONLY")
-                || normalized.contains("EXCEPTION");
+                || normalized.contains("EXCEPTION")
+                || normalized.contains("NO ENUM CONSTANT REDIS.CLIENTS.JEDIS.PROTOCOL.COMMAND");
     }
 
     private void copyResult(String resultText) {
