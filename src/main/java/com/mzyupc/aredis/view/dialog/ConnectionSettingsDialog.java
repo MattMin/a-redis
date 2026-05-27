@@ -46,6 +46,9 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
     private static final int RIGHT_SPACER_WIDTH = 170;
     private static final int PORT_SEPARATOR_WIDTH = 6;
     private static final int PORT_FIELD_WIDTH = 52;
+    private static final int DIALOG_WIDTH = 720;
+    private static final int DIALOG_HEIGHT = 540;
+    private static final int SECURITY_TABS_HEIGHT = 280;
     private static final int TEST_RESULT_HEIGHT = 96;
     private static final Icon PASSWORD_VISIBLE_ICON = IconLoader.getIcon("/icons/password-visible.svg", ConnectionSettingsDialog.class);
     private static final Icon PASSWORD_HIDDEN_ICON = IconLoader.getIcon("/icons/password-hidden.svg", ConnectionSettingsDialog.class);
@@ -107,7 +110,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         this.connectionManager = connectionManager;
         this.loadingDecoratorDisposable = Disposer.newDisposable("ConnectionSettingsDialog.loadingDecorator");
         this.setTitle("Connection Settings");
-        this.setSize(720, 460);
+        this.setSize(DIALOG_WIDTH, DIALOG_HEIGHT);
         this.myOKAction = new CustomOKAction();
         this.init();
     }
@@ -287,7 +290,8 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         securityTabs.addTab("Cluster", createTabPanel(clusterModeCheckBox, clusterConfigPanel));
         securityTabs.addTab("SSH Tunnel", createTabPanel(sshTunnelCheckBox, sshTunnelConfigPanel));
         securityTabs.addTab("SSL/TLS", createTabPanel(sslTlsCheckBox, sslConfigPanel));
-        securityTabs.setPreferredSize(new Dimension(0, 320));
+        securityTabs.setPreferredSize(new Dimension(0, SECURITY_TABS_HEIGHT));
+        securityTabs.setMinimumSize(new Dimension(0, SECURITY_TABS_HEIGHT));
 
         centerPanel = new JPanel(new BorderLayout(0, 8));
         centerPanel.add(securityTabs, BorderLayout.CENTER);

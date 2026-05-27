@@ -236,7 +236,7 @@ public class ConnectionManager implements Disposable {
             return;
         }
 
-        TreePath pathForLocation = connectionTree.getPathForLocation(e.getX(), e.getY());
+        TreePath pathForLocation = getPathForPopupLocation(e, connectionTree);
         if (pathForLocation == null) {
             return;
         }
@@ -254,6 +254,24 @@ public class ConnectionManager implements Disposable {
                     .getComponent()
                     .show(connectionTree, e.getX(), e.getY());
         }
+    }
+
+    private TreePath getPathForPopupLocation(MouseEvent e, Tree connectionTree) {
+        TreePath pathForLocation = connectionTree.getPathForLocation(e.getX(), e.getY());
+        if (pathForLocation != null) {
+            return pathForLocation;
+        }
+
+        int row = connectionTree.getClosestRowForLocation(e.getX(), e.getY());
+        if (row < 0) {
+            return null;
+        }
+
+        Rectangle rowBounds = connectionTree.getRowBounds(row);
+        if (rowBounds == null || e.getY() < rowBounds.y || e.getY() >= rowBounds.y + rowBounds.height) {
+            return null;
+        }
+        return connectionTree.getPathForRow(row);
     }
 
     /**
