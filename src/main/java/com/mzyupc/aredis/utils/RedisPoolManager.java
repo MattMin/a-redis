@@ -1106,8 +1106,14 @@ public class RedisPoolManager implements Disposable {
             ScanParams scanParams = new ScanParams();
             scanParams.count(limit);
             scanParams.match(pattern);
-            ScanResult<String> scanResult = jedis.scan(cursor, scanParams);
-            return scanResult.getResult();
+            LinkedHashSet<String> keys = new LinkedHashSet<>();
+            String currentCursor = StringUtils.defaultIfBlank(cursor, ScanParams.SCAN_POINTER_START);
+            do {
+                ScanResult<String> scanResult = jedis.scan(currentCursor, scanParams);
+                keys.addAll(scanResult.getResult());
+                currentCursor = scanResult.getCursor();
+            } while (!StringUtils.equals(currentCursor, ScanParams.SCAN_POINTER_START) && keys.size() < limit);
+            return new ArrayList<>(keys).subList(0, Math.min(keys.size(), limit));
         } catch (Exception e) {
             throw new IllegalArgumentException(e);
         }
