@@ -178,7 +178,7 @@ public class InfoDialog extends DialogWrapper {
 
         String title = StringUtils.trimToEmpty(lines[0]);
         sectionInfo.setTitle(title);
-        sectionInfo.setDisplayTitle(StringUtils.removeStart(title, "# "));
+        sectionInfo.setDisplayTitle(title.startsWith("# ") ? title.substring("# ".length()) : title);
         if (lines.length == 1) {
             sectionInfo.setInfoArray(new String[0][2]);
             return Optional.of(sectionInfo);
@@ -187,7 +187,7 @@ public class InfoDialog extends DialogWrapper {
         List<String[]> rows = new ArrayList<>();
         for (int i = 1; i < lines.length; i++) {
             String line = StringUtils.trimToEmpty(lines[i]);
-            if (StringUtils.isBlank(line) || StringUtils.startsWith(line, "#")) {
+            if (StringUtils.isBlank(line) || line.startsWith("#")) {
                 continue;
             }
             String[] pair = line.split(":", 2);
@@ -284,4 +284,3 @@ public class InfoDialog extends DialogWrapper {
         private String[][] infoArray;
     }
 }
-

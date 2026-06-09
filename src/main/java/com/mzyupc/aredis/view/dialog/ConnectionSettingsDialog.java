@@ -10,6 +10,7 @@ import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.LoadingDecorator;
 import com.intellij.openapi.ui.TextFieldWithBrowseButton;
 import com.intellij.openapi.ui.ValidationInfo;
+import com.intellij.openapi.util.CheckedDisposable;
 import com.intellij.openapi.util.Comparing;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.IconLoader;
@@ -89,7 +90,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
     private final ConnectionInfo connection;
     private final Tree connectionTree;
     private final ConnectionManager connectionManager;
-    private final Disposable loadingDecoratorDisposable;
+    private final CheckedDisposable loadingDecoratorDisposable;
 
     private final Project project;
     private volatile boolean disposed;
@@ -108,7 +109,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         this.connection = connection;
         this.connectionTree = connectionTree;
         this.connectionManager = connectionManager;
-        this.loadingDecoratorDisposable = Disposer.newDisposable("ConnectionSettingsDialog.loadingDecorator");
+        this.loadingDecoratorDisposable = Disposer.newCheckedDisposable("ConnectionSettingsDialog.loadingDecorator");
         this.setTitle("Connection Settings");
         this.setSize(DIALOG_WIDTH, DIALOG_HEIGHT);
         this.myOKAction = new CustomOKAction();
@@ -730,14 +731,14 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         if (testResultLoadingDecorator != null) {
             testResultLoadingDecorator.stopLoading();
         }
-        if (!Disposer.isDisposed(loadingDecoratorDisposable)) {
+        if (!loadingDecoratorDisposable.isDisposed()) {
             Disposer.dispose(loadingDecoratorDisposable);
         }
         super.dispose();
     }
 
     private boolean isDialogDisposed() {
-        return disposed || Disposer.isDisposed(loadingDecoratorDisposable);
+        return disposed || loadingDecoratorDisposable.isDisposed();
     }
 
     /**
@@ -876,7 +877,7 @@ public class ConnectionSettingsDialog extends DialogWrapper implements Disposabl
         if (StringUtils.isBlank(fileName)) {
             return false;
         }
-        return StringUtils.startsWith(fileName, "id_");
+        return fileName.startsWith("id_");
     }
 
     private boolean isGenericSuccessMessage(String message) {
