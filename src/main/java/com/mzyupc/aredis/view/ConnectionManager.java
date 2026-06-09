@@ -24,6 +24,7 @@ import com.mzyupc.aredis.utils.RedisPoolManager;
 import com.mzyupc.aredis.utils.ThreadPoolManager;
 import com.mzyupc.aredis.view.dialog.ConfirmDialog;
 import com.mzyupc.aredis.view.dialog.ConnectionSettingsDialog;
+import com.mzyupc.aredis.view.dialog.ErrorDialog;
 import com.mzyupc.aredis.view.dialog.InfoDialog;
 import com.mzyupc.aredis.view.editor.ConsoleFileSystem;
 import com.mzyupc.aredis.view.editor.ConsoleVirtualFile;
@@ -33,6 +34,7 @@ import com.mzyupc.aredis.view.render.ConnectionTreeCellRenderer;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import com.mzyupc.aredis.vo.DbInfo;
 import com.mzyupc.aredis.vo.Keyspace;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
@@ -45,8 +47,8 @@ import javax.swing.tree.TreePath;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.util.List;
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.CopyOnWriteArraySet;
 
 import static com.mzyupc.aredis.message.ARedisStateChangeListener.AREDIS_STATE_CHANGE_TOPIC;
@@ -55,6 +57,7 @@ import static com.mzyupc.aredis.utils.JTreeUtil.expandTree;
 /**
  * @author mzyupc@163.com
  */
+@Slf4j
 public class ConnectionManager implements Disposable {
     /**
      * connectionId-redisPoolManager
@@ -123,15 +126,9 @@ public class ConnectionManager implements Disposable {
      * 初始化连接
      */
     public void initConnections(Tree connectionTree) {
-        List<ConnectionInfo> connections = propertyUtil.getConnections();
-        for (ConnectionInfo connection : connections) {
-            if (connection != null && StringUtils.isNotEmpty(connection.getId())) {
-                addConnectionToList(connectionTreeModel, connection);
-            }
-        }
-
         connectionTree.setModel(connectionTreeModel);
         connectionTree.setRootVisible(false);
+        loadConnectionsAsync();
     }
 
     /**
@@ -150,14 +147,23 @@ public class ConnectionManager implements Disposable {
         ConnectionManager connectionManager = this;
         connectionTree.addMouseListener(new MouseAdapter() {
             @Override
+            public void mousePressed(MouseEvent e) {
+                super.mousePressed(e);
+                showPopupIfNeeded(e, connectionTree);
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                super.mouseReleased(e);
+                showPopupIfNeeded(e, connectionTree);
+            }
+
+            @Override
             public void mouseClicked(MouseEvent e) {
                 super.mouseClicked(e);
 
-                int x = e.getX();
-                int y = e.getY();
-
-                // connectionTree的双击事件 && 不是右键
-                if (e.getClickCount() == 2 && !e.isMetaDown()) {
+                // connectionTree的双击事件，仅响应鼠标左键双击
+                if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
 
                     // 第一个选中的节点路径
                     TreePath selectionPath = connectionTree.getSelectionPath();
@@ -220,17 +226,52 @@ public class ConnectionManager implements Disposable {
                     }
 
                 }
-
-                if (e.getButton() == MouseEvent.BUTTON3) {
-                    // 获取右键点击所在connectionNodede路径
-                    TreePath pathForLocation = connectionTree.getSelectionPath();
-                    if (pathForLocation != null && pathForLocation.getPathCount() == 2) {
-                        createConnectionPopupMenu(connectionTree, connectionTreeModel, connectionTreeLoadingDecorator).getComponent().show(connectionTree, x, y);
-                    }
-                }
             }
         });
         return connectionTree;
+    }
+
+    private void showPopupIfNeeded(MouseEvent e, Tree connectionTree) {
+        if (!e.isPopupTrigger()) {
+            return;
+        }
+
+        TreePath pathForLocation = getPathForPopupLocation(e, connectionTree);
+        if (pathForLocation == null) {
+            return;
+        }
+
+        connectionTree.setSelectionPath(pathForLocation);
+        if (pathForLocation.getPathCount() == 2) {
+            createConnectionPopupMenu(connectionTree, connectionTreeModel, connectionTreeLoadingDecorator)
+                    .getComponent()
+                    .show(connectionTree, e.getX(), e.getY());
+            return;
+        }
+
+        if (pathForLocation.getPathCount() == 3) {
+            createDbPopupMenu(connectionTree)
+                    .getComponent()
+                    .show(connectionTree, e.getX(), e.getY());
+        }
+    }
+
+    private TreePath getPathForPopupLocation(MouseEvent e, Tree connectionTree) {
+        TreePath pathForLocation = connectionTree.getPathForLocation(e.getX(), e.getY());
+        if (pathForLocation != null) {
+            return pathForLocation;
+        }
+
+        int row = connectionTree.getClosestRowForLocation(e.getX(), e.getY());
+        if (row < 0) {
+            return null;
+        }
+
+        Rectangle rowBounds = connectionTree.getRowBounds(row);
+        if (rowBounds == null || e.getY() < rowBounds.y || e.getY() >= rowBounds.y + rowBounds.height) {
+            return null;
+        }
+        return connectionTree.getPathForRow(row);
     }
 
     /**
@@ -337,19 +378,43 @@ public class ConnectionManager implements Disposable {
     }
 
     public void reloadConnections() {
-        // remove
-        DefaultMutableTreeNode root = (DefaultMutableTreeNode) connectionTreeModel.getRoot();
-        root.removeAllChildren();
-        connectionTreeModel.reload();
+        loadConnectionsAsync();
+    }
 
-        // add
-        List<ConnectionInfo> connections = propertyUtil.getConnections();
-        for (ConnectionInfo connection : connections) {
-            if (connection != null && StringUtils.isNotEmpty(connection.getId())) {
-                addConnectionToList(connectionTreeModel, connection);
-            }
+    private void loadConnectionsAsync() {
+        if (connectionTreeLoadingDecorator != null) {
+            connectionTreeLoadingDecorator.startLoading(false);
         }
 
+        ThreadPoolManager.execute(() -> {
+            try {
+                List<ConnectionInfo> connections = propertyUtil.getConnections();
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    DefaultMutableTreeNode root = (DefaultMutableTreeNode) connectionTreeModel.getRoot();
+                    root.removeAllChildren();
+
+                    for (ConnectionInfo connection : connections) {
+                        if (connection != null && StringUtils.isNotEmpty(connection.getId())) {
+                            addConnectionToList(connectionTreeModel, connection);
+                        }
+                    }
+                    connectionTreeModel.reload();
+
+                    if (connectionTreeLoadingDecorator != null) {
+                        connectionTreeLoadingDecorator.stopLoading();
+                    }
+                });
+            } catch (Exception exception) {
+                log.warn("Failed to load Redis connections", exception);
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    if (connectionTreeLoadingDecorator != null) {
+                        connectionTreeLoadingDecorator.stopLoading();
+                    }
+                    ErrorDialog.show("Failed to load Redis connections: "
+                            + StringUtils.defaultIfBlank(exception.getMessage(), exception.getClass().getSimpleName()));
+                });
+            }
+        });
     }
 
     /**
@@ -439,7 +504,24 @@ public class ConnectionManager implements Disposable {
                 .name(connectionInfo.getName() + "_copy")
                 .url(connectionInfo.getUrl())
                 .port(connectionInfo.getPort())
+                .user(connectionInfo.getUser())
                 .password(connectionInfo.getPassword())
+                .clusterMode(connectionInfo.getClusterMode())
+                .sshTunnel(connectionInfo.getSshTunnel())
+                .tunnelHost(connectionInfo.getTunnelHost())
+                .tunnelPort(connectionInfo.getTunnelPort())
+                .tunnelUser(connectionInfo.getTunnelUser())
+                .tunnelVerifyHostKey(connectionInfo.getTunnelVerifyHostKey())
+                .tunnelPassword(connectionInfo.getTunnelPassword())
+                .tunnelPrivateKeyPath(connectionInfo.getTunnelPrivateKeyPath())
+                .tunnelPassphrase(connectionInfo.getTunnelPassphrase())
+                .sslTls(connectionInfo.getSslTls())
+                .sslTrustAllCertificates(connectionInfo.getSslTrustAllCertificates())
+                .sslVerifyHostname(connectionInfo.getSslVerifyHostname())
+                .sslTruststorePath(connectionInfo.getSslTruststorePath())
+                .sslTruststorePassword(connectionInfo.getSslTruststorePassword())
+                .sslKeystorePath(connectionInfo.getSslKeystorePath())
+                .sslKeystorePassword(connectionInfo.getSslKeystorePassword())
                 .global(connectionInfo.getGlobal())
                 .build();
         addConnectionToList((DefaultTreeModel) connectionTree.getModel(), newConnectionInfo);
@@ -591,31 +673,49 @@ public class ConnectionManager implements Disposable {
         ConsoleAction consoleAction = new ConsoleAction();
         consoleAction.setAction(e -> {
             TreePath selectionPath = connectionTree.getSelectionPath();
-            if (selectionPath == null || selectionPath.getPathCount() != 2) {
+            if (selectionPath == null) {
                 return;
             }
 
-            DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) selectionPath.getPath()[1];
-            ConnectionInfo connectionInfo = (ConnectionInfo) connectionNode.getUserObject();
-
-            // test connection
-            RedisPoolManager redis = getConnectionRedisMap().get(connectionInfo.getId());
-            try (Jedis jedis = redis.getJedis(0)) {
-                if (jedis == null) {
-                    return;
-                }
+            Object[] path = selectionPath.getPath();
+            if (path.length == 2) {
+                DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) path[1];
+                ConnectionInfo connectionInfo = (ConnectionInfo) connectionNode.getUserObject();
+                openConsole(connectionInfo, 0);
+                return;
             }
 
-            // console
-            ConsoleVirtualFile consoleVirtualFile = new ConsoleVirtualFile(
-                    connectionInfo.getName() + "-Console",
-                    project,
-                    connectionInfo,
-                    connectionRedisMap.get(connectionInfo.getId())
-            );
-            ConsoleFileSystem.getInstance(project).openEditor(consoleVirtualFile);
+            if (path.length == 3) {
+                DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) path[1];
+                DefaultMutableTreeNode dbNode = (DefaultMutableTreeNode) path[2];
+                ConnectionInfo connectionInfo = (ConnectionInfo) connectionNode.getUserObject();
+                DbInfo dbInfo = (DbInfo) dbNode.getUserObject();
+                openConsole(connectionInfo, dbInfo.getIndex());
+            }
         });
         return consoleAction;
+    }
+
+    private void openConsole(ConnectionInfo connectionInfo, int dbIndex) {
+        RedisPoolManager redis = getConnectionRedisMap().get(connectionInfo.getId());
+        if (redis == null) {
+            return;
+        }
+
+        try (Jedis jedis = redis.getJedis(dbIndex)) {
+            if (jedis == null) {
+                return;
+            }
+        }
+
+        ConsoleVirtualFile consoleVirtualFile = new ConsoleVirtualFile(
+                connectionInfo.getName() + "-Console",
+                project,
+                connectionInfo,
+                redis,
+                dbIndex
+        );
+        ConsoleFileSystem.getInstance(project).openEditor(consoleVirtualFile);
     }
 
     private InfoAction createInfoAction(Tree connectionTree) {
@@ -629,11 +729,6 @@ public class ConnectionManager implements Disposable {
             DefaultMutableTreeNode connectionNode = (DefaultMutableTreeNode) selectionPath.getPath()[1];
             ConnectionInfo connectionInfo = (ConnectionInfo) connectionNode.getUserObject();
             RedisPoolManager redis = getConnectionRedisMap().get(connectionInfo.getId());
-            try (Jedis jedis = redis.getJedis(0)) {
-                if (jedis == null) {
-                    return;
-                }
-            }
             new InfoDialog(project, redis).show();
         });
         return infoAction;
@@ -684,6 +779,14 @@ public class ConnectionManager implements Disposable {
         actionGroup.add(createInfoAction(connectionTree));
         actionGroup.addSeparator();
         actionGroup.add(createCloseAction(connectionTree, connectionTreeModel));
+        ActionPopupMenu menu = ActionManager.getInstance().createActionPopupMenu(ActionPlaces.POPUP, actionGroup);
+        menu.setTargetComponent(connectionTree);
+        return menu;
+    }
+
+    private ActionPopupMenu createDbPopupMenu(Tree connectionTree) {
+        DefaultActionGroup actionGroup = new DefaultActionGroup();
+        actionGroup.add(createConsoleAction(connectionTree));
         ActionPopupMenu menu = ActionManager.getInstance().createActionPopupMenu(ActionPlaces.POPUP, actionGroup);
         menu.setTargetComponent(connectionTree);
         return menu;

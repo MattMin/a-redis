@@ -1,0 +1,21 @@
+Port 22
+Protocol 2
+PermitRootLogin no
+PasswordAuthentication yes
+PubkeyAuthentication yes
+KbdInteractiveAuthentication no
+ChallengeResponseAuthentication no
+UsePAM no
+AllowUsers tunnel
+AuthorizedKeysFile .ssh/authorized_keys
+AllowTcpForwarding yes
+PermitOpen any
+GatewayPorts no
+X11Forwarding no
+PrintMotd no
+PermitTunnel no
+ClientAliveInterval 60
+ClientAliveCountMax 3
+Subsystem sftp internal-sftp
+PidFile /var/run/sshd.pid
+

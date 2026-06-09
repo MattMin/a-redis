@@ -3,19 +3,16 @@
     <name>Redis Helper</name>
     <vendor email="mzyupc@163.com" url="https://github.com/MattMin">MattMin</vendor>
 
-    <description><![CDATA[Redis Helper is a simple and open source IntelliJ-based Redis plugin for browsing keys, editing values, and managing Redis connections efficiently.
-    <br>
-    <div>
-        A simple and open source IntelliJ-based Redis plugin
-    </div>
-    <div style="white-space:normal; word-break:break-all; width:100%">
+    <description><![CDATA[Redis Helper is an open source IntelliJ-based Redis client for managing connections, browsing keys, editing values, and running Redis commands directly inside your IDE.
+    <br><br>
+    <div style="white-space:normal; word-break:break-word; width:100%">
         <ul>
-            <li>Convenient management of Redis connections</li>
-            <li>Display DB and number of keys</li>
-            <li>Filtering and grouping of keys</li>
-            <li>Support adding, modifying and deleting keys and value</li>
-            <li>Support displaying String, List, Set, ZSet, Hash data formats</li>
-            <li>The value can be formatted as JSON, XML, HTML for display</li>
+            <li>Manage standalone Redis connections, Redis Cluster connections, SSL/TLS connections, and SSH tunnel connections with password or private-key authentication.</li>
+            <li>Browse Redis databases, view key counts, and quickly find keys with filtering and grouping support.</li>
+            <li>Create, edit, rename, delete, and inspect String, List, Set, ZSet, and Hash values.</li>
+            <li>Use the redesigned Redis console with command history, searchable output, re-run support, copy actions, and improved command parsing.</li>
+            <li>Format values as JSON, XML, or HTML for easier reading and editing.</li>
+            <li>Load Redis INFO sections asynchronously and inspect server details without blocking the IDE.</li>
         </ul>
     </div>
     <br>

@@ -1,0 +1,56 @@
+services:
+  redis-tls:
+    image: redis:7.2-alpine
+    container_name: aredis-redis-tls
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    ports:
+      - "6380:6380"
+    volumes:
+      - ./redis/tls/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - ./certs:/certs:ro
+    networks:
+      - aredis-test-net
+
+  redis-mtls:
+    image: redis:7.2-alpine
+    container_name: aredis-redis-mtls
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    ports:
+      - "6381:6381"
+    volumes:
+      - ./redis/mtls/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - ./certs:/certs:ro
+    networks:
+      - aredis-test-net
+
+  redis-private:
+    image: redis:7.2-alpine
+    container_name: aredis-redis-private
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    expose:
+      - "6379"
+    volumes:
+      - ./redis/private/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - aredis-test-net
+
+  ssh-jump:
+    build:
+      context: ./ssh-jump
+    container_name: aredis-ssh-jump
+    depends_on:
+      - redis-private
+    environment:
+      SSH_USER: tunnel
+      SSH_PASSWORD: tunnel-pass
+    ports:
+      - "2222:22"
+    volumes:
+      - ./ssh/client:/authorized_keys:ro
+    networks:
+      - aredis-test-net
+
+networks:
+  aredis-test-net:
+    name: aredis-test-net
+

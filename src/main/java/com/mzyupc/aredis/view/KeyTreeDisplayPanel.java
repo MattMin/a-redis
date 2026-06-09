@@ -1,21 +1,15 @@
 package com.mzyupc.aredis.view;
 
 import com.intellij.ide.CommonActionsManager;
-import com.intellij.openapi.actionSystem.ActionManager;
-import com.intellij.openapi.actionSystem.ActionPlaces;
-import com.intellij.openapi.actionSystem.ActionPopupMenu;
-import com.intellij.openapi.actionSystem.ActionToolbar;
-import com.intellij.openapi.actionSystem.DefaultActionGroup;
+import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.LoadingDecorator;
 import com.intellij.ui.JBSplitter;
 import com.intellij.ui.TreeSpeedSearch;
-import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.treeStructure.Tree;
 import com.intellij.util.containers.Convertor;
-import com.intellij.util.ui.JBUI;
 import com.mzyupc.aredis.action.AddAction;
 import com.mzyupc.aredis.action.ClearAction;
 import com.mzyupc.aredis.action.DeleteAction;
@@ -35,15 +29,10 @@ import lombok.Getter;
 import lombok.SneakyThrows;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.jetbrains.annotations.NotNull;
 import redis.clients.jedis.Jedis;
 
 import javax.swing.*;
-import javax.swing.tree.DefaultMutableTreeNode;
-import javax.swing.tree.DefaultTreeModel;
-import javax.swing.tree.MutableTreeNode;
-import javax.swing.tree.TreeNode;
-import javax.swing.tree.TreePath;
+import javax.swing.tree.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -65,6 +54,21 @@ import static redis.clients.jedis.params.ScanParams.SCAN_POINTER_START;
 @Getter
 public class KeyTreeDisplayPanel extends JPanel {
 
+    private static class KeyTreeRootDisplay {
+        private final Integer dbIndex;
+        private final int displayedKeyCount;
+
+        private KeyTreeRootDisplay(Integer dbIndex, int displayedKeyCount) {
+            this.dbIndex = dbIndex;
+            this.displayedKeyCount = displayedKeyCount;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("DB%s (%s)", dbIndex, displayedKeyCount);
+        }
+    }
+
     private final Tree keyTree;
     private final LoadingDecorator keyDisplayLoadingDecorator;
     private final DbInfo dbInfo;
@@ -81,7 +85,6 @@ public class KeyTreeDisplayPanel extends JPanel {
      * 没有分组过的根节点
      */
     private DefaultMutableTreeNode flatRootNode;
-    private JBLabel pageSizeLabel;
     private List<String> keys;
 
     public KeyTreeDisplayPanel(Project project,
@@ -124,7 +127,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                 int x = e.getX();
                 int y = e.getY();
 
-                if (e.getClickCount() == 2) {
+                if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
                     // 第一个选中的节点路径
                     TreePath selectionPath = keyTree.getSelectionPath();
                     if (selectionPath == null) {
@@ -172,16 +175,12 @@ public class KeyTreeDisplayPanel extends JPanel {
         ActionToolbar actionToolbar = ActionManager.getInstance()
                 .createActionToolbar(ActionPlaces.TOOLBAR, actions, true);
 
-        // key分页panel
-        JPanel keyPagingPanel = createPagingPanel();
-
         // key展示区域 包括key工具栏区域, key树状图区域, key分页区
         keyDisplayPanel = new JPanel(new BorderLayout());
         keyDisplayPanel.setMinimumSize(new Dimension(255, 100));
         actionToolbar.setTargetComponent(keyDisplayPanel);
         keyDisplayPanel.add(actionToolbar.getComponent(), BorderLayout.NORTH);
         keyDisplayPanel.add(keyDisplayLoadingDecorator.getComponent(), BorderLayout.CENTER);
-        keyDisplayPanel.add(keyPagingPanel, BorderLayout.SOUTH);
 
         splitterContainer.setFirstComponent(keyDisplayPanel);
 
@@ -234,18 +233,6 @@ public class KeyTreeDisplayPanel extends JPanel {
     }
 
     /**
-     * key分页panel
-     */
-    @NotNull
-    private JPanel createPagingPanel() {
-        JPanel keyPagingPanel = new JPanel(new BorderLayout());
-        pageSizeLabel = new JBLabel("Displayed key count: " + keys.size());
-        pageSizeLabel.setBorder(JBUI.Borders.emptyLeft(5));
-        keyPagingPanel.add(pageSizeLabel, BorderLayout.NORTH);
-        return keyPagingPanel;
-    }
-
-    /**
      * 渲染keyTree
      */
     @SneakyThrows
@@ -258,7 +245,6 @@ public class KeyTreeDisplayPanel extends JPanel {
                     return null;
                 }
                 dbInfo.setKeyCount(dbSize);
-                flatRootNode = new DefaultMutableTreeNode(dbInfo);
 
                 // redis 查询前pageSize个key
                 if (preparedKeys == null) {
@@ -270,6 +256,8 @@ public class KeyTreeDisplayPanel extends JPanel {
                 } else {
                     keys = preparedKeys;
                 }
+
+                flatRootNode = new DefaultMutableTreeNode(new KeyTreeRootDisplay(dbInfo.getIndex(), keys.size()));
 
                 if (CollectionUtils.isNotEmpty(keys)) {
                     for (String key : keys) {
@@ -283,7 +271,6 @@ public class KeyTreeDisplayPanel extends JPanel {
 
                 EventQueue.invokeLater(() -> {
                     updateKeyTree(groupSymbol);
-                    updatePageLabel();
                     keyDisplayPanel.updateUI();
                 });
             } finally {
@@ -558,10 +545,6 @@ public class KeyTreeDisplayPanel extends JPanel {
             renderKeyTree(parent.getKeyFilter(), parent.getGroupSymbol(), null);
         });
         return refreshAction;
-    }
-
-    private void updatePageLabel() {
-        pageSizeLabel.setText("Displayed key count: " + keys.size());
     }
 
     /**

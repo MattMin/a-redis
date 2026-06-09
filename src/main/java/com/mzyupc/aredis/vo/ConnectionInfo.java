@@ -32,6 +32,42 @@ public class ConnectionInfo {
     @Transient
     private String password;
 
+    private Boolean sshTunnel;
+
+    private String tunnelHost;
+
+    private String tunnelPort;
+
+    private String tunnelUser;
+
+    private Boolean tunnelVerifyHostKey;
+
+    @Transient
+    private String tunnelPassword;
+
+    private String tunnelPrivateKeyPath;
+
+    @Transient
+    private String tunnelPassphrase;
+
+    private Boolean sslTls;
+
+    private Boolean clusterMode;
+
+    private Boolean sslTrustAllCertificates;
+
+    private Boolean sslVerifyHostname;
+
+    private String sslTruststorePath;
+
+    @Transient
+    private String sslTruststorePassword;
+
+    private String sslKeystorePath;
+
+    @Transient
+    private String sslKeystorePassword;
+
     /**
      * 每个db的分组标识
      */
@@ -87,6 +123,74 @@ public class ConnectionInfo {
     @Transient
     public String getPassword() {
         return password;
+    }
+
+    public Boolean getSshTunnel() {
+        return sshTunnel;
+    }
+
+    public String getTunnelHost() {
+        return tunnelHost;
+    }
+
+    public String getTunnelPort() {
+        return tunnelPort;
+    }
+
+    public String getTunnelUser() {
+        return tunnelUser;
+    }
+
+    public Boolean getTunnelVerifyHostKey() {
+        return tunnelVerifyHostKey;
+    }
+
+    @Transient
+    public String getTunnelPassword() {
+        return tunnelPassword;
+    }
+
+    public String getTunnelPrivateKeyPath() {
+        return tunnelPrivateKeyPath;
+    }
+
+    @Transient
+    public String getTunnelPassphrase() {
+        return tunnelPassphrase;
+    }
+
+    public Boolean getSslTls() {
+        return sslTls;
+    }
+
+    public Boolean getClusterMode() {
+        return clusterMode;
+    }
+
+    public Boolean getSslTrustAllCertificates() {
+        return sslTrustAllCertificates;
+    }
+
+    public Boolean getSslVerifyHostname() {
+        return sslVerifyHostname;
+    }
+
+    public String getSslTruststorePath() {
+        return sslTruststorePath;
+    }
+
+    @Transient
+    public String getSslTruststorePassword() {
+        return sslTruststorePassword;
+    }
+
+    public String getSslKeystorePath() {
+        return sslKeystorePath;
+    }
+
+    @Transient
+    public String getSslKeystorePassword() {
+        return sslKeystorePassword;
     }
 
     public Map<Integer, String> getGroupSymbols() {
