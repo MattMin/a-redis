@@ -2,6 +2,7 @@ package com.mzyupc.aredis.utils;
 
 import com.google.common.collect.Lists;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.util.text.StringUtil;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.Session;
 import com.mzyupc.aredis.view.dialog.ErrorDialog;
@@ -404,7 +405,10 @@ public class RedisPoolManager implements Disposable {
     }
 
     private boolean isLocalHost(String host) {
-        return StringUtils.equalsAnyIgnoreCase(StringUtils.trimToEmpty(host), "127.0.0.1", "localhost", "::1");
+        String s1 = StringUtils.trimToEmpty(host);
+        return StringUtil.equalsIgnoreCase(s1, "127.0.0.1")
+                || StringUtil.equalsIgnoreCase(s1, "localhost")
+                || StringUtil.equalsIgnoreCase(s1, "::1");
     }
 
     private String fetchClusterNodeId(String host, int port) {
@@ -484,7 +488,7 @@ public class RedisPoolManager implements Disposable {
         if (left == null || right == null) {
             return false;
         }
-        return StringUtils.equalsIgnoreCase(left.getHost(), right.getHost()) && left.getPort() == right.getPort();
+        return StringUtil.equalsIgnoreCase(left.getHost(), right.getHost()) && left.getPort() == right.getPort();
     }
 
     private static HostAndPort parseClusterNodeEndpoint(String clusterNodeEndpoint) {
@@ -499,7 +503,7 @@ public class RedisPoolManager implements Disposable {
 
         String host;
         String portText;
-        if (StringUtils.startsWith(endpoint, "[")) {
+        if (StringUtil.startsWith(endpoint, "[")) {
             int closingBracketIndex = endpoint.indexOf(']');
             if (closingBracketIndex <= 0 || closingBracketIndex + 2 >= endpoint.length()) {
                 return null;
@@ -754,7 +758,7 @@ public class RedisPoolManager implements Disposable {
     }
 
     private boolean isTrustStorePath(String path) {
-        return StringUtils.equals(path, connectionInfo.getSslTruststorePath());
+        return StringUtil.equals(path, connectionInfo.getSslTruststorePath());
     }
 
     private String getCertificatePasswordFieldName(String path) {
@@ -1088,7 +1092,7 @@ public class RedisPoolManager implements Disposable {
                             ScanResult<String> scanResult = currentNode.scan(currentCursor, scanParams);
                             keys.addAll(scanResult.getResult());
                             currentCursor = scanResult.getCursor();
-                        } while (!StringUtils.equals(currentCursor, ScanParams.SCAN_POINTER_START) && keys.size() < limit);
+                        } while (!StringUtil.equals(currentCursor, ScanParams.SCAN_POINTER_START) && keys.size() < limit);
                         if (keys.size() >= limit) {
                             break;
                         }
@@ -1112,7 +1116,7 @@ public class RedisPoolManager implements Disposable {
                 ScanResult<String> scanResult = jedis.scan(currentCursor, scanParams);
                 keys.addAll(scanResult.getResult());
                 currentCursor = scanResult.getCursor();
-            } while (!StringUtils.equals(currentCursor, ScanParams.SCAN_POINTER_START) && keys.size() < limit);
+            } while (!StringUtil.equals(currentCursor, ScanParams.SCAN_POINTER_START) && keys.size() < limit);
             return new ArrayList<>(keys).subList(0, Math.min(keys.size(), limit));
         } catch (Exception e) {
             throw new IllegalArgumentException(e);
@@ -1338,7 +1342,7 @@ public class RedisPoolManager implements Disposable {
             return -1;
         }
         for (int i = 0; i < values.length; i++) {
-            if (StringUtils.equalsIgnoreCase(values[i], target)) {
+            if (StringUtil.equalsIgnoreCase(values[i], target)) {
                 return i;
             }
         }
@@ -1497,7 +1501,7 @@ public class RedisPoolManager implements Disposable {
 
     private String getClusterInfo(@Nullable String section) throws Exception {
         String normalizedSection = StringUtils.trimToNull(section);
-        if (StringUtils.equalsIgnoreCase(normalizedSection, "keyspace")) {
+        if (StringUtil.equalsIgnoreCase(normalizedSection, "keyspace")) {
             return String.format(CLUSTER_KEYSPACE_SECTION, Optional.ofNullable(dbSize(Protocol.DEFAULT_DATABASE)).orElse(0L));
         }
         return StringUtils.defaultIfBlank(executeOnFirstClusterMaster(node ->

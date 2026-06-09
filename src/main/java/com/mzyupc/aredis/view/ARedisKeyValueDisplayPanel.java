@@ -5,6 +5,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.LoadingDecorator;
 import com.intellij.openapi.ui.Splitter;
+import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.ui.JBSplitter;
 import com.intellij.ui.SearchTextField;
 import com.intellij.ui.components.JBScrollPane;
@@ -212,12 +213,12 @@ public class ARedisKeyValueDisplayPanel extends JPanel implements Disposable {
         String searchKeyword = StringUtils.trimToEmpty(searchTextField.getText());
         keyFilter = buildKeyFilter(searchKeyword);
 
-        if (addToHistory && StringUtils.isNotEmpty(searchKeyword) && !StringUtils.equals(lastHistoryKeyword, searchKeyword)) {
+        if (addToHistory && StringUtils.isNotEmpty(searchKeyword) && !StringUtil.equals(lastHistoryKeyword, searchKeyword)) {
             searchTextField.addCurrentTextToHistory();
             lastHistoryKeyword = searchKeyword;
         }
 
-        if (keyTreeDisplayPanel == null || StringUtils.equals(lastRenderedSearchKeyword, searchKeyword)) {
+        if (keyTreeDisplayPanel == null || StringUtil.equals(lastRenderedSearchKeyword, searchKeyword)) {
             return;
         }
 

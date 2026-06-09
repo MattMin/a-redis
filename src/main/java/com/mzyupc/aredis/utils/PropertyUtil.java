@@ -8,6 +8,7 @@ import com.intellij.ide.passwordSafe.PasswordSafe;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.text.StringUtil;
 import com.mzyupc.aredis.service.ConnectionsService;
 import com.mzyupc.aredis.service.GlobalConnectionsService;
 import com.mzyupc.aredis.vo.ConnectionInfo;
@@ -279,7 +280,7 @@ public class PropertyUtil {
 
     private ConnectionInfo findStoredConnection(String id) {
         for (ConnectionInfo connection : getStoredConnections()) {
-            if (StringUtils.equals(connection.getId(), id)) {
+            if (StringUtil.equals(connection.getId(), id)) {
                 return connection;
             }
         }
