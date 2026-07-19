@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-07-19
+
+### Changed
+- 构建目标升级到 IntelliJ IDEA 2026.2 和 Java 25
+- 替换已废弃的 IntelliJ Platform 和 Apache Commons Lang API, 提升后续版本兼容性
+
+### Fixed
+- 移除旧版 Apache Commons Collections API 调用, 修复 IDEA 2026.2 中 Redis Helper 工具窗口初始化失败的问题
 
 ## [1.3.0] - 2026-05-24
 
@@ -120,6 +128,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - reload connection bug
 - query the number of DBs without using the 'CONFIG GET' command
 - replace Label with Jlabel
+
+[1.4.0]: https://github.com/MattMin/a-redis/releases/tag/1.4.0
 
 [1.3.0]: https://github.com/MattMin/a-redis/releases/tag/1.3.0
 
