@@ -35,7 +35,6 @@ import com.mzyupc.aredis.vo.ConnectionInfo;
 import com.mzyupc.aredis.vo.DbInfo;
 import com.mzyupc.aredis.vo.Keyspace;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 import redis.clients.jedis.Jedis;
@@ -325,7 +324,7 @@ public class ConnectionManager implements Disposable {
     public void removeConnectionFromTree(Tree connectionTree) {
         // 从connectionTree移除元素
         java.util.List<ConnectionInfo> connectionInfoList = getSelectedConnectionAndRemove(connectionTree);
-        if (CollectionUtils.isEmpty(connectionInfoList)) {
+        if (connectionInfoList == null || connectionInfoList.isEmpty()) {
             return;
         }
 
@@ -371,7 +370,7 @@ public class ConnectionManager implements Disposable {
      */
     public void removeEditor(String connectionId, KeyValueDisplayVirtualFile virtualFile) {
         CopyOnWriteArraySet<KeyValueDisplayVirtualFile> keyValueDisplayVirtualFiles = connectionDbEditorMap.get(connectionId);
-        if (CollectionUtils.isEmpty(keyValueDisplayVirtualFiles)) {
+        if (keyValueDisplayVirtualFiles == null || keyValueDisplayVirtualFiles.isEmpty()) {
             return;
         }
         keyValueDisplayVirtualFiles.remove(virtualFile);
@@ -535,7 +534,7 @@ public class ConnectionManager implements Disposable {
      */
     private void closeAllEditor(String connectionId) {
         CopyOnWriteArraySet<KeyValueDisplayVirtualFile> keyValueDisplayVirtualFiles = connectionDbEditorMap.get(connectionId);
-        if (CollectionUtils.isEmpty(keyValueDisplayVirtualFiles)) {
+        if (keyValueDisplayVirtualFiles == null || keyValueDisplayVirtualFiles.isEmpty()) {
             return;
         }
 

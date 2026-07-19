@@ -27,7 +27,6 @@ import com.mzyupc.aredis.vo.FragmentedKey;
 import com.mzyupc.aredis.vo.KeyInfo;
 import lombok.Getter;
 import lombok.SneakyThrows;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import redis.clients.jedis.Jedis;
 
@@ -259,7 +258,7 @@ public class KeyTreeDisplayPanel extends JPanel {
 
                 flatRootNode = new DefaultMutableTreeNode(new KeyTreeRootDisplay(dbInfo.getIndex(), keys.size()));
 
-                if (CollectionUtils.isNotEmpty(keys)) {
+                if (!keys.isEmpty()) {
                     for (String key : keys) {
                         DefaultMutableTreeNode keyNode = new DefaultMutableTreeNode(KeyInfo.builder()
                                 .key(key)
@@ -493,7 +492,7 @@ public class KeyTreeDisplayPanel extends JPanel {
                             DefaultMutableTreeNode selectNode = (DefaultMutableTreeNode) selectionPath.getLastPathComponent();
                             List<String> keys = new ArrayList<>();
                             findDeleteKeys(selectNode, keys, valueDisplayPanel);
-                            if (CollectionUtils.isNotEmpty(keys)) {
+                            if (!keys.isEmpty()) {
                                 try (Jedis jedis = redisPoolManager.getJedis(dbInfo.getIndex())) {
                                     if (jedis != null) {
                                         jedis.del(keys.toArray(new String[]{}));

@@ -13,7 +13,6 @@ import com.mzyupc.aredis.service.ConnectionsService;
 import com.mzyupc.aredis.service.GlobalConnectionsService;
 import com.mzyupc.aredis.vo.ConnectionInfo;
 import com.mzyupc.aredis.vo.DbInfo;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.*;
@@ -87,7 +86,7 @@ public class PropertyUtil {
      */
     public List<ConnectionInfo> getConnectionsOld() {
         List<String> ids = properties.getList(CONNECTION_ID_LIST_KEY);
-        if (CollectionUtils.isEmpty(ids)) {
+        if (ids == null || ids.isEmpty()) {
             return Lists.newArrayList();
         }
 
@@ -165,7 +164,7 @@ public class PropertyUtil {
      */
     public void removeConnectionOld(String id) {
         List<String> ids = properties.getList(CONNECTION_ID_LIST_KEY);
-        if (CollectionUtils.isEmpty(ids)) {
+        if (ids == null || ids.isEmpty()) {
             return;
         }
 

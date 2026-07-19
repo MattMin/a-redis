@@ -580,7 +580,7 @@ public class RedisPoolManager implements Disposable {
         }
         for (int i = 1; i < hostSegments.length; i++) {
             String candidate = StringUtils.trimToNull(hostSegments[i]);
-            if (candidate != null && !StringUtils.contains(candidate, "=")) {
+            if (candidate != null && !candidate.contains("=")) {
                 return candidate;
             }
         }
@@ -697,7 +697,7 @@ public class RedisPoolManager implements Disposable {
 
     private String getKeyStoreType(String path) {
         String lowerCasePath = StringUtils.lowerCase(path);
-        if (StringUtils.endsWithAny(lowerCasePath, ".p12", ".pfx")) {
+        if (endsWithAny(lowerCasePath, ".p12", ".pfx")) {
             return "PKCS12";
         }
         return KeyStore.getDefaultType();
@@ -705,7 +705,7 @@ public class RedisPoolManager implements Disposable {
 
     private boolean isCertificateFile(String path) {
         String lowerCasePath = StringUtils.lowerCase(path);
-        return StringUtils.endsWithAny(lowerCasePath, ".crt", ".cer", ".pem");
+        return endsWithAny(lowerCasePath, ".crt", ".cer", ".pem");
     }
 
     public static boolean isSupportedClientKeystorePath(String path) {
@@ -714,7 +714,7 @@ public class RedisPoolManager implements Disposable {
         }
         String lowerCasePath = StringUtils.lowerCase(path);
         for (String extension : CLIENT_KEYSTORE_EXTENSIONS) {
-            if (StringUtils.endsWith(lowerCasePath, "." + extension)) {
+            if (lowerCasePath.endsWith("." + extension)) {
                 return true;
             }
         }
@@ -734,9 +734,9 @@ public class RedisPoolManager implements Disposable {
 
     private Exception buildKeyStoreLoadException(String path, Exception e) {
         String message = buildDetailedErrorMessage(e);
-        if (StringUtils.containsIgnoreCase(message, "keystore password was incorrect")
-                || StringUtils.containsIgnoreCase(message, "password was incorrect")
-                || StringUtils.containsIgnoreCase(message, "keystore tampered with")) {
+        if (containsIgnoreCase(message, "keystore password was incorrect")
+                || containsIgnoreCase(message, "password was incorrect")
+                || containsIgnoreCase(message, "keystore tampered with")) {
             return new Exception(String.format(
                     "Failed to load %s '%s': keystore password was incorrect. Please check %s.",
                     isTrustStorePath(path) ? "CA truststore" : "client certificate keystore",
@@ -745,7 +745,7 @@ public class RedisPoolManager implements Disposable {
             ), e);
         }
 
-        if (StringUtils.endsWithAny(StringUtils.lowerCase(path), ".p12", ".pfx", ".jks")) {
+        if (endsWithAny(StringUtils.lowerCase(path), ".p12", ".pfx", ".jks")) {
             return new Exception(String.format(
                     "Failed to load %s '%s'. Please check the file format and %s. Details: %s",
                     isTrustStorePath(path) ? "CA truststore" : "client certificate keystore",
@@ -759,6 +759,22 @@ public class RedisPoolManager implements Disposable {
 
     private boolean isTrustStorePath(String path) {
         return StringUtil.equals(path, connectionInfo.getSslTruststorePath());
+    }
+
+    private static boolean endsWithAny(String value, String... suffixes) {
+        if (StringUtils.isEmpty(value) || suffixes == null || suffixes.length == 0) {
+            return false;
+        }
+        for (String suffix : suffixes) {
+            if (suffix != null && value.endsWith(suffix)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean containsIgnoreCase(String value, String searchValue) {
+        return value != null && searchValue != null && StringUtil.containsIgnoreCase(value, searchValue);
     }
 
     private String getCertificatePasswordFieldName(String path) {
@@ -1608,7 +1624,7 @@ public class RedisPoolManager implements Disposable {
 
     private boolean isMasterNode(Jedis node) {
         try {
-            return StringUtils.containsIgnoreCase(node.info("replication"), "role:master");
+            return containsIgnoreCase(node.info("replication"), "role:master");
         } catch (Exception e) {
             log.warn("Failed to determine cluster node role", e);
             return false;
