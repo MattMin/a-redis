@@ -26,8 +26,8 @@ repositories {
 dependencies {
     // 调试插件的 IDEA 版本
     intellijPlatform {
-        intellijIdea("2026.2")
-//        intellijIdea("2024.1.7")
+//        intellijIdea("2026.2")
+        intellijIdea("2024.1.7")
 
         bundledPlugin("com.intellij.java")
 
@@ -54,8 +54,8 @@ dependencies {
 }
 
 patchPluginXml {
-    // 声明插件适用的版本 241.19416.15 (2024.1.7)
-    sinceBuild = '241.19416.15'
+    // 声明插件适用的版本 (2026.2)
+    sinceBuild = '262.8665.258'
     untilBuild = provider { null }
     changeNotes = """
       1.4.0<br>
