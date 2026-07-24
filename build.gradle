@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'com.mzyupc'
-version = '1.3.0'
+version = '1.3.1'
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
@@ -56,7 +56,7 @@ dependencies {
 patchPluginXml {
     // 声明插件适用的版本 241.19416.15 (2024.1.7)
     sinceBuild = '241.19416.15'
-    untilBuild = provider { null }
+    untilBuild = '261.26222.65'
     changeNotes = """
       1.3.0<br>
       <ul>
